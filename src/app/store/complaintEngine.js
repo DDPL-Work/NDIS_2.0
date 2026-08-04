@@ -345,16 +345,21 @@ export const useComplaintEngine = create(
       // Transition complaint state machine
       transitionComplaintState(complaintId, nextState, actorUser, remarks = '', extraData = {}) {
         const now = new Date().toISOString()
+        const current = get().complaints.find((item) => item.id === complaintId)
+        if (!current) return false
+        if (nextState === 'closed' && !['citizen', 'system'].includes(actorUser?.role)) return false
+        // Department resolution always awaits the citizen; a department cannot close.
+        const effectiveState = nextState === 'resolved' ? 'verification_pending' : nextState
         const complaints = get().complaints.map((c) => {
           if (c.id !== complaintId) return c
 
           const updated = {
             ...c,
-            state: nextState,
+            state: effectiveState,
             ...extraData,
           }
 
-          if (nextState === 'resolved') {
+          if (effectiveState === 'verification_pending') {
             updated.resolutionDetails = {
               resolvedAt: now,
               resolvedBy: actorUser.name,
@@ -363,7 +368,7 @@ export const useComplaintEngine = create(
             }
           }
 
-          if (nextState === 'closed') {
+          if (effectiveState === 'closed') {
             updated.closedAt = now
           }
 
@@ -380,9 +385,9 @@ export const useComplaintEngine = create(
           actorName: actorUser?.name || 'System User',
           actorRole: actorUser?.role || 'user',
           departmentId: targetComplaint?.departmentId || 'general',
-          action: `WORKFLOW_TRANSITION_${nextState.toUpperCase()}`,
+          action: `WORKFLOW_TRANSITION_${effectiveState.toUpperCase()}`,
           oldValue: get().complaints.find((c) => c.id === complaintId)?.state,
-          newValue: nextState,
+          newValue: effectiveState,
           location: actorUser?.jurisdiction?.village || 'District Office',
           device: 'NDISP Web Gateway',
         }
@@ -394,7 +399,7 @@ export const useComplaintEngine = create(
           targetRole: 'citizen',
           recipientName: targetComplaint?.citizen?.name || 'Citizen',
           channel: 'portal',
-          message: `Update on Ticket ${complaintId}: Status is now "${nextState.replace(/_/g, ' ').toUpperCase()}". ${remarks ? `Remarks: ${remarks}` : ''}`,
+          message: `Update on Ticket ${complaintId}: Status is now "${effectiveState.replace(/_/g, ' ').toUpperCase()}". ${remarks ? `Remarks: ${remarks}` : ''}`,
           read: false,
           createdAt: now,
           departmentId: targetComplaint?.departmentId,
@@ -405,6 +410,30 @@ export const useComplaintEngine = create(
           auditLogs: [audit, ...s.auditLogs],
           notifications: [notification, ...s.notifications],
         }))
+        return true
+      },
+
+      submitCitizenVerification(complaintId, actorUser, feedback) {
+        const complaint = get().complaints.find((item) => item.id === complaintId)
+        if (!complaint || !['verification_pending', 'resolved'].includes(complaint.state) || actorUser?.role !== 'citizen') return false
+        if (feedback.satisfied) {
+          return get().transitionComplaintState(complaintId, 'closed', actorUser, feedback.comment || 'Citizen accepted the resolution.', { citizenFeedback: { ...feedback, submittedAt: new Date().toISOString(), overallScore: feedback.rating } })
+        }
+        return get().transitionComplaintState(complaintId, 'reopened', actorUser, feedback.reason || 'Citizen requested rework.', { citizenFeedback: { ...feedback, submittedAt: new Date().toISOString() } })
+      },
+
+      escalateCitizenComplaint(complaintId, actorUser, reason) {
+        const complaint = get().complaints.find((item) => item.id === complaintId)
+        const allowed = complaint && (new Date(complaint.slaDueAt) < new Date() || ['verification_pending', 'resolved', 'reopened'].includes(complaint.state))
+        if (!allowed || actorUser?.role !== 'citizen' || !reason) return false
+        return get().transitionComplaintState(complaintId, 'escalated', actorUser, reason, { escalationLevel: 'department_head' })
+      },
+
+      autoCloseCitizenVerifications() {
+        const cutoff = Date.now() - 7 * 24 * 3600 * 1000
+        get().complaints.filter((item) => ['verification_pending', 'resolved'].includes(item.state) && new Date(item.resolutionDetails?.resolvedAt || item.updatedAt || item.createdAt).getTime() < cutoff).forEach((item) => {
+          get().transitionComplaintState(item.id, 'closed', { name: 'Citizen Response Timer', role: 'system' }, 'Auto closed: citizen no response after 7 days.', { closureReason: 'citizen_no_response' })
+        })
       },
 
       // Simulation Engine Functions (Part 16)

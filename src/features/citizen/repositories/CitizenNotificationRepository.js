@@ -1,0 +1,1 @@
+export const CitizenNotificationRepository = { list: (notifications) => notifications.filter((item) => item.targetRole === 'citizen').map((item) => ({ message: item.message, createdAt: item.createdAt })) }

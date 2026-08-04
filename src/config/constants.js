@@ -219,6 +219,7 @@ export const GRIEVANCE_STATE_LABELS = {
 
 // Program 2 — 11-Stage Workflow Engine State Machine (LLD Vol 3 §15.2)
 export const COMPLAINT_WORKFLOW_STATES = [
+  'draft',
   'submitted',
   'assigned',
   'accepted',
@@ -227,6 +228,7 @@ export const COMPLAINT_WORKFLOW_STATES = [
   'work_started',
   'work_completed',
   'verification_pending',
+  'citizen_verified',
   'resolved',
   'citizen_confirmation',
   'closed',
@@ -238,6 +240,7 @@ export const COMPLAINT_WORKFLOW_STATES = [
 ]
 
 export const COMPLAINT_STATE_LABELS = {
+  draft: 'Draft',
   submitted: 'Submitted',
   assigned: 'Assigned to Officer',
   accepted: 'Accepted by Dept',
@@ -246,7 +249,9 @@ export const COMPLAINT_STATE_LABELS = {
   work_started: 'Work Started',
   work_completed: 'Work Completed',
   verification_pending: 'Verification Pending',
-  resolved: 'Resolved',
+  resolved: 'Resolved Awaiting Citizen',
+  verification_pending: 'Resolved Awaiting Citizen',
+  citizen_verified: 'Citizen Verified',
   citizen_confirmation: 'Citizen Verification',
   closed: 'Closed',
   rejected: 'Rejected',
@@ -263,6 +268,8 @@ export const STATUS_TONE = {
   inspection_completed: 'info',
   work_started: 'warning',
   work_completed: 'positive',
+  verification_pending: 'warning',
+  citizen_verified: 'positive',
   verification_pending: 'warning',
   resolved: 'positive',
   citizen_confirmation: 'warning',

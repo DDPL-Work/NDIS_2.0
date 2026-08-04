@@ -1,19 +1,16 @@
 import { useState, useRef, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Check, ArrowRight, ArrowLeft, MapPin, Navigation, Camera, FileText,
-  ShieldCheck, QrCode, Download, Sparkles, AlertCircle, Building2, Eye, EyeOff
+  Check, ArrowRight, ArrowLeft, Navigation, Camera, ShieldCheck, Download, Building2, Eye, EyeOff
 } from 'lucide-react'
 import PageHeader from '../../components/ui/PageHeader'
 import MapView from '../../components/map/MapView'
 import Button from '../../components/ui/Button'
-import Badge from '../../components/ui/Badge'
 import Select from '../../components/ui/Select'
-import StatusBadge from '../../components/ui/StatusBadge'
 import { useAuthStore } from '../../app/store/authStore'
 import { useComplaintEngine } from '../../app/store/complaintEngine'
 import { useUiStore } from '../../app/store/uiStore'
-import { CATEGORY_ROUTING_RULES, DEPARTMENTS, DEPARTMENT_MAP, ADMINISTRATIVE_STRUCTURE, PRIORITY_CONFIG } from '../../config/constants'
+import { CATEGORY_ROUTING_RULES, DEPARTMENT_MAP } from '../../config/constants'
 import { getAllFacilities } from '../../services/mock/facilities'
 import { distanceMeters } from '../../utils/geo'
 
@@ -24,6 +21,12 @@ const WIZARD_STEPS = [
   { id: 4, label: 'Citizen Info' },
   { id: 5, label: 'Review & Submit' },
 ]
+
+const CITIZEN_DEPARTMENTS = [
+  ['water', 'Water & Sanitation (JJM)', 'Handpumps, pipelines, tanks and drinking water'], ['electricity', 'Electricity', 'Street lights, transformers and power supply'], ['health', 'Health & Family Welfare', 'Hospitals, ambulances and public health services'], ['education', 'School Education', 'Schools, classrooms and learning facilities'], ['pwd', 'Roads & Public Works', 'Roads, bridges and public buildings'], ['solar', 'Solar & Renewable Energy', 'Solar panels, batteries and renewable systems'], ['tourism', 'Tourism & Heritage', 'Visitor facilities, heritage sites and signs'], ['urban', 'Urban Local Body', 'Sanitation, drains and public spaces'],
+]
+const ISSUE_CATEGORIES = { water: ['Broken Handpump', 'Pipe Leakage', 'Motor Burnt', 'Water Contamination', 'Low Water Pressure', 'Pipeline Damage', 'Water Tank Overflow', 'Other'], electricity: ['Street Light', 'Transformer', 'Power Failure', 'Electric Pole', 'Electric Wire', 'Meter', 'Other'], health: ['Hospital Cleanliness', 'Medicine Shortage', 'Doctor Absent', 'Oxygen', 'Ambulance', 'Other'], education: ['School Toilet', 'Classroom Damage', 'Furniture', 'Teacher Absent', 'Drinking Water', 'Other'], pwd: ['Pothole', 'Bridge Damage', 'Road Blocked', 'Public Building Damage', 'Other'], solar: ['Solar Panel', 'Battery', 'Controller', 'Power Generation', 'Other'], tourism: ['Tourism Signboard', 'Lighting', 'Visitor Facility', 'Heritage Site', 'Other'], urban: ['Garbage', 'Drain Blockage', 'Sanitation', 'Street Cleaning', 'Other'] }
+const routeFor = (departmentId, category) => CATEGORY_ROUTING_RULES.find((rule) => rule.departmentId === departmentId && rule.categoryName.toLowerCase().includes(category.toLowerCase().split(' ')[0])) || CATEGORY_ROUTING_RULES.find((rule) => rule.departmentId === departmentId) || { categoryId: `${departmentId}_${category.toLowerCase().replace(/\W+/g, '_')}`, categoryName: category, departmentId, defaultPriority: 'medium', slaHours: 24 }
 
 export default function RegisterComplaintWizard() {
   const user = useAuthStore((s) => s.user)
@@ -36,18 +39,19 @@ export default function RegisterComplaintWizard() {
 
   // Step 1 State
   const [categoryId, setCategoryId] = useState(CATEGORY_ROUTING_RULES[0].categoryId)
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState('water')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [priority, setPriority] = useState('high')
 
   // Step 2 Location State
   const [selectedPos, setSelectedPos] = useState([85.4211, 25.0294]) // Rajgir default
-  const [districtId, setDistrictId] = useState('nalanda')
+  const [districtId] = useState('nalanda')
   const [blockId, setBlockId] = useState('silao')
   const [villageName, setVillageName] = useState('Rajgir')
   const [wardName, setWardName] = useState('Ward 02')
-  const [streetAddress, setStreetAddress] = useState('Near Market Chowk')
-  const [nearestLandmark, setNearestLandmark] = useState('Public Bus Stand')
+  const [streetAddress] = useState('Near Market Chowk')
+  const [nearestLandmark] = useState('Public Bus Stand')
   const [isLocating, setIsLocating] = useState(false)
 
   // Step 3 Attachments State
@@ -79,8 +83,6 @@ export default function RegisterComplaintWizard() {
   const selectedRule = useMemo(() => {
     return CATEGORY_ROUTING_RULES.find((r) => r.categoryId === categoryId) || CATEGORY_ROUTING_RULES[0]
   }, [categoryId])
-
-  const targetDept = DEPARTMENT_MAP[selectedRule.departmentId]
 
   // Nearest facility computation
   const nearestFacility = useMemo(() => {
@@ -216,82 +218,15 @@ export default function RegisterComplaintWizard() {
         </div>
       )}
 
-      {/* STEP 1: CATEGORY & DETAILS */}
+      {/* STEP 1: DEPARTMENT, CATEGORY & DETAILS */}
       {!createdTicket && currentStep === 1 && (
         <div className="card p-6 space-y-5 animate-fade-in">
-          <div className="border-b border-ink-100 pb-3">
-            <h3 className="text-[15px] font-semibold text-ink-950">Step 1: Select Defect Category</h3>
-            <p className="text-[12px] text-ink-500">Choose the problem category. Responsible department and SLA target will auto-assign.</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {CATEGORY_ROUTING_RULES.map((rule) => {
-              const dept = DEPARTMENT_MAP[rule.departmentId]
-              const isSelected = categoryId === rule.categoryId
-              return (
-                <button
-                  key={rule.categoryId}
-                  onClick={() => {
-                    setCategoryId(rule.categoryId)
-                    setPriority(rule.defaultPriority)
-                  }}
-                  className={`p-3.5 rounded-xl border text-left flex items-start gap-3 transition-all ${
-                    isSelected ? 'border-saffron-500 bg-saffron-50/40 ring-2 ring-saffron-200' : 'border-ink-200 bg-white hover:border-ink-300'
-                  }`}
-                >
-                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-white mt-0.5" style={{ background: dept?.color || '#546882' }}>
-                    <Building2 size={16} />
-                  </div>
-                  <div>
-                    <h4 className="text-[13px] font-semibold text-ink-900">{rule.categoryName}</h4>
-                    <div className="flex items-center gap-2 mt-1 text-[11px] text-ink-500">
-                      <span>{dept?.label}</span>
-                      <span>·</span>
-                      <span className="font-semibold text-saffron-700">{rule.slaHours}h SLA</span>
-                    </div>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-
-          {/* Auto-Routing Preview Banner */}
-          <div className="p-3.5 rounded-xl bg-ink-50 border border-ink-200 flex items-center justify-between text-[12.5px]">
-            <div className="flex items-center gap-2.5">
-              <Sparkles size={16} className="text-saffron-500" />
-              <div>
-                <span className="font-semibold text-ink-900">Automatic Routing Assigned:</span>
-                <span className="text-ink-600 ml-1.5">{targetDept?.label}</span>
-              </div>
-            </div>
-            <Badge tone="warning">Target SLA: {selectedRule.slaHours} Hours</Badge>
-          </div>
-
-          <div className="space-y-3 pt-2">
-            <div>
-              <label className="block text-[12px] font-semibold text-ink-700 mb-1">Complaint Title</label>
-              <input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder={`e.g. ${selectedRule.categoryName} at ${villageName}`}
-                className="w-full rounded-lg border border-ink-200 px-3 py-2 text-[13px] focus:outline-none focus-visible:ring-2 focus-visible:ring-ink-900/20"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[12px] font-semibold text-ink-700 mb-1">Detailed Description</label>
-              <textarea
-                rows={3}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Describe the issue, duration of failure, and safety hazards if any…"
-                className="w-full rounded-lg border border-ink-200 px-3 py-2 text-[13px] focus:outline-none focus-visible:ring-2 focus-visible:ring-ink-900/20"
-              />
-            </div>
-          </div>
+          <div className="border-b border-ink-100 pb-3"><h3 className="text-[15px] font-semibold text-ink-950">Step 1: Tell us what service needs help</h3><p className="text-[12px] text-ink-500">Select the public-service area and the issue you want to report.</p></div>
+          <div className="space-y-2"><span className="text-[12px] font-semibold text-ink-800">Select service area</span><div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">{CITIZEN_DEPARTMENTS.map(([id, label, summary]) => { const selected = selectedDepartmentId === id; return <button key={id} onClick={() => { const first = ISSUE_CATEGORIES[id][0]; const rule = routeFor(id, first); setSelectedDepartmentId(id); setCategoryId(rule.categoryId); setPriority(rule.defaultPriority) }} className={`p-3.5 rounded-xl border text-left transition-all ${selected ? 'border-saffron-500 bg-saffron-50 ring-2 ring-saffron-100' : 'border-ink-200 hover:border-ink-400 hover:-translate-y-0.5'}`}><div className="flex gap-2.5"><div className="grid h-9 w-9 place-items-center rounded-lg text-white" style={{ background: DEPARTMENT_MAP[id]?.color || '#546882' }}><Building2 size={16}/></div><div><b className="block text-[13px]">{label}</b><span className="text-[11px] text-ink-500 leading-snug block mt-1">{summary}</span></div></div></button> })}</div></div>
+          <div className="space-y-2"><span className="text-[12px] font-semibold text-ink-800">Select issue category</span><div className="flex flex-wrap gap-2">{ISSUE_CATEGORIES[selectedDepartmentId].map((category) => { const rule = routeFor(selectedDepartmentId, category); const selected = categoryId === rule.categoryId; return <button key={category} onClick={() => { setCategoryId(rule.categoryId); setPriority(rule.defaultPriority) }} className={`px-3 py-2 rounded-lg text-[12px] font-semibold border ${selected ? 'bg-ink-900 border-ink-900 text-white' : 'border-ink-200 text-ink-700 hover:bg-ink-50'}`}>{category}</button> })}</div></div>
+          <div className="space-y-3 pt-2"><div><label className="block text-[12px] font-semibold text-ink-700 mb-1">Complaint title</label><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={`e.g. ${selectedRule.categoryName} at ${villageName}`} className="w-full rounded-lg border border-ink-200 px-3 py-2 text-[13px]"/></div><div><label className="block text-[12px] font-semibold text-ink-700 mb-1">Describe the problem</label><textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Tell us what happened and when it started." className="w-full rounded-lg border border-ink-200 px-3 py-2 text-[13px]"/></div></div>
         </div>
       )}
-
       {/* STEP 2: GIS & LOCATION */}
       {!createdTicket && currentStep === 2 && (
         <div className="card p-6 space-y-5 animate-fade-in">
@@ -354,10 +289,6 @@ export default function RegisterComplaintWizard() {
                 />
               </div>
 
-              <div className="p-2.5 rounded-lg bg-sky-50 border border-sky-200 text-sky-900">
-                <span className="font-semibold block text-[11.5px]">Nearest Spatial Facility:</span>
-                <span className="text-[11px] text-sky-800 mt-0.5 block">{nearestFacility}</span>
-              </div>
             </div>
           </div>
         </div>
@@ -391,10 +322,6 @@ export default function RegisterComplaintWizard() {
             ))}
           </div>
 
-          <div className="p-3 bg-leaf-50 border border-leaf-200 rounded-xl text-[12px] text-leaf-800 flex items-center gap-2">
-            <ShieldCheck size={16} className="text-leaf-600 shrink-0" />
-            <span>EXIF Geotag Verification Passed: Photo coordinates match dropped pin location within 50m tolerance.</span>
-          </div>
         </div>
       )}
 
@@ -451,7 +378,7 @@ export default function RegisterComplaintWizard() {
         <div className="card p-6 space-y-5 animate-fade-in">
           <div className="border-b border-ink-100 pb-3">
             <h3 className="text-[15px] font-semibold text-ink-950">Step 5: Review & Submit Complaint</h3>
-            <p className="text-[12px] text-ink-500">Verify details before routing ticket to department queue.</p>
+            <p className="text-[12px] text-ink-500">Please check the details before submitting your complaint.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-[12.5px] p-4 bg-white border border-ink-200 rounded-xl">
@@ -460,16 +387,8 @@ export default function RegisterComplaintWizard() {
               <p className="font-semibold text-ink-900 mt-0.5">{selectedRule.categoryName}</p>
             </div>
             <div>
-              <span className="text-[11px] font-semibold text-ink-400 uppercase">Routing Target</span>
-              <p className="font-semibold text-ink-900 mt-0.5">{targetDept?.label}</p>
-            </div>
-            <div>
               <span className="text-[11px] font-semibold text-ink-400 uppercase">Location</span>
               <p className="font-semibold text-ink-900 mt-0.5">{villageName}, {wardName} ({blockId.toUpperCase()})</p>
-            </div>
-            <div>
-              <span className="text-[11px] font-semibold text-ink-400 uppercase">Priority & SLA</span>
-              <p className="font-semibold text-saffron-600 mt-0.5">{priority.toUpperCase()} ({selectedRule.slaHours}h target)</p>
             </div>
           </div>
         </div>
@@ -494,12 +413,7 @@ export default function RegisterComplaintWizard() {
               <span className="font-bold text-ink-950 bg-white px-2 py-0.5 rounded border border-ink-200">{createdTicket.trackingCode}</span>
             </div>
 
-            {/* Generated Simulated QR Code */}
-            <div className="h-32 w-32 mx-auto bg-white p-2 border border-ink-200 rounded-xl grid place-items-center shadow-xs">
-              <QrCode size={96} className="text-ink-950" />
-            </div>
-
-            <p className="text-[11px] text-ink-400">Scan QR Code or use Tracking Code on Citizen Portal to monitor live resolution workflow.</p>
+            <p className="text-[11px] text-ink-400">Keep this tracking number to follow updates on your complaint.</p>
           </div>
 
           <div className="flex flex-wrap justify-center gap-3 pt-2">

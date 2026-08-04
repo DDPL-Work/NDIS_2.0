@@ -1,69 +1,12 @@
 import { useState } from 'react'
-import { Search, AlertCircle } from 'lucide-react'
-import { workflowApi } from '../../services/api'
-import { Card, CardBody, CardHeader } from '../../components/ui/Card'
+import { AlertCircle, Search } from 'lucide-react'
 import Button from '../../components/ui/Button'
-import Badge from '../../components/ui/Badge'
-import GrievanceTimeline from '../shared/GrievanceTimeline'
-import { DEPARTMENT_MAP } from '../../config/constants'
-import { useI18n } from '../../i18n/i18n'
+import Modal from '../../components/ui/Modal'
+import CitizenComplaintDetail from './CitizenComplaintDetail'
+import { useComplaintEngine } from '../../app/store/complaintEngine'
 
 export default function TrackGrievance() {
-  const { t } = useI18n()
-  const [code, setCode] = useState('')
-  const [result, setResult] = useState(undefined) // undefined = not searched, null = not found
-  const [loading, setLoading] = useState(false)
-
-  async function handleSearch(e) {
-    e.preventDefault()
-    if (!code.trim()) return
-    setLoading(true)
-    try {
-      const found = await workflowApi.trackGrievance(code)
-      setResult(found)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <div className="max-w-2xl mx-auto p-6">
-      <div className="text-center mb-6">
-        <h2 className="text-xl font-display font-semibold text-ink-950">{t('citizen.trackGrievance')}</h2>
-        <p className="text-[13px] text-ink-500 mt-1">Enter the tracking code you received when submitting a grievance.</p>
-      </div>
-
-      <form onSubmit={handleSearch} className="flex gap-2.5">
-        <div className="relative flex-1">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
-          <input
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            placeholder="e.g. NDISP-HE100001"
-            className="w-full rounded-lg border border-ink-200 pl-9 pr-3 py-2.5 text-[13px] kbd-mono focus:outline-none focus-visible:ring-2 focus-visible:ring-ink-900/20"
-          />
-        </div>
-        <Button type="submit" loading={loading}>Track</Button>
-      </form>
-
-      {result === null && (
-        <div className="mt-6 flex items-center gap-2.5 rounded-xl border border-alert-200 bg-alert-50 px-4 py-3 text-[13px] text-alert-600">
-          <AlertCircle size={16} /> No grievance found for that tracking code. Double-check and try again.
-        </div>
-      )}
-
-      {result && (
-        <Card className="mt-6">
-          <CardHeader
-            title={result.title}
-            subtitle={`${DEPARTMENT_MAP[result.departmentId]?.label} · ${result.facilityName}, ${result.village}`}
-            action={<Badge tone="neutral" className="kbd-mono">{result.trackingCode}</Badge>}
-          />
-          <CardBody>
-            <GrievanceTimeline state={result.state} submittedAt={result.submittedAt} slaDueAt={result.slaDueAt} />
-          </CardBody>
-        </Card>
-      )}
-    </div>
-  )
+  const complaints = useComplaintEngine((state) => state.complaints); const [code, setCode] = useState(''); const [result, setResult] = useState(undefined)
+  const search = (event) => { event.preventDefault(); const value = code.trim().toLowerCase(); setResult(complaints.find((item) => [item.trackingCode, item.ticketNumber].filter(Boolean).some((key) => key.toLowerCase() === value)) || null) }
+  return <div className="max-w-2xl mx-auto p-6"><div className="text-center mb-6"><h2 className="text-xl font-display font-semibold">Track Complaint</h2><p className="text-sm text-ink-500 mt-1">Enter the tracking number you received after submitting your complaint.</p></div><form onSubmit={search} className="flex gap-2"><div className="relative flex-1"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400"/><input className="w-full input-field !pl-9 kbd-mono" value={code} onChange={(event) => setCode(event.target.value)} placeholder="Enter tracking number"/></div><Button type="submit">Track</Button></form>{result === null && <p className="mt-5 rounded-xl border border-alert-200 bg-alert-50 p-3 text-sm text-alert-700 flex gap-2"><AlertCircle size={16}/>No complaint found. Please check the tracking number.</p>}{result && <div className="mt-6 card p-4"><span className="text-xs text-ink-400">Tracking number</span><h3 className="font-semibold">{result.title}</h3><p className="text-sm text-ink-600 mt-1">Current update: {result.state === 'verification_pending' ? 'Waiting for your review' : result.state.replace(/_/g, ' ')}</p><Button className="mt-3" onClick={() => setResult({ ...result, open: true })}>View details</Button></div>}<Modal open={Boolean(result?.open)} onClose={() => setResult({ ...result, open: false })} width="max-w-3xl">{result?.open && <CitizenComplaintDetail complaintId={result.id} onClose={() => setResult({ ...result, open: false })}/>}</Modal></div>
 }
