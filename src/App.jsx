@@ -49,10 +49,10 @@ import DepartmentAssetWorkspace from './features/department/workspaces/Departmen
 import DepartmentWorkflowWorkspace from './features/department/workspaces/DepartmentWorkflowWorkspace'
 import DepartmentReportWorkspace from './features/department/workspaces/DepartmentReportWorkspace'
 import DepartmentSettingsWorkspace from './features/department/workspaces/DepartmentSettingsWorkspace'
-import DepartmentProjectsWorkspace from './features/department/workspaces/DepartmentProjectsWorkspace'
 import DepartmentResourceWorkspace from './features/department/workspaces/DepartmentResourceWorkspace'
 import DepartmentWorkforceWorkspace from './features/department/workspaces/DepartmentWorkforceWorkspace'
 import DepartmentPlanningWorkspace from './features/department/workspaces/DepartmentPlanningWorkspace'
+import DepartmentExecutionWorkspace from './features/department/workspaces/DepartmentExecutionWorkspace'
 import { useCan } from './features/department/identity/hooks/useAuthorization'
 
 function useFilteredNav(items) {
@@ -149,7 +149,7 @@ export default function App() {
                 <Route path="planning/funding" element={<DepartmentPage permission="projects.view"><DepartmentPlanningWorkspace view="dashboard" /></DepartmentPage>} />
                 <Route path="planning/analytics" element={<DepartmentPage permission="projects.view"><DepartmentPlanningWorkspace view="dashboard" /></DepartmentPage>} />
                 <Route path="data-upload" element={<DepartmentPage permission="projects.create"><DataUpload /></DepartmentPage>} />
-                <Route path="projects" element={<DepartmentPage permission="projects.view"><DepartmentProjectsWorkspace /></DepartmentPage>} />
+                <Route path="projects" element={<DepartmentPage permission="projects.view"><DepartmentExecutionWorkspace /></DepartmentPage>} />
                 <Route path="inventory" element={<DepartmentPage permission="inventory.view"><DepartmentResourceWorkspace mode="inventory" /></DepartmentPage>} />
                 <Route path="budget" element={<DepartmentPage permission="budget.view"><DepartmentResourceWorkspace mode="budget" /></DepartmentPage>} />
                 <Route path="reports" element={<DepartmentPage permission="reports.view"><DepartmentReportWorkspace /></DepartmentPage>} />

@@ -377,6 +377,9 @@ export const useProjectEngine = create(
       aiRecommendations: [],
       departmentNotifications: [],
       reports: [],
+      executionLogs: [],
+      measurementBooks: [],
+      bills: [],
 
       createProposal: (payload) => {
         const id = `PRP-2026-${String(get().proposals.length + 101).padStart(5, '0')}`
@@ -547,6 +550,22 @@ export const useProjectEngine = create(
         get().transitionProposal(proposalId, 'approved', actorUser, remarks)
         return get().projects.find((project) => project.proposalId === proposalId) || null
       },
+
+      recordDailyProgress: (payload) => set((s) => {
+        const log = { id: `LOG-${Date.now()}`, recordedAt: new Date().toISOString(), photos: [], weather: 'Clear', labour: 0, machinery: '', materials: '', ...payload }
+        return {
+          executionLogs: [log, ...s.executionLogs],
+          projects: s.projects.map((project) => project.id === payload.projectId ? { ...project, progress: Math.max(project.progress || 0, Number(payload.progress || 0)), status: 'execution', currentStage: 'execution' } : project),
+          timelines: [...s.timelines, event('project', payload.projectId, 'DAILY_PROGRESS_RECORDED', `${payload.progress}% progress: ${payload.remarks || 'Site diary updated'}`)],
+        }
+      }),
+      recordMeasurement: (payload) => set((s) => ({ measurementBooks: [{ id: `MB-${Date.now()}`, date: new Date().toISOString().split('T')[0], verified: false, ...payload }, ...s.measurementBooks], timelines: [...s.timelines, event('project', payload.projectId, 'MEASUREMENT_BOOK_ENTRY', payload.workItem)] })),
+      recordBill: (payload) => set((s) => ({ bills: [{ id: `BILL-${Date.now()}`, status: 'pending_verification', createdAt: new Date().toISOString(), ...payload }, ...s.bills], timelines: [...s.timelines, event('project', payload.projectId, 'RUNNING_BILL_SUBMITTED', `${payload.amount} submitted for verification`)] })),
+      completeProject: (projectId, actor, remarks = 'Engineer completion certification recorded.') => set((s) => ({
+        projects: s.projects.map((project) => project.id === projectId ? { ...project, status: 'completed', currentStage: 'asset_handover', progress: 100, completionCertifiedAt: new Date().toISOString() } : project),
+        assets: s.assets.map((asset) => asset.projectId === projectId ? { ...asset, status: 'active', lifecycleState: 'operational', handoverAt: new Date().toISOString() } : asset),
+        timelines: [...s.timelines, event('project', projectId, 'PROJECT_COMPLETED', `${actor?.name || 'Officer'}: ${remarks}`)],
+      })),
 
       createWorkOrder: (woPayload) => {
         const id = `WO-2026-${String(get().workOrders.length + 101).padStart(5, '0')}`
