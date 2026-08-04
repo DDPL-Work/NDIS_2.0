@@ -1,16 +1,20 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../app/store/authStore'
 import { ROLES, ROLE_LABELS } from '../../config/constants'
-import { User, Gavel, ShieldCheck, Building2, Wrench, Globe2, MapPinned } from 'lucide-react'
+import { User, Gavel, ShieldCheck, Building2, Wrench, Globe2, MapPinned, Activity, Eye, ClipboardList } from 'lucide-react'
 import { useI18n } from '../../i18n/i18n'
 
 const ROLE_CARDS = [
-  { role: ROLES.CITIZEN, icon: User, blurb: 'Explore the district map, report issues and track schemes.' },
-  { role: ROLES.DM, icon: Gavel, blurb: 'District-wide visibility, approvals and tasking.' },
-  { role: ROLES.ADM, icon: ShieldCheck, blurb: 'Delegated approvals within assigned sectors.' },
-  { role: ROLES.DEPT_OFFICER, icon: Building2, blurb: 'Manage sector data, respond to directives.' },
-  { role: ROLES.FIELD_ENGINEER, icon: Wrench, blurb: 'Update asset status, geo-tag inspection photos.' },
-  { role: ROLES.STATE_ADMIN, icon: Globe2, blurb: 'Cross-district KPI comparison (Phase 2+).' },
+  { role: ROLES.CITIZEN, icon: User, blurb: 'Register complaints via 5-step wizard, track status & confirm resolution.' },
+  { role: ROLES.DISTRICT_COLLECTOR, icon: Gavel, blurb: 'District Executive command center, SLA leaderboards & AI recommendations.' },
+  { role: ROLES.DM, icon: ShieldCheck, blurb: 'District Magistrate approvals, directive tasking & proposal review.' },
+  { role: ROLES.ADM, icon: Eye, blurb: 'Delegated administrative oversight & sector grievance monitoring.' },
+  { role: ROLES.DEPT_HEAD, icon: Building2, blurb: 'Departmental resource planning, asset schemas & officer tasking.' },
+  { role: ROLES.DEPT_OFFICER, icon: ClipboardList, blurb: 'Manage assigned complaints queue, schedule inspections & resolve.' },
+  { role: ROLES.FIELD_INSPECTOR, icon: Wrench, blurb: 'Field inspector mobile PWA, site geotag validation & evidence upload.' },
+  { role: ROLES.ENGINEER, icon: Activity, blurb: 'Assistant / Executive Engineer job execution & material logging.' },
+  { role: ROLES.SUPERVISOR, icon: ShieldCheck, blurb: 'Field operations supervision & inspection report verification.' },
+  { role: ROLES.STATE_ADMIN, icon: Globe2, blurb: 'State-level cross-district KPI comparison & radar analytics.' },
 ]
 
 export default function LoginPage() {
@@ -32,42 +36,46 @@ export default function LoginPage() {
       <div className="absolute -top-40 -right-40 h-96 w-96 rounded-full bg-saffron-500/20 blur-3xl" />
       <div className="absolute -bottom-32 -left-32 h-96 w-96 rounded-full bg-leaf-500/15 blur-3xl" />
 
-      <div className="relative w-full max-w-4xl">
-        <div className="text-center mb-10">
-          <div className="inline-flex items-center gap-2.5 mb-5">
-            <div className="grid h-11 w-11 place-items-center rounded-xl bg-saffron-500 text-white">
+      <div className="relative w-full max-w-5xl">
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center gap-2.5 mb-3">
+            <div className="grid h-11 w-11 place-items-center rounded-xl bg-saffron-500 text-white shadow-lg">
               <MapPinned size={22} />
             </div>
             <div className="text-left">
-              <p className="font-display text-lg font-semibold text-white tracking-tight leading-none">NDISP</p>
+              <p className="font-display text-lg font-semibold text-white tracking-tight leading-none">NDISP 2.0</p>
               <p className="text-[11px] text-ink-300 leading-none mt-1">National District Infrastructure &amp; Services Portal</p>
             </div>
           </div>
-          <h1 className="font-display text-2xl md:text-3xl font-semibold text-white">{t('login.title', 'Sign in to NDISP')}</h1>
-          <p className="text-ink-300 text-[13.5px] mt-2">{t('login.subtitle')} — Nalanda &amp; Rajgir Pilot, Bihar</p>
+          <h1 className="font-display text-2xl md:text-3xl font-semibold text-white">Program 2: Complaint Management &amp; Simulation Engine</h1>
+          <p className="text-ink-300 text-[13px] mt-1.5">Select a role persona to explore the end-to-end reactive workflow engine (Nalanda &amp; Rajgir Pilot)</p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {ROLE_CARDS.map(({ role, icon: Icon, blurb }) => (
             <button
               key={role}
               onClick={() => handleSelect(role)}
-              className="group text-left rounded-2xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] hover:border-white/20 backdrop-blur px-5 py-5 transition-colors"
+              className="group text-left rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.09] hover:border-saffron-500/50 backdrop-blur px-4 py-3.5 transition-all"
             >
-              <div className="grid h-10 w-10 place-items-center rounded-lg bg-white/10 text-saffron-300 mb-3.5 group-hover:bg-saffron-500 group-hover:text-white transition-colors">
-                <Icon size={18} />
+              <div className="flex items-center gap-3">
+                <div className="grid h-9 w-9 place-items-center rounded-lg bg-white/10 text-saffron-300 group-hover:bg-saffron-500 group-hover:text-white transition-colors shrink-0">
+                  <Icon size={16} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-[13.5px] font-semibold text-white truncate">{ROLE_LABELS[role]}</h3>
+                  <span className="text-[11px] text-saffron-300 font-semibold group-hover:translate-x-0.5 transition-transform inline-block">
+                    Enter Portal →
+                  </span>
+                </div>
               </div>
-              <h3 className="text-[14px] font-semibold text-white">{ROLE_LABELS[role]}</h3>
-              <p className="text-[12px] text-ink-300 mt-1 leading-snug">{blurb}</p>
-              <span className="mt-3 inline-block text-[11.5px] font-semibold text-saffron-300 group-hover:translate-x-0.5 transition-transform">
-                {t('login.continue')} →
-              </span>
+              <p className="text-[11.5px] text-ink-300 mt-2 leading-snug">{blurb}</p>
             </button>
           ))}
         </div>
 
-        <p className="text-center text-[11.5px] text-ink-400 mt-8">
-          Demo build — persona selection stands in for government SSO (OIDC) at pilot. All data shown is illustrative mock data.
+        <p className="text-center text-[11.5px] text-ink-400 mt-6">
+          NDISP Program 2 Specification — JWT claims simulation, 11-stage state machine &amp; reactive simulation engine enabled.
         </p>
       </div>
     </div>

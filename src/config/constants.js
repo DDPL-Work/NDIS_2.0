@@ -1,63 +1,187 @@
 // Central reference data mirroring LLD Vol 1 §7 (Personas), Vol 2 Ch 14 (RBAC),
-// Vol 1 §1.4 (pilot districts) and Vol 3 Ch 16 (Department Modules).
-// Kept as plain config (not code) so new roles/departments/districts don't
-// require touching component logic — same "configuration not code" principle
-// the workflow engine (Vol 3 §15.1) uses.
+// Vol 1 §1.4 (pilot districts) and Vol 3 Ch 15/16 (Workflow & Department Modules).
 
 export const PORTALS = {
   CITIZEN: 'citizen',
   ADMIN: 'admin',
   LINEDEPT: 'linedept',
+  ENGINEER: 'engineer',
 }
 
-// LLD Vol 2 §14.1 Roles
+// LLD Vol 2 §14.1 Expanded Roles (10 Roles)
 export const ROLES = {
   CITIZEN: 'citizen',
-  FIELD_ENGINEER: 'field_engineer',
-  DEPT_OFFICER: 'dept_officer',
-  ADM: 'adm',
+  DISTRICT_COLLECTOR: 'district_collector',
   DM: 'dm',
+  ADM: 'adm',
+  DEPT_HEAD: 'dept_head',
+  DEPT_OFFICER: 'dept_officer',
+  ENGINEER: 'engineer',
+  FIELD_INSPECTOR: 'field_inspector',
+  SUPERVISOR: 'supervisor',
   STATE_ADMIN: 'state_admin',
+  SYSTEM_ADMIN: 'system_admin',
 }
 
 export const ROLE_LABELS = {
   [ROLES.CITIZEN]: 'Citizen',
-  [ROLES.FIELD_ENGINEER]: 'Field Engineer / Data Entry Operator',
-  [ROLES.DEPT_OFFICER]: 'Department Officer',
+  [ROLES.DISTRICT_COLLECTOR]: 'District Collector (Executive)',
+  [ROLES.DM]: 'District Magistrate (DM)',
   [ROLES.ADM]: 'Additional District Magistrate (ADM)',
-  [ROLES.DM]: 'District Collector / DM',
+  [ROLES.DEPT_HEAD]: 'Department Head',
+  [ROLES.DEPT_OFFICER]: 'Department Officer',
+  [ROLES.ENGINEER]: 'Executive / Assistant Engineer',
+  [ROLES.FIELD_INSPECTOR]: 'Field Inspector / Junior Engineer',
+  [ROLES.SUPERVISOR]: 'Field Supervisor',
   [ROLES.STATE_ADMIN]: 'State Admin',
+  [ROLES.SYSTEM_ADMIN]: 'System Administrator',
 }
 
 // Which portal a role lands in after login
 export const ROLE_PORTAL = {
   [ROLES.CITIZEN]: PORTALS.CITIZEN,
-  [ROLES.FIELD_ENGINEER]: PORTALS.LINEDEPT,
-  [ROLES.DEPT_OFFICER]: PORTALS.LINEDEPT,
-  [ROLES.ADM]: PORTALS.ADMIN,
+  [ROLES.DISTRICT_COLLECTOR]: PORTALS.ADMIN,
   [ROLES.DM]: PORTALS.ADMIN,
+  [ROLES.ADM]: PORTALS.ADMIN,
+  [ROLES.DEPT_HEAD]: PORTALS.LINEDEPT,
+  [ROLES.DEPT_OFFICER]: PORTALS.LINEDEPT,
+  [ROLES.ENGINEER]: PORTALS.ENGINEER,
+  [ROLES.FIELD_INSPECTOR]: PORTALS.ENGINEER,
+  [ROLES.SUPERVISOR]: PORTALS.LINEDEPT,
   [ROLES.STATE_ADMIN]: PORTALS.ADMIN,
+  [ROLES.SYSTEM_ADMIN]: PORTALS.ADMIN,
 }
 
 // LLD Vol 1 §1.4 (A5) — six pilot sectors
 export const DEPARTMENTS = [
-  { id: 'health', label: 'Health', color: '#c0392b', accent: 'alert', icon: 'HeartPulse' },
-  { id: 'water', label: 'Water & Sanitation', color: '#1d7ab5', accent: 'sky', icon: 'Droplets' },
-  { id: 'education', label: 'Education', color: '#1f7a54', accent: 'leaf', icon: 'GraduationCap' },
-  { id: 'tourism', label: 'Tourism', color: '#8a4fc0', accent: 'violet', icon: 'Landmark' },
-  { id: 'solar', label: 'Solar Energy', color: '#e07a2c', accent: 'saffron', icon: 'Sun' },
-  { id: 'district_assets', label: 'District Assets', color: '#546882', accent: 'ink', icon: 'Building2' },
+  { id: 'water', label: 'Water & Sanitation (JJM)', color: '#1d7ab5', accent: 'sky', icon: 'Droplets' },
+  { id: 'health', label: 'Health & Family Welfare', color: '#c0392b', accent: 'alert', icon: 'HeartPulse' },
+  { id: 'education', label: 'School Education', color: '#1f7a54', accent: 'leaf', icon: 'GraduationCap' },
+  { id: 'pwd', label: 'Public Works Dept (PWD / Roads)', color: '#546882', accent: 'ink', icon: 'Building2' },
+  { id: 'electricity', label: 'Electricity Board', color: '#e07a2c', accent: 'saffron', icon: 'Zap' },
+  { id: 'urban', label: 'Urban Local Body / Sanitation', color: '#8a4fc0', accent: 'violet', icon: 'Landmark' },
+  { id: 'solar', label: 'Solar & Renewable Energy', color: '#d35400', accent: 'saffron', icon: 'Sun' },
+  { id: 'tourism', label: 'Tourism & Heritage Development', color: '#8e44ad', accent: 'violet', icon: 'Compass' },
 ]
 
 export const DEPARTMENT_MAP = Object.fromEntries(DEPARTMENTS.map((d) => [d.id, d]))
 
-// LLD Vol 1 §1.1 — pilot in Nalanda/Rajgir, Bihar; others locked (Phase 2/3 rollout)
-export const DISTRICTS = [
-  { id: 'nalanda', label: 'Nalanda', state: 'Bihar', center: [85.4434, 25.1372], zoom: 10.4, phase: 'Pilot', population: 2937552 },
-  { id: 'rajgir', label: 'Rajgir (Subdivision)', state: 'Bihar', center: [85.4211, 25.0294], zoom: 12, phase: 'Pilot', population: 405000 },
-  { id: 'patna', label: 'Patna', state: 'Bihar', center: [85.1376, 25.5941], zoom: 10, phase: 'Phase 2', population: 5838465 },
-  { id: 'gaya', label: 'Gaya', state: 'Bihar', center: [84.9994, 24.7955], zoom: 10, phase: 'Phase 2', population: 4391418 },
+// Automatic Routing Rules Table (Category → Responsible Dept)
+export const CATEGORY_ROUTING_RULES = [
+  {
+    categoryId: 'broken_handpump',
+    categoryName: 'Broken Handpump / Borewell Defect',
+    departmentId: 'water',
+    defaultPriority: 'high',
+    slaHours: 24,
+    keywords: ['handpump', 'borewell', 'water', 'pump', 'jjm'],
+  },
+  {
+    categoryId: 'water_leakage',
+    categoryName: 'Piped Water Leakage / Contamination',
+    departmentId: 'water',
+    defaultPriority: 'urgent',
+    slaHours: 12,
+    keywords: ['leakage', 'contamination', 'dirty water', 'pipe'],
+  },
+  {
+    categoryId: 'garbage_accumulation',
+    categoryName: 'Garbage Accumulation / Sanitation',
+    departmentId: 'urban',
+    defaultPriority: 'medium',
+    slaHours: 24,
+    keywords: ['garbage', 'waste', 'trash', 'drain', 'sanitation', 'cleanliness'],
+  },
+  {
+    categoryId: 'street_light_out',
+    categoryName: 'Non-Functional Street Light',
+    departmentId: 'electricity',
+    defaultPriority: 'low',
+    slaHours: 48,
+    keywords: ['street light', 'light', 'dark', 'bulb', 'pole'],
+  },
+  {
+    categoryId: 'power_outage',
+    categoryName: 'Transformer Failure / Power Outage',
+    departmentId: 'electricity',
+    defaultPriority: 'urgent',
+    slaHours: 6,
+    keywords: ['transformer', 'power', 'electricity', 'blackout', 'voltage'],
+  },
+  {
+    categoryId: 'hospital_facility_issue',
+    categoryName: 'Hospital Staff / Oxygen / Facility Issue',
+    departmentId: 'health',
+    defaultPriority: 'high',
+    slaHours: 12,
+    keywords: ['hospital', 'doctor', 'medicine', 'oxygen', 'ambulance', 'phc'],
+  },
+  {
+    categoryId: 'school_infrastructure',
+    categoryName: 'School Infrastructure / Roof / Sanitation',
+    departmentId: 'education',
+    defaultPriority: 'medium',
+    slaHours: 48,
+    keywords: ['school', 'classroom', 'teacher', 'midday meal', 'bench'],
+  },
+  {
+    categoryId: 'road_pothole',
+    categoryName: 'Road Potholes / Damaged Bridge',
+    departmentId: 'pwd',
+    defaultPriority: 'medium',
+    slaHours: 72,
+    keywords: ['road', 'pothole', 'bridge', 'tar', 'highway', 'pmgsy'],
+  },
 ]
+
+// Administrative Hierarchy Structure
+export const ADMINISTRATIVE_STRUCTURE = {
+  state: 'Bihar',
+  districts: [
+    {
+      id: 'nalanda',
+      label: 'Nalanda',
+      center: [85.4434, 25.1372],
+      zoom: 10.4,
+      blocks: [
+        {
+          id: 'silao',
+          label: 'Silao',
+          villages: ['Rajgir', 'Silao Bazar', 'Surajpur', 'Mahadeopur'],
+          wards: ['Ward 01', 'Ward 02', 'Ward 03', 'Ward 04'],
+        },
+        {
+          id: 'biharsharif',
+          label: 'Bihar Sharif',
+          villages: ['Sohsarai', 'Badi Dargah', 'Ramchandrapur', 'Kagzi Mohalla'],
+          wards: ['Ward 05', 'Ward 06', 'Ward 07', 'Ward 08'],
+        },
+        {
+          id: 'harnaut',
+          label: 'Harnaut',
+          villages: ['Cheran', 'Sabait', 'Lohra', 'Poari'],
+          wards: ['Ward 01', 'Ward 02', 'Ward 03'],
+        },
+      ],
+    },
+    {
+      id: 'rajgir',
+      label: 'Rajgir (Subdivision)',
+      center: [85.4211, 25.0294],
+      zoom: 12,
+      blocks: [
+        {
+          id: 'rajgir_block',
+          label: 'Rajgir Block',
+          villages: ['Kund Area', 'Venu Vana', 'Giriak Road', 'Banganga'],
+          wards: ['Ward 01', 'Ward 02', 'Ward 03', 'Ward 04'],
+        },
+      ],
+    },
+  ],
+}
+
+export const DISTRICTS = ADMINISTRATIVE_STRUCTURE.districts
 
 // LLD Vol 3 §15.3 — Proposal → Approval → Budget → Tasking pipeline
 export const PROPOSAL_STATES = [
@@ -82,7 +206,6 @@ export const PROPOSAL_STATE_LABELS = {
   closed: 'Closed',
 }
 
-// LLD Vol 3 §15.2 — Citizen Complaint Workflow
 export const GRIEVANCE_STATES = ['submitted', 'assigned', 'in_progress', 'escalated', 'resolved', 'closed']
 
 export const GRIEVANCE_STATE_LABELS = {
@@ -94,13 +217,71 @@ export const GRIEVANCE_STATE_LABELS = {
   closed: 'Closed',
 }
 
+// Program 2 — 11-Stage Workflow Engine State Machine (LLD Vol 3 §15.2)
+export const COMPLAINT_WORKFLOW_STATES = [
+  'submitted',
+  'assigned',
+  'accepted',
+  'inspection_scheduled',
+  'inspection_completed',
+  'work_started',
+  'work_completed',
+  'verification_pending',
+  'resolved',
+  'citizen_confirmation',
+  'closed',
+  // Re-entrant / Side states:
+  'rejected',
+  'cancelled',
+  'escalated',
+  'reopened',
+]
+
+export const COMPLAINT_STATE_LABELS = {
+  submitted: 'Submitted',
+  assigned: 'Assigned to Officer',
+  accepted: 'Accepted by Dept',
+  inspection_scheduled: 'Inspection Scheduled',
+  inspection_completed: 'Inspection Completed',
+  work_started: 'Work Started',
+  work_completed: 'Work Completed',
+  verification_pending: 'Verification Pending',
+  resolved: 'Resolved',
+  citizen_confirmation: 'Citizen Verification',
+  closed: 'Closed',
+  rejected: 'Rejected',
+  cancelled: 'Cancelled',
+  escalated: 'Escalated to Collector',
+  reopened: 'Reopened by Citizen',
+}
+
 export const STATUS_TONE = {
-  draft: 'neutral', submitted: 'info', under_review: 'info', approved: 'positive',
-  rejected: 'negative', budget_approved: 'positive', tasked: 'info', assigned_to_field: 'info',
-  inspection_scheduled: 'info', inspection_complete: 'positive', completed: 'positive',
-  citizen_feedback_open: 'warning', closed: 'neutral',
-  assigned: 'info', in_progress: 'warning', escalated: 'negative', resolved: 'positive',
-  active: 'positive', inactive: 'neutral', pending: 'warning',
+  submitted: 'info',
+  assigned: 'info',
+  accepted: 'info',
+  inspection_scheduled: 'warning',
+  inspection_completed: 'info',
+  work_started: 'warning',
+  work_completed: 'positive',
+  verification_pending: 'warning',
+  resolved: 'positive',
+  citizen_confirmation: 'warning',
+  closed: 'neutral',
+  rejected: 'negative',
+  cancelled: 'neutral',
+  escalated: 'negative',
+  reopened: 'negative',
+  draft: 'neutral',
+  active: 'positive',
+  inactive: 'neutral',
+  pending: 'warning',
+}
+
+export const PRIORITY_CONFIG = {
+  urgent: { label: 'Urgent', color: '#c0392b', tone: 'negative', defaultSlaHours: 6 },
+  high: { label: 'High', color: '#e07a2c', tone: 'warning', defaultSlaHours: 12 },
+  medium: { label: 'Medium', color: '#1d7ab5', tone: 'info', defaultSlaHours: 24 },
+  low: { label: 'Low', color: '#1f7a54', tone: 'positive', defaultSlaHours: 48 },
 }
 
 export const LANGUAGES = [
@@ -109,6 +290,4 @@ export const LANGUAGES = [
 ]
 
 export const NOTIFICATION_CHANNELS = ['portal', 'sms', 'email']
-
-// LLD Vol 3 §16 — 3 km default deficit radius (configurable per category, §10.4)
 export const DEFAULT_DEFICIT_RADIUS_KM = 3

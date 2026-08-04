@@ -72,9 +72,9 @@ const RECOMMENDATION_TEMPLATES = {
   health: (village) => `Recommend new Health Subcentre near ${village} — population-coverage gap exceeds 3km service radius.`,
   water: (village) => `Recommend recharge structure (percolation tank) near ${village} — groundwater stress + rainfall deficit overlay.`,
   education: (village) => `Recommend school-catchment expansion near ${village} — settlements beyond acceptable travel distance.`,
-  tourism: (village) => `Recommend visitor facility upgrade near ${village} — footfall density exceeds current facility adequacy ratio.`,
-  solar: (village) => `Recommend rooftop solar assessment for government buildings near ${village} — high irradiance, low shadow interference.`,
-  district_assets: (village) => `Recommend road resurfacing priority near ${village} — condition rating and population served both flag high priority.`,
+  urban: (village) => `Recommend visitor facility upgrade near ${village} — footfall density exceeds current facility adequacy ratio.`,
+  electricity: (village) => `Recommend rooftop solar assessment for government buildings near ${village} — high irradiance, low shadow interference.`,
+  pwd: (village) => `Recommend road resurfacing priority near ${village} — condition rating and population served both flag high priority.`,
 }
 
 // LLD Vol 3 §17.5 — rules-based MCDA ranking; every recommendation carries a

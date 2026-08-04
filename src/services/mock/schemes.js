@@ -7,7 +7,7 @@ export const SCHEMES = [
     beneficiariesInDistrict: 184320, status: 'active',
   },
   {
-    id: 'pm-surya-ghar', name: 'PM Surya Ghar: Muft Bijli Yojana', departmentId: 'solar',
+    id: 'pm-surya-ghar', name: 'PM Surya Ghar: Muft Bijli Yojana', departmentId: 'electricity',
     description: 'Rooftop solar subsidy for households and government buildings.',
     eligibility: 'Homeowners and government building custodians with suitable rooftop area.',
     beneficiariesInDistrict: 6410, status: 'active',
@@ -25,13 +25,13 @@ export const SCHEMES = [
     beneficiariesInDistrict: 812, status: 'active',
   },
   {
-    id: 'pmgsy', name: 'Pradhan Mantri Gram Sadak Yojana', departmentId: 'district_assets',
+    id: 'pmgsy', name: 'Pradhan Mantri Gram Sadak Yojana', departmentId: 'pwd',
     description: 'All-weather road connectivity for unconnected habitations.',
     eligibility: 'Habitations above the population threshold without all-weather road access.',
     beneficiariesInDistrict: 96, status: 'active',
   },
   {
-    id: 'swadesh-darshan', name: 'Swadesh Darshan 2.0', departmentId: 'tourism',
+    id: 'swadesh-darshan', name: 'Swadesh Darshan 2.0', departmentId: 'urban',
     description: 'Sustainable and responsible development of tourist circuits.',
     eligibility: 'Heritage sites and circuits nominated under the Buddhist Circuit theme.',
     beneficiariesInDistrict: 14, status: 'active',

@@ -36,8 +36,8 @@ export const FACILITY_SCHEMAS = {
     ],
     attributeFields: ['institution_type', 'board_affiliation', 'student_count', 'teacher_count', 'has_digital_classroom'],
   },
-  tourism: {
-    custodian: 'District Tourism Office, Nalanda',
+  urban: {
+    custodian: 'Urban Local Body, Nalanda',
     categories: [
       { id: 'heritage_site', label: 'Heritage Site', radiusKm: 5, weight: 6 },
       { id: 'museum', label: 'Museum', radiusKm: 5, weight: 2 },
@@ -46,17 +46,17 @@ export const FACILITY_SCHEMAS = {
     ],
     attributeFields: ['site_category', 'visiting_hours', 'entry_fee', 'heritage_protection_status', 'avg_footfall_monthly'],
   },
-  solar: {
-    custodian: 'BREDA (Bihar Renewable Energy Dev. Agency)',
+  electricity: {
+    custodian: 'BREDA / SBPDCL (Bihar Renewable Energy & Power)',
     categories: [
       { id: 'govt_building', label: 'Government Building (Rooftop Candidate)', radiusKm: 2, weight: 10 },
       { id: 'solar_installation', label: 'Solar Installation', radiusKm: 2, weight: 6 },
-      { id: 'solar_park', label: 'Solar Park', radiusKm: 8, weight: 1 },
+      { id: 'solar_park', label: 'Solar Park / Substation', radiusKm: 8, weight: 1 },
     ],
     attributeFields: ['rooftop_area_sqm', 'installed_capacity_kw', 'generation_status', 'subsidy_scheme_id'],
   },
-  district_assets: {
-    custodian: 'District Magistrate Office, Nalanda',
+  pwd: {
+    custodian: 'Public Works Dept / DM Office, Nalanda',
     categories: [
       { id: 'road', label: 'Road Segment', radiusKm: 2, weight: 10 },
       { id: 'govt_building', label: 'Public Building', radiusKm: 2, weight: 8 },

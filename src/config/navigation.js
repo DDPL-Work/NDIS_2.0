@@ -1,37 +1,47 @@
 import { ROLES } from './constants'
 
-// Sidebar nav per portal. `roles: null` = visible to every role allowed in that portal.
+// Navigation strictly tailored to RBAC permissions per persona (Part 2 Requirements)
+
 export const CITIZEN_NAV = [
-  { to: '/citizen', label: 'Explore Map', icon: 'Map', end: true },
-  { to: '/citizen/schemes', label: 'Government Schemes', icon: 'FileText' },
-  { to: '/citizen/grievance/track', label: 'Track a Grievance', icon: 'Search' },
-  { to: '/citizen/reports', label: 'Public Reports', icon: 'FileDown' },
+  { to: '/citizen', label: 'Dashboard', icon: 'LayoutDashboard', end: true },
+  { to: '/citizen/map', label: 'Explore Map', icon: 'Map' },
+  { to: '/citizen/register', label: 'Register Complaint', icon: 'PlusCircle' },
+  { to: '/citizen/complaints', label: 'My Complaints', icon: 'FileText' },
+  { to: '/citizen/track', label: 'Track Complaint', icon: 'Search' },
+  { to: '/citizen/schemes', label: 'Schemes', icon: 'Sparkles' },
+  { to: '/citizen/facilities', label: 'Facilities', icon: 'Building2' },
+  { to: '/citizen/notifications', label: 'Notifications', icon: 'Bell' },
+  { to: '/citizen/profile', label: 'Profile', icon: 'User' },
 ]
 
 export const ADMIN_NAV = [
-  { to: '/admin', label: 'Dashboard', icon: 'LayoutDashboard', end: true },
-  { to: '/admin/situation-matrix', label: 'Situation Matrix', icon: 'Map' },
-  { to: '/admin/approvals', label: 'Approvals', icon: 'ClipboardCheck' },
-  { to: '/admin/tasking', label: 'Tasking', icon: 'Send' },
-  { to: '/admin/recommendations', label: 'GIS Decision Support', icon: 'Sparkles' },
-  { to: '/admin/grievances', label: 'Grievance Oversight', icon: 'AlertTriangle' },
+  { to: '/admin/collector-dashboard', label: 'District Command Center', icon: 'LayoutDashboard', end: true },
+  { to: '/admin/situation-matrix', label: 'District GIS', icon: 'Map' },
+  { to: '/admin/complaints-oversight', label: 'Complaints', icon: 'AlertTriangle' },
+  { to: '/admin/departments-overview', label: 'Departments', icon: 'Building2' },
   { to: '/admin/analytics', label: 'Analytics', icon: 'BarChart2' },
-  { to: '/admin/system-health', label: 'System Health', icon: 'Activity' },
-  { to: '/admin/audit-logs', label: 'Audit Logs', icon: 'ShieldCheck' },
-  { to: '/admin/reports', label: 'Reports & Exports', icon: 'FileDown' },
-  {
-    to: '/admin/state-rollup',
-    label: 'Cross-District KPIs',
-    icon: 'Globe2',
-    roles: [ROLES.STATE_ADMIN],
-  },
+  { to: '/admin/reports', label: 'Reports', icon: 'FileDown' },
+  { to: '/admin/recommendations', label: 'AI Recommendations', icon: 'Sparkles' },
+  { to: '/admin/approvals', label: 'Approvals', icon: 'ClipboardCheck' },
+  { to: '/admin/notifications', label: 'Notifications', icon: 'Bell' },
+  { to: '/admin/state-rollup', label: 'Cross-District KPIs', icon: 'Globe2', roles: [ROLES.STATE_ADMIN] },
 ]
 
 export const LINEDEPT_NAV = [
-  { to: '/linedept', label: 'Department Overview', icon: 'LayoutDashboard', end: true },
-  { to: '/linedept/data-upload', label: 'Data Upload (CSV)', icon: 'UploadCloud' },
-  { to: '/linedept/directives', label: 'Directives Inbox', icon: 'Inbox' },
-  { to: '/linedept/proposals', label: 'Proposals', icon: 'FilePlus2' },
-  { to: '/linedept/field-ops', label: 'Complaints & Inspections', icon: 'Wrench' },
-  { to: '/linedept/schema-config', label: 'Schema Config', icon: 'Settings2' },
+  { to: '/linedept', label: 'Department Dashboard', icon: 'LayoutDashboard', end: true },
+  { to: '/linedept/complaints-queue', label: 'Assigned Complaints', icon: 'Inbox' },
+  { to: '/linedept/gis', label: 'Department GIS', icon: 'Map' },
+  { to: '/linedept/schema-config', label: 'Assets', icon: 'Settings2' },
+  { to: '/linedept/proposals', label: 'Workflow', icon: 'FilePlus2' },
+  { to: '/linedept/data-upload', label: 'CSV Upload', icon: 'UploadCloud' },
+  { to: '/linedept/reports', label: 'Reports', icon: 'FileDown' },
+]
+
+export const ENGINEER_NAV = [
+  { to: '/engineer', label: 'My Jobs', icon: 'Wrench', end: true },
+  { to: '/engineer/today-tasks', label: "Today's Tasks", icon: 'CheckSquare' },
+  { to: '/engineer/navigation', label: 'Navigation', icon: 'Navigation' },
+  { to: '/engineer/inspection', label: 'Inspection Form', icon: 'ClipboardList' },
+  { to: '/engineer/evidence', label: 'Upload Evidence', icon: 'Camera' },
+  { to: '/engineer/offline-sync', label: 'Offline Sync', icon: 'RefreshCw' },
 ]

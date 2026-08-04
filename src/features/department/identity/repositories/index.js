@@ -1,0 +1,7 @@
+export { DepartmentEmployeeRepository } from './DepartmentEmployeeRepository'
+export { RoleRepository } from './RoleRepository'
+export { AttendanceRepository } from './AttendanceRepository'
+export { LeaveRepository } from './LeaveRepository'
+export { PerformanceRepository } from './PerformanceRepository'
+export { AuditRepository } from './AuditRepository'
+export { AuthorizationRepository } from './AuthorizationRepository'

@@ -8,7 +8,7 @@ import { useAuthStore } from '../../app/store/authStore'
 import { useI18n } from '../../i18n/i18n'
 import { useAsync } from '../../hooks/useAsync'
 import { notificationApi } from '../../services/api'
-import { DISTRICTS, DEPARTMENTS, ROLE_LABELS } from '../../config/constants'
+import { DISTRICTS, DEPARTMENTS, ROLE_LABELS, ROLES } from '../../config/constants'
 import { useNavigate } from 'react-router-dom'
 
 function useOutsideClick(ref, onOutside) {
@@ -77,6 +77,8 @@ export default function Topbar({ title, subtitle, showDistrict = true, showDepar
   }, [notifications])
 
   const unreadCount = localNotifs.filter((n) => !n.read).length
+  const canSwitchDepartment = [ROLES.DISTRICT_COLLECTOR, ROLES.DM, ROLES.ADM, ROLES.STATE_ADMIN, ROLES.SYSTEM_ADMIN].includes(user?.role)
+  const currentDepartment = DEPARTMENTS.find((department) => department.id === user?.departmentId)
 
   function handleMarkAllRead() {
     setLocalNotifs((cur) => cur.map((n) => ({ ...n, read: true })))
@@ -103,14 +105,11 @@ export default function Topbar({ title, subtitle, showDistrict = true, showDepar
             <kbd className="font-mono text-[10px] text-ink-400 bg-white px-1.5 py-0.5 rounded border border-ink-200">⌘K</kbd>
           </button>
 
-          {showDepartment && (
-            <Select
-              small
-              value={user?.departmentId}
-              onChange={setDepartment}
-              options={DEPARTMENTS.map((d) => ({ value: d.id, label: d.label }))}
-            />
-          )}
+          {showDepartment && (canSwitchDepartment ? (
+            <Select small value={user?.departmentId} onChange={setDepartment} options={DEPARTMENTS.map((d) => ({ value: d.id, label: d.label }))} />
+          ) : (
+            <Badge tone="info">{currentDepartment?.label || 'Department workspace'}</Badge>
+          ))}
 
           {showDistrict && (
             <div className="hidden md:flex items-center gap-1.5 pl-1">

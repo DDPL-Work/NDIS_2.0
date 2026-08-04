@@ -155,6 +155,9 @@ export default function LineDeptOverview() {
         <Card>
           <CardHeader title="Quick actions" icon={FilePlus2} />
           <CardBody className="space-y-2">
+            <Button as={Link} to={`/department/${dept.id}`} className="w-full justify-center bg-ink-950 text-white hover:bg-ink-900 font-semibold mb-1">
+              Go to Enterprise operations
+            </Button>
             <Button as={Link} to="/linedept/proposals" variant="outline" className="w-full justify-center">Submit new proposal</Button>
             <Button as={Link} to="/linedept/data-upload" variant="outline" className="w-full justify-center">Upload CSV data</Button>
           </CardBody>

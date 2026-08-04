@@ -17,9 +17,9 @@ const PROPOSAL_TITLES = {
   health: ['New Subcentre at {village}', 'Upgrade PHC to CHC — {village}', 'Ambulance deployment for {village} cluster', 'Oxygen supply augmentation — {village}'],
   water: ['New borewell — {village}', 'JJM last-mile connection — {village}', 'Overhead tank capacity upgrade — {village}', 'Water quality remediation — {village}'],
   education: ['New classroom block — {village}', 'Digital classroom rollout — {village}', 'Teacher deployment request — {village}', 'Anganwadi upgrade — {village}'],
-  tourism: ['Heritage buffer fencing — {village}', 'Visitor facilitation centre — {village}', 'Circuit road connectivity — {village}'],
-  solar: ['Rooftop solar assessment — {village} govt building', 'Solar park feasibility — {village}', 'Grid connection for installed capacity — {village}'],
-  district_assets: ['Road resurfacing — {village}', 'Public building repair — {village}', 'Land parcel utilization plan — {village}'],
+  urban: ['Heritage buffer fencing — {village}', 'Visitor facilitation centre — {village}', 'Solid waste management plant — {village}'],
+  electricity: ['Rooftop solar assessment — {village} govt building', 'Solar park feasibility — {village}', 'Grid connection for installed capacity — {village}'],
+  pwd: ['Road resurfacing — {village}', 'Public building repair — {village}', 'Land parcel utilization plan — {village}'],
 }
 
 function guardConditionFor(state) {

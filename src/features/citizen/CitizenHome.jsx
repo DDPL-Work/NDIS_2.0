@@ -1,4 +1,4 @@
-// Citizen Home — GIS facility search, Map Toolbar, Near Me sorting, and walking distance estimates.
+//// Citizen Home — GIS facility search, Map Toolbar, Near Me sorting, and walking distance estimates.
 import { useState, useMemo, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Navigation, Footprints, MapPin } from 'lucide-react'

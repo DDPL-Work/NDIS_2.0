@@ -1,5 +1,5 @@
 // Approvals Page — Vol 3 §15.3 Workflow Approval Pipeline & Delegation Limits.
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { AlertCircle, ShieldAlert, CheckCircle2, FileText, Info } from 'lucide-react'
 import PageHeader from '../../components/ui/PageHeader'
 import Tabs from '../../components/ui/Tabs'
@@ -11,10 +11,11 @@ import Select from '../../components/ui/Select'
 import Badge from '../../components/ui/Badge'
 import WorkflowStepper from '../../components/ui/WorkflowStepper'
 import ProposalTimeline from '../shared/ProposalTimeline'
-import { useAsync } from '../../hooks/useAsync'
-import { workflowApi } from '../../services/api'
 import { useAuthStore } from '../../app/store/authStore'
 import { useUiStore } from '../../app/store/uiStore'
+import { useProjectEngine } from '../../app/store/projectEngine'
+import { ProposalRepository } from '../department/repositories/ProposalRepository'
+import { ProjectCreationService } from '../department/repositories/ProjectCreationService'
 import { DEPARTMENTS, DEPARTMENT_MAP } from '../../config/constants'
 import { formatCurrencyINR, formatDate, formatNumber } from '../../utils/format'
 
@@ -34,19 +35,20 @@ export default function Approvals() {
   const [remarks, setRemarks] = useState('')
   const [busy, setBusy] = useState(false)
 
-  const { data: proposals, loading, refetch } = useAsync(
-    () => workflowApi.listProposals({ districtId: user?.districtId, state: tab === 'all' ? undefined : tab, departmentId: deptFilter === 'all' ? undefined : deptFilter }),
-    [tab, deptFilter, user?.districtId]
-  )
+  const allProposals = useProjectEngine((state) => state.proposals)
+  const proposals = useMemo(() => allProposals.filter((proposal) => {
+    const queueState = ['dm_review', 'collector', 'submitted'].includes(proposal.state) ? 'under_review' : proposal.state
+    return (tab === 'all' || queueState === tab) && (deptFilter === 'all' || proposal.departmentId === deptFilter)
+  }).map((proposal) => ({ ...proposal, requestedAmount: proposal.financialEstimate || 0, submittedAt: proposal.createdAt, village: proposal.gisLocation?.address || '—', submittedBy: proposal.auditTrail?.[0]?.actorName || 'Department Officer', history: proposal.auditTrail || [] })), [allProposals, tab, deptFilter])
 
   async function handleDecision(nextState) {
     setBusy(true)
     try {
-      await workflowApi.transitionProposal(selected.id, nextState, remarks)
+      if (nextState === 'approved') ProjectCreationService.sanction(selected.id, user, remarks)
+      else ProposalRepository.transition(selected.id, nextState, user, remarks)
       pushToast(`Proposal ${selected.id} ${nextState === 'approved' ? 'approved' : 'rejected'}.`, nextState === 'approved' ? 'success' : 'warning')
       setSelected(null)
       setRemarks('')
-      refetch()
     } finally {
       setBusy(false)
     }
@@ -97,7 +99,7 @@ export default function Approvals() {
       </div>
       <div className="p-6">
         <div className="card">
-          {loading ? <div className="p-6 text-[12.5px] text-ink-400">Loading…</div> : <DataTable columns={columns} rows={proposals} onRowClick={setSelected} />}
+          <DataTable columns={columns} rows={proposals} onRowClick={setSelected} />
         </div>
       </div>
 
@@ -107,7 +109,7 @@ export default function Approvals() {
         title={selected?.title}
         width="max-w-2xl"
         footer={
-          selected?.state === 'under_review' ? (
+          ['under_review', 'dm_review', 'collector', 'submitted'].includes(selected?.state) ? (
             <>
               <Button variant="outline" onClick={() => setSelected(null)}>Cancel</Button>
               <Button variant="danger" loading={busy} onClick={() => handleDecision('rejected')}>Reject</Button>

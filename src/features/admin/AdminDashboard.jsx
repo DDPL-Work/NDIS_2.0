@@ -60,9 +60,9 @@ export default function AdminDashboard() {
               {!loadingKpis && (
                 <div className="divide-y divide-ink-50">
                   {kpis.map((k) => {
-                    const dept = DEPARTMENT_MAP[k.departmentId]
+                    const dept = DEPARTMENT_MAP[k.departmentId] || { label: k.departmentId, color: '#1d7ab5', icon: 'Building2' }
                     return (
-                      <div key={k.departmentId} className="flex items-center gap-4 py-3">
+                      <Link key={k.departmentId} to={`/department/${k.departmentId}`} className="flex items-center gap-4 py-3 hover:bg-ink-50 px-2 rounded-xl transition-colors">
                         <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-white" style={{ background: dept.color }}>
                           <Icon name={dept.icon} size={15} />
                         </div>
@@ -74,7 +74,7 @@ export default function AdminDashboard() {
                           <TrendChart data={k.trend} height={40} color={dept.color} />
                         </div>
                         <GapScoreRing score={k.avgGapScore} size={40} strokeWidth={4} />
-                      </div>
+                      </Link>
                     )
                   })}
                 </div>
