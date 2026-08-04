@@ -1,0 +1,66 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: ['./index.html', './src/**/*.{js,jsx}'],
+  theme: {
+    extend: {
+      colors: {
+        ink: {
+          50: '#f4f6f8',
+          100: '#e4e8ed',
+          200: '#c9d2dc',
+          300: '#a3b1c2',
+          400: '#7488a0',
+          500: '#546882',
+          600: '#425268',
+          700: '#374356',
+          800: '#2b3444',
+          900: '#0b3558',
+          950: '#081f33',
+        },
+        saffron: {
+          50: '#fdf4ec',
+          100: '#faE6d1',
+          200: '#f3c99e',
+          300: '#eba966',
+          400: '#e28b3d',
+          500: '#e07a2c',
+          600: '#c05f1c',
+          700: '#984b18',
+          800: '#7a3d18',
+          900: '#653417',
+        },
+        leaf: {
+          50: '#ecf7f1',
+          100: '#d2ecdf',
+          200: '#a6d9c1',
+          300: '#71bf9d',
+          400: '#43a17e',
+          500: '#1f7a54',
+          600: '#186344',
+          700: '#144f38',
+          800: '#123f2e',
+          900: '#0f3427',
+        },
+        alert: {
+          50: '#fdecea',
+          400: '#e0654f',
+          500: '#c0392b',
+          600: '#9c2d21',
+        },
+      },
+      fontFamily: {
+        display: ['"Space Grotesk"', 'sans-serif'],
+        body: ['"Inter"', 'sans-serif'],
+        mono: ['"IBM Plex Mono"', 'monospace'],
+      },
+      boxShadow: {
+        card: '0 1px 2px rgba(11,53,88,0.06), 0 1px 12px rgba(11,53,88,0.05)',
+        popover: '0 8px 30px rgba(11,53,88,0.16)',
+      },
+      borderRadius: {
+        xl2: '1.25rem',
+      },
+    },
+  },
+  plugins: [],
+}

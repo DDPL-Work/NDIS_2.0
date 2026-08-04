@@ -1,0 +1,49 @@
+@import 'maplibre-gl/dist/maplibre-gl.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply antialiased;
+  }
+  body {
+    @apply bg-ink-50 text-ink-900 font-body text-[14px];
+  }
+  h1, h2, h3, h4 {
+    @apply font-display text-ink-950;
+  }
+  ::selection {
+    @apply bg-saffron-200 text-ink-950;
+  }
+  :focus-visible {
+    outline: 2px solid #e07a2c;
+    outline-offset: 2px;
+  }
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #c9d2dc; border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: #a3b1c2; }
+}
+
+@layer components {
+  .card {
+    @apply bg-white border border-ink-100 rounded-xl2 shadow-card;
+  }
+  .eyebrow {
+    @apply text-[11px] font-semibold tracking-[0.12em] uppercase text-ink-400;
+  }
+  .kbd-mono {
+    @apply font-mono text-[12px];
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in { animation: fade-in 0.25s ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
