@@ -4,6 +4,19 @@ export default {
   theme: {
     extend: {
       colors: {
+        royal: {
+          50: '#eef5ff',
+          100: '#dceafe',
+          200: '#bcd6fd',
+          300: '#8db8fa',
+          400: '#5893f5',
+          500: '#2f6ef0',
+          600: '#1d4fd9',
+          700: '#1a3fb0',
+          800: '#17318b',
+          900: '#132a72',
+          950: '#0a1a4a',
+        },
         ink: {
           50: '#f4f6f8',
           100: '#e4e8ed',

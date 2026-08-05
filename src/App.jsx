@@ -4,6 +4,7 @@ import { useAuthStore } from './app/store/authStore'
 import RequireRole from './app/RequireRole'
 import AppShell from './components/layout/AppShell'
 import LoginPage from './features/auth/LoginPage'
+import LandingPage from './features/landing/LandingPage'
 import SimulationControlPanel from './components/ui/SimulationControlPanel'
 
 import { CITIZEN_NAV, ADMIN_NAV, ENGINEER_NAV } from './config/navigation'
@@ -86,7 +87,8 @@ export default function App() {
     <I18nProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<LoginPage />} />
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/login" element={<LoginPage />} />
 
           {/* Citizen Routes */}
           <Route element={<RequireRole roles={[ROLES.CITIZEN]} />}>

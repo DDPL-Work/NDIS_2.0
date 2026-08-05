@@ -6,6 +6,7 @@
 @layer base {
   html {
     @apply antialiased;
+    scroll-behavior: smooth;
   }
   body {
     @apply bg-ink-50 text-ink-900 font-body text-[14px];
