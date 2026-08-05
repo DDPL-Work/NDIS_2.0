@@ -13,6 +13,7 @@ export default function DepartmentLayout() {
   const navItems = useMemo(() => getDepartmentNavigation(can), [can])
 
   return <AppShell
+    theme="royal"
     navItems={navItems}
     portalLabel={dept.label}
     portalIcon={dept.icon || 'Building2'}

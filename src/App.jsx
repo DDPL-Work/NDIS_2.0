@@ -63,12 +63,12 @@ function useFilteredNav(items) {
 
 function CitizenShell() {
   const nav = useFilteredNav(CITIZEN_NAV)
-  return <AppShell navItems={nav} portalLabel="Citizen Portal" portalIcon="User" accentClassName="bg-leaf-600" title="Citizen Portal" subtitle="NDISP Public Services & Complaint Tracking" showDistrict showDepartment={false} />
+  return <AppShell theme="royal" navItems={nav} portalLabel="Citizen Portal" portalIcon="User" accentClassName="bg-leaf-600" title="Citizen Portal" subtitle="NDISP Public Services & Complaint Tracking" showDistrict showDepartment={false} />
 }
 
 function AdminShell() {
   const nav = useFilteredNav(ADMIN_NAV)
-  return <AppShell navItems={nav} portalLabel="Executive Admin" portalIcon="Gavel" accentClassName="bg-ink-900" title="Executive Command Center" subtitle="District Administration & GIS Oversight" showDistrict showDepartment={false} />
+  return <AppShell theme="royal" navItems={nav} portalLabel="Executive Admin" portalIcon="Gavel" accentClassName="bg-ink-900" title="Executive Command Center" subtitle="District Administration & GIS Oversight" showDistrict showDepartment={false} />
 }
 
 function DepartmentPage({ permission, children }) {
@@ -79,7 +79,7 @@ function DepartmentPage({ permission, children }) {
 
 function EngineerShell() {
   const nav = useFilteredNav(ENGINEER_NAV)
-  return <AppShell navItems={nav} portalLabel="Field Inspector" portalIcon="Wrench" accentClassName="bg-sky-600" title="Inspector Mobile Portal" subtitle="Field Operations & Evidence Capture" showDistrict showDepartment />
+  return <AppShell theme="royal" navItems={nav} portalLabel="Field Inspector" portalIcon="Wrench" accentClassName="bg-sky-600" title="Inspector Mobile Portal" subtitle="Field Operations & Evidence Capture" showDistrict showDepartment />
 }
 
 export default function App() {
