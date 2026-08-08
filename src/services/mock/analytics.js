@@ -53,7 +53,6 @@ export function getDistrictSummary(districtId = 'nalanda') {
 
 // LLD Vol 3 §17.4 — Hotspot Detection (kernel density over grievance/outbreak points)
 export function getHotspots(districtId = 'nalanda') {
-  const rng = makeRng(`hotspots-${districtId}`)
   const facilities = getFacilitiesBy({ districtId })
   const byVillage = new Map()
   facilities.forEach((f) => {

@@ -11,28 +11,23 @@ export const MAP_TOOLS = {
 }
 
 export const BASEMAPS = [
-  { id: 'positron', label: 'Light', url: 'https://tiles.openfreemap.org/styles/positron' },
-  { id: 'dark', label: 'Dark', url: 'https://tiles.openfreemap.org/styles/dark' },
-  { id: 'bright', label: 'Bright', url: 'https://tiles.openfreemap.org/styles/bright' },
+  { id: 'osm', label: 'OSM', url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png' },
+  { id: 'dark', label: 'Dark', url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png' },
+  { id: 'bright', label: 'Bright', url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png' },
   {
     id: 'satellite',
     label: 'Satellite',
-    // MapLibre raster-tiles style for Esri World Imagery (no API key needed)
-    url: {
-      version: 8,
-      sources: {
-        satellite: {
-          type: 'raster',
-          tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
-          tileSize: 256,
-          attribution: '© Esri, Maxar, GeoEye, Earthstar Geographics',
-          maxzoom: 19,
-        },
-      },
-      layers: [{ id: 'satellite-layer', type: 'raster', source: 'satellite' }],
-    },
+    // ESRI World Imagery raster tiles (no API key needed)
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
   },
 ]
+
+export function attributionFor(url = '') {
+  if (url.includes('openstreetmap')) return '© OpenStreetMap contributors'
+  if (url.includes('arcgisonline')) return 'Tiles © Esri — Source: Esri, Maxar, GeoEye, Earthstar Geographics'
+  if (url.includes('cartocdn')) return '© CARTO'
+  return ''
+}
 
 export function useMapTools() {
   const [activeTool, setActiveTool] = useState(MAP_TOOLS.NONE)
@@ -41,7 +36,7 @@ export function useMapTools() {
   const [measurePoints, setMeasurePoints] = useState([])   // [[lng,lat], [lng,lat]]
   const [measureDistKm, setMeasureDistKm] = useState(null)
   const [clusterEnabled, setClusterEnabled] = useState(false)
-  const [basemapId, setBasemapId] = useState('positron')
+  const [basemapId, setBasemapId] = useState('osm')
 
   // Activate a tool; toggling same tool deactivates
   const selectTool = useCallback((tool) => {

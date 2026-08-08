@@ -11,13 +11,14 @@ import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
 import { useAsync } from '../../hooks/useAsync'
 import { workflowApi } from '../../services/api'
+import { useComplaintEngine } from '../../app/store/complaintEngine'
 import { useAuthStore } from '../../app/store/authStore'
 import { useUiStore } from '../../app/store/uiStore'
 import { formatDate, daysUntil } from '../../utils/format'
 
 const TABS = [
   { value: 'assigned', label: 'Assigned' },
-  { value: 'in_progress', label: 'In progress' },
+  { value: 'inspection_started', label: 'Inspection' },
   { value: 'resolved', label: 'Resolved' },
   { value: 'closed', label: 'Closed' },
 ]
@@ -25,6 +26,7 @@ const TABS = [
 export default function FieldOps() {
   const user = useAuthStore((s) => s.user)
   const pushToast = useUiStore((s) => s.pushToast)
+  const transitionComplaintState = useComplaintEngine((s) => s.transitionComplaintState)
   const [tab, setTab] = useState('assigned')
   const [selected, setSelected] = useState(null)
 
@@ -71,10 +73,18 @@ export default function FieldOps() {
   }
 
   async function updateStatus(next) {
+    if (!selected) return
     setBusy(true)
     try {
-      selected.state = next // demo mutation on in-memory mock object
-      pushToast(`Grievance ${selected.trackingCode} updated to ${next.replace('_', ' ')}.`, 'success')
+      const ok = await transitionComplaintState(
+        selected.id,
+        next,
+        user,
+        next === 'inspection_started'
+          ? 'Field work commenced at site by department staff.'
+          : 'Inspection and field work completed; forwarded for resolution review.'
+      )
+      if (ok) pushToast(`Grievance ${selected.trackingCode} moved to ${next.replace(/_/g, ' ')}.`, 'success')
       setSelected(null)
       clearPhoto()
       refetch()
@@ -136,11 +146,11 @@ export default function FieldOps() {
               Close
             </Button>
             {selected?.state === 'assigned' && (
-              <Button icon={Wrench} loading={busy} onClick={() => updateStatus('in_progress')}>
+              <Button icon={Wrench} loading={busy} onClick={() => updateStatus('inspection_started')}>
                 Start work
               </Button>
             )}
-            {selected?.state === 'in_progress' && (
+            {selected?.state === 'inspection_started' && (
               <Button
                 icon={CheckCircle2}
                 loading={busy}
@@ -164,7 +174,7 @@ export default function FieldOps() {
               Location: <strong className="text-ink-800">{selected.facilityName}, {selected.village}</strong>
             </p>
 
-            {selected.state === 'in_progress' && (
+            {selected.state === 'inspection_started' && (
               <div className="space-y-3 pt-2 border-t border-ink-100">
                 <label className="block text-[12px] font-semibold text-ink-800">
                   Geo-tagged Photo Verification (Required to resolve)

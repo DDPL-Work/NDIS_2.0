@@ -1,4 +1,3 @@
-@import 'maplibre-gl/dist/maplibre-gl.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -30,6 +29,9 @@
   .card {
     @apply bg-white border border-ink-100 rounded-xl2 shadow-card;
   }
+  .input-field {
+    @apply w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-[13px] text-ink-900 placeholder:text-ink-400 focus:border-ink-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink-900/20;
+  }
   .eyebrow {
     @apply text-[11px] font-semibold tracking-[0.12em] uppercase text-ink-400;
   }
@@ -43,6 +45,10 @@
   to { opacity: 1; transform: translateY(0); }
 }
 .animate-fade-in { animation: fade-in 0.25s ease-out; }
+
+/* Keep Leaflet panes within the map stacking context.  React map controls
+   and the citizen sidebar/legend deliberately sit above this surface. */
+.leaflet-container { z-index: 0; }
 
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }

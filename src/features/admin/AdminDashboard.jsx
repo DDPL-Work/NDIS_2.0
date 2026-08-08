@@ -21,7 +21,15 @@ export default function AdminDashboard() {
   const districtId = user?.districtId || 'nalanda'
   const district = DISTRICTS.find((d) => d.id === districtId)
 
-  const { data: summary, loading: loadingSummary } = useAsync(() => analyticsApi.getDistrictSummary(districtId), [districtId])
+  const { data: summaryRaw, loading: loadingSummary } = useAsync(() => analyticsApi.getDistrictSummary(districtId), [districtId])
+  const summary = {
+    totalFacilities: summaryRaw?.totalFacilities ?? summaryRaw?.total_facilities ?? 0,
+    geoTaggedPct: summaryRaw?.geoTaggedPct ?? summaryRaw?.geo_tagged_pct ?? 0,
+    avgGapScore: summaryRaw?.avgGapScore ?? summaryRaw?.avg_gap_score ?? 0,
+    approvalCycleDays: summaryRaw?.approvalCycleDays ?? summaryRaw?.approval_cycle_days ?? 0,
+    grievanceClosureSlaPct: summaryRaw?.grievanceClosureSlaPct ?? summaryRaw?.grievance_closure_sla_pct ?? 0,
+    uptime: summaryRaw?.uptime ?? summaryRaw?.uptime_pct ?? 0,
+  }
   const { data: kpis, loading: loadingKpis } = useAsync(() => analyticsApi.getDepartmentKpis(districtId), [districtId])
   const { data: proposals } = useAsync(() => workflowApi.listProposals({ districtId, state: 'under_review' }), [districtId])
   const { data: recommendations } = useAsync(() => analyticsApi.getRecommendations(districtId), [districtId])

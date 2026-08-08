@@ -5,6 +5,7 @@ import RequireRole from './app/RequireRole'
 import AppShell from './components/layout/AppShell'
 import LoginPage from './features/auth/LoginPage'
 import SimulationControlPanel from './components/ui/SimulationControlPanel'
+import AuthBootstrap from './app/AuthBootstrap'
 
 import { CITIZEN_NAV, ADMIN_NAV, ENGINEER_NAV } from './config/navigation'
 import { ROLES } from './config/constants'
@@ -85,6 +86,7 @@ export default function App() {
   return (
     <I18nProvider>
       <BrowserRouter>
+        <AuthBootstrap>
         <Routes>
           <Route path="/" element={<LoginPage />} />
 
@@ -95,7 +97,7 @@ export default function App() {
               <Route path="map" element={<CitizenHome />} />
               <Route path="register" element={<RegisterComplaintWizard />} />
               <Route path="complaints" element={<CitizenDashboard />} />
-              <Route path="facility/:id" element={<FacilityDetail />} />
+              <Route path="facility/:slug" element={<FacilityDetail />} />
               <Route path="report/:facilityId?" element={<ReportIssue />} />
               <Route path="track" element={<TrackGrievance />} />
               <Route path="schemes" element={<Schemes />} />
@@ -112,6 +114,7 @@ export default function App() {
               <Route index element={<DistrictCommandPlatform />} />
               <Route path="collector-dashboard" element={<DistrictCommandPlatform />} />
               <Route path="situation-matrix" element={<SituationMatrix />} />
+              <Route path="gis-map" element={<CitizenHome />} />
               <Route path="complaints-oversight" element={<GrievanceOversight />} />
               <Route path="departments-overview" element={<AdminDashboard />} />
               <Route path="approvals" element={<Approvals />} />
@@ -133,6 +136,7 @@ export default function App() {
               <Route element={<DepartmentLayout />}>
                 <Route index element={<DepartmentDashboardWorkspace />} />
                 <Route path="dashboard" element={<DepartmentDashboardWorkspace />} />
+                <Route path="gis-map" element={<CitizenHome />} />
                 <Route path="complaints" element={<DepartmentPage permission="complaints.view"><DepartmentOfficerQueue /></DepartmentPage>} />
                 <Route path="complaints-queue" element={<Navigate to="/linedept/complaints" replace />} />
                 <Route path="gis" element={<DepartmentPage permission="gis.view"><DepartmentGisWorkspace /></DepartmentPage>} />
@@ -172,6 +176,7 @@ export default function App() {
               <Route index element={<EngineerPortal />} />
               <Route path="today-tasks" element={<EngineerPortal />} />
               <Route path="navigation" element={<EngineerPortal />} />
+              <Route path="gis-map" element={<CitizenHome />} />
               <Route path="inspection" element={<EngineerPortal />} />
               <Route path="evidence" element={<EngineerPortal />} />
               <Route path="offline-sync" element={<EngineerPortal />} />
@@ -194,7 +199,8 @@ export default function App() {
         </Routes>
 
         {/* Global Reactive Simulation Engine Control Panel Overlay */}
-        <SimulationControlPanel />
+        {/* <SimulationControlPanel /> */}
+        </AuthBootstrap>
       </BrowserRouter>
     </I18nProvider>
   )

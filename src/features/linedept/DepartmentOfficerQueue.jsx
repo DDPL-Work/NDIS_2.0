@@ -1,7 +1,7 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   Inbox, CheckCircle2, AlertTriangle, Clock, MapPin, Search, Filter, Layers,
-  ChevronRight, Building2, User, Flame, ArrowRight
+  ChevronRight, Building2, User, Flame, ArrowRight, RefreshCw
 } from 'lucide-react'
 import PageHeader from '../../components/ui/PageHeader'
 import StatCard from '../../components/ui/StatCard'
@@ -24,6 +24,9 @@ export default function DepartmentOfficerQueue() {
   const dept = DEPARTMENT_MAP[deptId] || DEPARTMENT_MAP.water
 
   const complaints = useComplaintEngine((s) => s.complaints)
+  const hydrationStatus = useComplaintEngine((s) => s.hydrationStatus)
+  const hydrate = useComplaintEngine((s) => s.hydrate)
+  const refresh = useComplaintEngine((s) => s.refresh)
 
   const [query, setQuery] = useState('')
   const [priorityFilter, setPriorityFilter] = useState('all')
@@ -31,10 +34,17 @@ export default function DepartmentOfficerQueue() {
   const [selectedComplaintId, setSelectedComplaintId] = useState(null)
   const [viewMode, setViewMode] = useState('queue') // 'queue' | 'gis'
 
-  // Filter department complaints
-  const deptComplaints = useMemo(() => {
-    return complaints.filter((c) => c.departmentId === deptId || user?.role === 'dm' || user?.role === 'district_collector')
-  }, [complaints, deptId, user?.role])
+  // Re-hydrate whenever the signed-in user becomes available so the role-scoped
+  // backend list (GET /api/complaints/) populates the queue after login.
+  useEffect(() => {
+    if (user && hydrationStatus === 'error') hydrate()
+  }, [user, hydrationStatus, hydrate])
+
+  // Backend already returns exactly the complaints visible to the logged-in
+  // role (Department Head / Department Officer / Executive Engineer).  We must
+  // NOT filter by department client-side — doing so would empty the queue for
+  // roles whose department slug resolution differs from the backend's.
+  const deptComplaints = complaints
 
   const filtered = useMemo(() => {
     return deptComplaints.filter((c) => {
@@ -45,6 +55,7 @@ export default function DepartmentOfficerQueue() {
         return (
           c.title.toLowerCase().includes(q) ||
           c.id.toLowerCase().includes(q) ||
+          c.trackingCode?.toLowerCase().includes(q) ||
           c.location.village.toLowerCase().includes(q)
         )
       }
@@ -57,11 +68,11 @@ export default function DepartmentOfficerQueue() {
     const now = Date.now()
     return {
       assignedToday: deptComplaints.filter((c) => new Date(c.createdAt).getTime() > now - 24 * 3600 * 1000).length,
-      pending: deptComplaints.filter((c) => ['submitted', 'assigned', 'accepted'].includes(c.state)).length,
-      inProgress: deptComplaints.filter((c) => ['inspection_scheduled', 'inspection_completed', 'work_started'].includes(c.state)).length,
+      pending: deptComplaints.filter((c) => ['submitted', 'assigned', 'accepted', 'reopened', 'transferred'].includes(c.state)).length,
+      inProgress: deptComplaints.filter((c) => ['inspection_started', 'evidence_uploaded'].includes(c.state)).length,
       resolved: deptComplaints.filter((c) => ['resolved', 'closed'].includes(c.state)).length,
       escalated: deptComplaints.filter((c) => c.state === 'escalated').length,
-      slaBreached: deptComplaints.filter((c) => new Date(c.slaDueAt).getTime() < now && !['resolved', 'closed'].includes(c.state)).length,
+      slaBreached: deptComplaints.filter((c) => c.slaDueAt && new Date(c.slaDueAt).getTime() < now && !['resolved', 'closed'].includes(c.state)).length,
     }
   }, [deptComplaints])
 
@@ -70,21 +81,23 @@ export default function DepartmentOfficerQueue() {
     { key: 'title', label: 'Complaint Title', render: (r) => <span className="font-semibold text-ink-900">{r.title}</span> },
     { key: 'village', label: 'Location', render: (r) => `${r.location.village}, ${r.location.ward}` },
     { key: 'priority', label: 'Priority', render: (r) => <Badge tone={r.priority === 'urgent' || r.priority === 'high' ? 'warning' : 'info'}>{r.priority.toUpperCase()}</Badge> },
-    { key: 'sla', label: 'SLA Due', render: (r) => <span className="font-mono text-[11.5px]">{formatDateTime(r.slaDueAt)}</span> },
+    { key: 'sla', label: 'SLA Due', render: (r) => <span className="font-mono text-[11.5px]">{r.slaDueAt ? formatDateTime(r.slaDueAt) : '—'}</span> },
     { key: 'state', label: 'Status', render: (r) => <StatusBadge status={r.state} /> },
   ]
 
   // Map view points
   const mapFacilities = useMemo(() => {
-    return filtered.map((c) => ({
-      id: c.id,
-      name: c.title,
-      departmentId: c.departmentId,
-      categoryLabel: c.categoryName,
-      status: c.state === 'resolved' || c.state === 'closed' ? 'active' : 'inactive',
-      gapScore: c.priority === 'urgent' ? 0.9 : c.priority === 'high' ? 0.7 : 0.4,
-      position: c.location.position,
-    }))
+    return filtered
+      .filter((c) => Array.isArray(c.location?.position) && c.location.position.length >= 2)
+      .map((c) => ({
+        id: c.id,
+        name: c.title,
+        departmentId: c.departmentId,
+        categoryLabel: c.categoryName,
+        status: c.state === 'resolved' || c.state === 'closed' ? 'active' : 'inactive',
+        gapScore: c.priority === 'urgent' ? 0.9 : c.priority === 'high' ? 0.7 : 0.4,
+        position: c.location.position,
+      }))
   }, [filtered])
 
   return (
@@ -160,22 +173,62 @@ export default function DepartmentOfficerQueue() {
                 { value: 'all', label: 'All States' },
                 { value: 'submitted', label: 'Submitted' },
                 { value: 'assigned', label: 'Assigned' },
-                { value: 'work_started', label: 'Work Started' },
+                { value: 'accepted', label: 'Accepted' },
+                { value: 'inspection_started', label: 'Inspection Started' },
+                { value: 'evidence_uploaded', label: 'Evidence Uploaded' },
                 { value: 'escalated', label: 'Escalated' },
                 { value: 'resolved', label: 'Resolved' },
+                { value: 'closed', label: 'Closed' },
               ]}
             />
+
+            <Button
+              size="sm"
+              variant="outline"
+              icon={RefreshCw}
+              onClick={() => refresh()}
+              title="Reload from backend"
+            >
+              Refresh
+            </Button>
           </div>
         </div>
 
         {/* View Mode 1: Table Queue */}
         {viewMode === 'queue' && (
           <div className="card">
-            <DataTable
-              columns={columns}
-              rows={filtered}
-              onRowClick={(row) => setSelectedComplaintId(row.id)}
-            />
+            {hydrationStatus === 'loading' && (
+              <div className="p-6 space-y-3">
+                {[0, 1, 2, 3].map((row) => (
+                  <div key={row} className="h-11 rounded-lg bg-ink-100 animate-pulse" />
+                ))}
+              </div>
+            )}
+            {hydrationStatus === 'error' && (
+              <div className="p-6 text-center text-[12.5px] text-alert-600">
+                Unable to load complaints. Check the backend connection and refresh.
+              </div>
+            )}
+            {hydrationStatus !== 'loading' && hydrationStatus !== 'error' && filtered.length === 0 && (
+              <div className="p-10 text-center">
+                <div className="mx-auto grid h-11 w-11 place-items-center rounded-full bg-ink-100 text-ink-400 mb-3">
+                  <Inbox size={20} />
+                </div>
+                <p className="text-[13px] font-semibold text-ink-800">No complaints in your queue</p>
+                <p className="text-[12px] text-ink-500 mt-1 max-w-md mx-auto">
+                  {hydrationStatus === 'ready' && complaints.length === 0
+                    ? 'The backend returned no visible complaints for your role. If you expect records, verify your JWT session is active.'
+                    : 'No records match the current filters.'}
+                </p>
+              </div>
+            )}
+            {hydrationStatus !== 'loading' && hydrationStatus !== 'error' && filtered.length > 0 && (
+              <DataTable
+                columns={columns}
+                rows={filtered}
+                onRowClick={(row) => setSelectedComplaintId(row.id)}
+              />
+            )}
           </div>
         )}
 
@@ -187,7 +240,7 @@ export default function DepartmentOfficerQueue() {
               zoom={11}
               facilities={mapFacilities}
               colorBy="gap"
-              onFacilityClick={(id) => setSelectedComplaintId(id)}
+              onFacilityClick={(facility) => setSelectedComplaintId(facility.id)}
               className="h-full"
             />
           </div>

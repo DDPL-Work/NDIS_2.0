@@ -92,7 +92,7 @@ function buildHistory(rng, finalState, submittedDaysAgo) {
   const finalIdx = finalState === 'rejected' ? 2 : order.indexOf(finalState)
   const steps = finalState === 'rejected' ? ['draft', 'submitted', 'under_review', 'rejected'] : order.slice(0, finalIdx + 1)
   let dayOffset = submittedDaysAgo
-  return steps.map((state, i) => {
+  return steps.map((state) => {
     dayOffset = Math.max(0, dayOffset - randInt(rng, 1, 6))
     return { state, at: new Date(Date.now() - dayOffset * 86400000).toISOString() }
   })

@@ -1,9 +1,7 @@
-import { DEPARTMENTS } from '../../config/constants'
-
-export function DepartmentLegend({ activeIds, onToggle }) {
+export function DepartmentLegend({ departments = [], activeIds, onToggle }) {
   return (
     <div className="card px-3 py-2.5 flex flex-wrap gap-x-3 gap-y-1.5">
-      {DEPARTMENTS.map((d) => {
+      {departments.map((d) => {
         const active = activeIds.includes(d.id)
         return (
           <button
@@ -13,7 +11,7 @@ export function DepartmentLegend({ activeIds, onToggle }) {
             style={{ opacity: active ? 1 : 0.35 }}
           >
             <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: d.color }} />
-            {d.label}
+            {d.name}
           </button>
         )
       })}

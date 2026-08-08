@@ -4,8 +4,8 @@ import { DEPARTMENT_MAP } from '../../config/constants'
 import GapScoreRing from '../../components/ui/GapScoreRing'
 import Badge from '../../components/ui/Badge'
 
-export default function FacilityCard({ facility, onClick, active }) {
-  const dept = DEPARTMENT_MAP[facility.departmentId]
+export default function FacilityCard({ facility, onClick, active, deptMap = DEPARTMENT_MAP }) {
+  const dept = deptMap[facility.departmentId]
   return (
     <button
       onClick={onClick}

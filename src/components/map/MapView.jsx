@@ -1,64 +1,19 @@
-// GIS map surface shared by all three portals (LLD Vol 1 §10.3).
-// MapLibre GL consumes vector-style basemap + facility points as GeoJSON.
-// Now supports: toolbar tools (radius, measure, cluster), basemap switching,
-// locate-me pulse marker, and PNG snapshot export.
-import { useEffect, useRef, useState, useCallback, useImperativeHandle, forwardRef } from 'react'
-import maplibregl from 'maplibre-gl'
-import { DEPARTMENT_MAP } from '../../config/constants'
-import { MAP_TOOLS } from '../../hooks/useMapTools'
+// GIS map surface shared by all portals (LLD Vol 1 §10.3), powered by Leaflet.
+// Engine re-implementation of the MapLibre surface: same props, same popups,
+// same toolbar tools (radius, measure, cluster), basemap switching, locate-me
+// pulse marker and PNG snapshot export.  Facilities are rendered as
+// L.marker([latitude, longitude]) from backend [longitude, latitude].
+import { useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
+import 'leaflet.markercluster/dist/MarkerCluster.css'
+import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
+import { MAP_TOOLS, attributionFor } from '../../hooks/useMapTools'
+import { createFacilityMarkers, createCatalogLayer, createSearchResultMarkers } from '../../services/LeafletLayerService'
+import { ensureLeafletPlugins } from '../../services/leafletPlugins'
 
-function facilitiesToGeoJSON(facilities) {
-  return {
-    type: 'FeatureCollection',
-    features: facilities.map((f) => ({
-      type: 'Feature',
-      geometry: { type: 'Point', coordinates: f.position },
-      properties: {
-        id: f.id,
-        name: f.name,
-        departmentId: f.departmentId,
-        categoryLabel: f.categoryLabel,
-        status: f.status,
-        gapScore: f.gapScore,
-        color: DEPARTMENT_MAP[f.departmentId]?.color || '#546882',
-      },
-    })),
-  }
-}
-
-// Generate a GeoJSON circle polygon approximation (for radius overlay)
-function circleGeoJSON(center, radiusKm, steps = 64) {
-  const R = 6371
-  const [lng, lat] = center
-  const coords = []
-  for (let i = 0; i <= steps; i++) {
-    const angle = (i / steps) * 2 * Math.PI
-    const dLat = (radiusKm / R) * (180 / Math.PI)
-    const dLng = dLat / Math.cos((lat * Math.PI) / 180)
-    coords.push([
-      lng + dLng * Math.sin(angle),
-      lat + dLat * Math.cos(angle),
-    ])
-  }
-  return {
-    type: 'FeatureCollection',
-    features: [{ type: 'Feature', geometry: { type: 'Polygon', coordinates: [coords] }, properties: {} }],
-  }
-}
-
-function measureLineGeoJSON(points) {
-  if (points.length < 2) {
-    return { type: 'FeatureCollection', features: [] }
-  }
-  return {
-    type: 'FeatureCollection',
-    features: [{
-      type: 'Feature',
-      geometry: { type: 'LineString', coordinates: points },
-      properties: {},
-    }],
-  }
-}
+const DEFAULT_TILES = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+const toLatLng = (position) => [position[1], position[0]]
 
 const MapView = forwardRef(function MapView({
   center = [85.4434, 25.1372],
@@ -70,7 +25,10 @@ const MapView = forwardRef(function MapView({
   selectedId,
   showHeat = false,
   heatPoints = [],
+  searchResults = [],
+  onSearchResultOpen = () => {},
   className = '',
+  onReady,             // additive: fires once the Leaflet map is initialised
   // Tool props
   activeTool = MAP_TOOLS.NONE,
   radiusCenter = null,
@@ -79,277 +37,267 @@ const MapView = forwardRef(function MapView({
   measureDistKm = null,
   clusterEnabled = false,
   basemapUrl,
+  departmentColors = {},
+  vectorLayers = [],
 }, ref) {
   const containerRef = useRef(null)
-  const mapRef = useRef(null)
+  const mapRef = useRef(null)              // Leaflet map instance
+  const tileLayerRef = useRef(null)
+  const facilitiesLayerRef = useRef(null)  // layerGroup | markerClusterGroup
+  const selectedRingRef = useRef(null)
+  const radiusRef = useRef(null)
+  const measureRef = useRef({ line: null, dots: null, label: null })
+  const heatRef = useRef(null)
+  const vectorLayerRef = useRef(null)
   const locMarkerRef = useRef(null)
+  const searchLayerRef = useRef(null)
   const [ready, setReady] = useState(false)
-  const DEFAULT_STYLE = 'https://tiles.openfreemap.org/styles/positron'
-  const [currentStyle, setCurrentStyle] = useState(basemapUrl || DEFAULT_STYLE)
+  // leaflet.heat / leaflet.markercluster attach to a global `L`; loaded async
+  // once window.L is available (see services/leafletPlugins.js).
+  const [pluginsReady, setPluginsReady] = useState(false)
 
-  // Expose snapshot + flyTo to parent via ref
+  useEffect(() => {
+    let cancelled = false
+    ensureLeafletPlugins().then(() => { if (!cancelled) setPluginsReady(true) })
+    return () => { cancelled = true }
+  }, [])
+
+  // Expose snapshot + flyTo + locateUser + the raw map to parents via ref
   useImperativeHandle(ref, () => ({
-    snapshot() {
-      const canvas = mapRef.current?.getCanvas()
-      if (!canvas) return
-      const a = document.createElement('a')
-      a.download = `ndisp-map-${Date.now()}.png`
-      a.href = canvas.toDataURL('image/png')
-      a.click()
-    },
-    flyTo(center, zoom) {
-      mapRef.current?.flyTo({ center, zoom, duration: 900 })
+    get map() { return mapRef.current },
+    snapshot() { exportSnapshot() },
+    flyTo(nextCenter, nextZoom) {
+      mapRef.current?.flyTo(toLatLng(nextCenter), nextZoom, { duration: 0.9 })
     },
     locateUser() {
       if (!navigator.geolocation) return
       navigator.geolocation.getCurrentPosition((pos) => {
         const lngLat = [pos.coords.longitude, pos.coords.latitude]
-        mapRef.current?.flyTo({ center: lngLat, zoom: 14, duration: 1000 })
-        // Pulse marker
+        mapRef.current?.flyTo(toLatLng(lngLat), 14, { duration: 1 })
         if (locMarkerRef.current) locMarkerRef.current.remove()
         const el = document.createElement('div')
-        el.className = 'locate-pulse'
         el.style.cssText = 'width:16px;height:16px;border-radius:50%;background:#1d7ab5;border:3px solid white;box-shadow:0 0 0 4px rgba(29,122,181,0.35);'
-        locMarkerRef.current = new maplibregl.Marker({ element: el })
-          .setLngLat(lngLat)
-          .addTo(mapRef.current)
+        locMarkerRef.current = L.marker(toLatLng(lngLat), { icon: L.divIcon({ className: '', html: el, iconSize: [16, 16], iconAnchor: [8, 8] }) }).addTo(mapRef.current)
       })
     },
+    showResult(result) {
+      if (!result || !Array.isArray(result.position) || result.position.length < 2) return
+      const map = mapRef.current
+      if (!map) return
+      map.flyTo([result.position[1], result.position[0]], 15, { duration: 0.8 })
+      setTimeout(() => {
+        const marker = searchLayerRef.current?.getLayers?.()?.find((item) => item.options?.spatialResultId === String(result.id))
+        if (marker) marker.openPopup()
+      }, 500)
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [])
+
+  // Vector-only snapshot export (raster tiles are CORS-tainted, so the basemap
+  // is intentionally omitted — overlays and markers are redrawn exactly).
+  function exportSnapshot() {
+    const map = mapRef.current
+    if (!map) return
+    const size = map.getSize()
+    const output = document.createElement('canvas')
+    output.width = size.x
+    output.height = size.y
+    const ctx = output.getContext('2d')
+    ctx.fillStyle = '#eef1f5'
+    ctx.fillRect(0, 0, output.width, output.height)
+    const project = (position) => map.latLngToContainerPoint(L.latLng(position[1], position[0]))
+    if (radiusRef.current && radiusCenter) {
+      const p = project(radiusCenter)
+      const metersPerPixel = typeof map.metersPerPixel === 'function' ? map.metersPerPixel(map.getZoom()) : 1
+      ctx.beginPath(); ctx.arc(p.x, p.y, radiusKm * 1000 / (metersPerPixel || 1), 0, Math.PI * 2)
+      ctx.strokeStyle = '#1d7ab5'; ctx.lineWidth = 2; ctx.setLineDash([3, 2]); ctx.stroke()
+    }
+    if (measureRef.current.line && measurePoints.length >= 2) {
+      ctx.setLineDash([4, 2]); ctx.strokeStyle = '#8a4fc0'; ctx.lineWidth = 2; ctx.beginPath()
+      measurePoints.forEach((point, index) => {
+        const p = project(point)
+        if (index === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y)
+      })
+      ctx.stroke()
+    }
+    facilitiesLayerRef.current?.eachLayer?.((marker) => {
+      if (marker.getLatLng && marker.options?.icon?.options?.html) {
+        const p = map.latLngToContainerPoint(marker.getLatLng())
+        ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, Math.PI * 2)
+        ctx.fillStyle = marker.options.icon.options.html.match(/#[0-9a-f]{3,6}/i)?.[0] || '#546882'
+        ctx.fill(); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5; ctx.stroke()
+      }
+    })
+    const a = document.createElement('a')
+    a.download = `ndisp-map-${Date.now()}.png`
+    a.href = output.toDataURL('image/png')
+    a.click()
+  }
 
   // Initialize map
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
-    const map = new maplibregl.Map({
-      container: containerRef.current,
-      style: currentStyle,
-      center,
+    const map = L.map(containerRef.current, {
+      center: toLatLng(center),
       zoom,
-      attributionControl: { compact: true },
+      zoomControl: false,
     })
-    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
-    map.addControl(new maplibregl.ScaleControl({ maxWidth: 80, unit: 'metric' }), 'bottom-right')
-    map.on('load', () => setReady(true))
+    L.control.zoom({ position: 'topright' }).addTo(map)
+    L.control.scale({ position: 'bottomright', imperial: false, maxWidth: 80 }).addTo(map)
+    tileLayerRef.current = L.tileLayer(basemapUrl || DEFAULT_TILES, { maxZoom: 19, attribution: attributionFor(basemapUrl) }).addTo(map)
     mapRef.current = map
+    setReady(true)
+    onReady?.(map)
     return () => {
       map.remove()
       mapRef.current = null
+      tileLayerRef.current = null
+      setReady(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Basemap switching — handles both string URLs and style objects (e.g. satellite raster)
+  // Keep the Leaflet surface sized when its container resizes.
   useEffect(() => {
     const map = mapRef.current
-    const newStyle = basemapUrl || 'https://tiles.openfreemap.org/styles/positron'
-    const isSame = JSON.stringify(newStyle) === JSON.stringify(currentStyle)
-    if (!map || isSame) return
-    setCurrentStyle(newStyle)
-    setReady(false)
-    map.setStyle(newStyle)
-    map.once('styledata', () => setReady(true))
-  }, [basemapUrl]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (!map || !containerRef.current) return
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(() => map.invalidateSize({ pan: false }))
+    observer.observe(containerRef.current)
+    return () => observer.disconnect()
+  }, [])
 
-  // Cursor changes by tool
+  // Basemap switching
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
-    if (activeTool !== MAP_TOOLS.NONE) {
-      map.getCanvas().style.cursor = 'crosshair'
-    } else {
-      map.getCanvas().style.cursor = ''
-    }
+    const next = basemapUrl || DEFAULT_TILES
+    if (tileLayerRef.current && tileLayerRef.current._url === next) return
+    if (tileLayerRef.current) map.removeLayer(tileLayerRef.current)
+    tileLayerRef.current = L.tileLayer(next, { maxZoom: 19, attribution: attributionFor(next) }).addTo(map)
+  }, [basemapUrl])
+
+  // Cursor changes by tool
+  useEffect(() => {
+    const container = mapRef.current?.getContainer()
+    if (!container) return
+    container.style.cursor = activeTool !== MAP_TOOLS.NONE ? 'crosshair' : ''
   }, [activeTool])
 
-  // Map click forwarding
+  // Tool clicks must work over GeoJSON boundaries as well as bare tiles.
+  // Leaflet vector layers can consume the map's synthetic click event, so use
+  // the map container's capture phase and translate the screen point through
+  // Leaflet. This remains within the Leaflet/React lifecycle.
   useEffect(() => {
     const map = mapRef.current
-    if (!map || !ready) return
-    const handler = (e) => {
-      if (activeTool !== MAP_TOOLS.NONE) {
-        onMapClick?.(e.lngLat)
-      }
+    const container = map?.getContainer()
+    if (!map || !container) return
+    const handler = (event) => {
+      if (activeTool === MAP_TOOLS.NONE) return
+      if (event.target.closest?.('.leaflet-control, .leaflet-popup')) return
+      const latlng = map.mouseEventToLatLng(event)
+      onMapClick?.({ lng: latlng.lng, lat: latlng.lat })
     }
-    map.on('click', handler)
-    return () => map.off('click', handler)
-  }, [ready, activeTool, onMapClick])
+    container.addEventListener('click', handler, true)
+    return () => container.removeEventListener('click', handler, true)
+  }, [activeTool, onMapClick])
 
   // Recenter when district/center changes
   useEffect(() => {
     if (mapRef.current && ready) {
-      mapRef.current.flyTo({ center, zoom, duration: 900 })
+      mapRef.current.flyTo(toLatLng(center), zoom, { duration: 0.9 })
     }
   }, [center, zoom, ready])
 
-  const paintExpression = useCallback(() => {
-    if (colorBy === 'gap') {
-      return [
-        'interpolate', ['linear'], ['get', 'gapScore'],
-        0, '#1f7a54', 0.33, '#e07a2c', 0.66, '#c0392b', 1, '#8a1c11',
-      ]
-    }
-    return ['get', 'color']
-  }, [colorBy])
-
-  // Facility points layer
+  // Facility markers (with clustering toggle)
   useEffect(() => {
     const map = mapRef.current
     if (!map || !ready) return
+    const valid = facilities.filter((item) => Array.isArray(item.position) && item.position.length >= 2)
+    if (import.meta.env.DEV) console.info('[GIS diagnostics] Leaflet facility markers', { inputCount: facilities.length, renderedMarkerCount: valid.length })
 
-    const geojson = facilitiesToGeoJSON(facilities)
+    const markers = createFacilityMarkers(valid, {
+      colorBy,
+      departmentColors,
+      activeTool,
+      onFacilityClick,
+      map,
+    }).getLayers()
 
-    // Cluster source
-    const clusterSrc = map.getSource('facilities-cluster')
-    if (clusterSrc) {
-      clusterSrc.setData(geojson)
+    let nextLayer
+    if (clusterEnabled && pluginsReady && typeof L.markerClusterGroup === 'function') {
+      nextLayer = L.markerClusterGroup({ maxClusterRadius: 40, disableClusteringAtZoom: 15, showCoverageOnHover: false })
+      nextLayer.addLayers(markers)
     } else {
-      map.addSource('facilities-cluster', {
-        type: 'geojson', data: geojson,
-        cluster: true, clusterMaxZoom: 14, clusterRadius: 40,
-      })
-      // Cluster circles
-      map.addLayer({
-        id: 'clusters',
-        type: 'circle',
-        source: 'facilities-cluster',
-        filter: ['has', 'point_count'],
-        paint: {
-          'circle-color': ['step', ['get', 'point_count'], '#546882', 10, '#e07a2c', 30, '#c0392b'],
-          'circle-radius': ['step', ['get', 'point_count'], 18, 10, 24, 30, 32],
-          'circle-opacity': 0.88,
-          'circle-stroke-width': 2,
-          'circle-stroke-color': '#ffffff',
-        },
-        layout: { visibility: 'none' },
-      })
-      // Cluster count labels
-      map.addLayer({
-        id: 'cluster-count',
-        type: 'symbol',
-        source: 'facilities-cluster',
-        filter: ['has', 'point_count'],
-        layout: {
-          'text-field': '{point_count_abbreviated}',
-          'text-font': ['Noto Sans Bold', 'Arial Unicode MS Bold'],
-          'text-size': 12,
-          visibility: 'none',
-        },
-        paint: { 'text-color': '#ffffff' },
-      })
+      nextLayer = L.layerGroup(markers)
     }
+    if (facilitiesLayerRef.current) map.removeLayer(facilitiesLayerRef.current)
+    facilitiesLayerRef.current = nextLayer
+    map.addLayer(nextLayer)
+  }, [facilities, departmentColors, ready, colorBy, onFacilityClick, activeTool, clusterEnabled, pluginsReady])
 
-    // Plain source (unclustered)
-    const src = map.getSource('facilities')
-    if (src) {
-      src.setData(geojson)
-    } else {
-      map.addSource('facilities', { type: 'geojson', data: geojson })
-      map.addLayer({
-        id: 'facility-halo',
-        type: 'circle',
-        source: 'facilities',
-        filter: ['!', ['has', 'point_count']],
-        paint: {
-          'circle-radius': 10,
-          'circle-color': paintExpression(),
-          'circle-opacity': 0.18,
-        },
-      })
-      map.addLayer({
-        id: 'facility-points',
-        type: 'circle',
-        source: 'facilities',
-        filter: ['!', ['has', 'point_count']],
-        paint: {
-          'circle-radius': ['case', ['==', ['get', 'status'], 'inactive'], 4, 5.5],
-          'circle-color': paintExpression(),
-          'circle-stroke-width': 1.5,
-          'circle-stroke-color': '#ffffff',
-        },
-      })
-
-      const popup = new maplibregl.Popup({ closeButton: false, offset: 12, maxWidth: '240px' })
-
-      map.on('mouseenter', 'facility-points', (e) => {
-        if (activeTool !== MAP_TOOLS.NONE) return
-        map.getCanvas().style.cursor = 'pointer'
-        const f = e.features[0]
-        const gap = (f.properties.gapScore * 100).toFixed(0)
-        const gapColor = f.properties.gapScore > 0.66 ? '#c0392b' : f.properties.gapScore > 0.33 ? '#e07a2c' : '#1f7a54'
-        popup
-          .setLngLat(f.geometry.coordinates)
-          .setHTML(
-            `<div style="font-family:Inter,sans-serif;padding:2px 0;">
-               <div style="font-weight:600;font-size:12.5px;color:#0b3558;">${f.properties.name}</div>
-               <div style="font-size:11.5px;color:#546882;margin-top:2px;">${f.properties.categoryLabel}</div>
-               <div style="margin-top:6px;display:flex;align-items:center;gap:6px;">
-                 <span style="font-size:11px;color:${gapColor};font-weight:600;">Gap ${gap}%</span>
-                 <span style="font-size:11px;color:#7488a0;">${f.properties.status}</span>
-               </div>
-             </div>`
-          )
-          .addTo(map)
-      })
-      map.on('mouseleave', 'facility-points', () => {
-        if (activeTool !== MAP_TOOLS.NONE) return
-        map.getCanvas().style.cursor = activeTool !== MAP_TOOLS.NONE ? 'crosshair' : ''
-        popup.remove()
-      })
-      map.on('click', 'facility-points', (e) => {
-        if (activeTool !== MAP_TOOLS.NONE) return
-        const id = e.features[0].properties.id
-        onFacilityClick?.(id)
-      })
-    }
-  }, [facilities, ready, paintExpression, onFacilityClick, activeTool])
-
-  // Cluster visibility toggle
+  // Spatial-query result layer: cleared on every new search batch, markers are
+  // drawn on top of the facility layer and the map fits the result bounds.
+  // One result zooms directly onto it.
   useEffect(() => {
     const map = mapRef.current
-    if (!map || !ready || !map.getLayer('clusters')) return
-    const vis = clusterEnabled ? 'visible' : 'none'
-    const ptVis = clusterEnabled ? 'none' : 'visible'
-    map.setLayoutProperty('clusters', 'visibility', vis)
-    map.setLayoutProperty('cluster-count', 'visibility', vis)
-    map.setLayoutProperty('facility-points', 'visibility', ptVis)
-    map.setLayoutProperty('facility-halo', 'visibility', ptVis)
-  }, [clusterEnabled, ready])
+    if (!map || !ready) return
+    if (searchLayerRef.current) { map.removeLayer(searchLayerRef.current); searchLayerRef.current = null }
+    const valid = (searchResults || []).filter((item) => Array.isArray(item.position) && item.position.length >= 2)
+    if (!valid.length) return
+    const layer = createSearchResultMarkers(valid, { onOpenDetails: onSearchResultOpen, map })
+    searchLayerRef.current = layer
+    map.addLayer(layer)
+    const bounds = L.latLngBounds(valid.map((item) => toLatLng(item.position)))
+    if (valid.length === 1) {
+      map.setView(toLatLng(valid[0].position), 15, { animate: true })
+    } else {
+      map.fitBounds(bounds, { padding: [48, 48], maxZoom: 14 })
+    }
+  }, [searchResults, ready, onSearchResultOpen])
 
-  // Repaint color mode
+  // Auto-fit to the visible facilities (current behaviour, kept identical)
   useEffect(() => {
     const map = mapRef.current
-    if (!map || !ready || !map.getLayer('facility-points')) return
-    map.setPaintProperty('facility-points', 'circle-color', paintExpression())
-    map.setPaintProperty('facility-halo', 'circle-color', paintExpression())
-  }, [colorBy, ready, paintExpression])
+    const valid = facilities.filter((item) => Array.isArray(item.position) && item.position.length >= 2)
+    if (!map || !ready || !valid.length) return
+    const bounds = L.latLngBounds(valid.map((item) => toLatLng(item.position)))
+    map.fitBounds(bounds, { padding: [48, 48], maxZoom: 14 })
+    if (import.meta.env.DEV) console.info('[GIS diagnostics] Leaflet map bounds', { visibleCount: valid.length })
+  }, [facilities, ready])
+
+  // Backend GIS catalog layers (Point / LineString / Polygon / MultiPolygon
+  // GeoJSON from the server, rendered untouched — no geometry transforms).
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !ready) return
+    const group = L.layerGroup()
+    ;(vectorLayers || []).forEach((entry) => {
+      if (!entry?.features?.length) return
+      const layer = createCatalogLayer(entry, { layerName: entry.layerName, category: entry.category })
+      group.addLayer(layer)
+    })
+    if (vectorLayerRef.current) map.removeLayer(vectorLayerRef.current)
+    vectorLayerRef.current = group
+    if (group.getLayers().length) map.addLayer(group)
+  }, [vectorLayers, ready])
+
+  // Cluster visibility / plain vs clustered handled above with the markers.
 
   // Selected facility highlight ring
   useEffect(() => {
     const map = mapRef.current
     if (!map || !ready) return
+    if (selectedRingRef.current) { map.removeLayer(selectedRingRef.current); selectedRingRef.current = null }
     const selected = facilities.find((f) => f.id === selectedId)
-    const data = {
-      type: 'FeatureCollection',
-      features: selected
-        ? [{ type: 'Feature', geometry: { type: 'Point', coordinates: selected.position }, properties: {} }]
-        : [],
-    }
-    const src = map.getSource('selected-facility')
-    if (src) {
-      src.setData(data)
-    } else {
-      map.addSource('selected-facility', { type: 'geojson', data })
-      map.addLayer({
-        id: 'selected-facility-ring',
-        type: 'circle',
-        source: 'selected-facility',
-        paint: {
-          'circle-radius': 14,
-          'circle-color': 'transparent',
-          'circle-stroke-width': 2.5,
-          'circle-stroke-color': '#0b3558',
-        },
-      })
+    if (selected && Array.isArray(selected.position)) {
+      selectedRingRef.current = L.circleMarker(toLatLng(selected.position), {
+        radius: 14,
+        color: '#0b3558',
+        weight: 2.5,
+        fillColor: 'transparent',
+        fillOpacity: 0,
+      }).addTo(map)
     }
   }, [selectedId, facilities, ready])
 
@@ -357,156 +305,70 @@ const MapView = forwardRef(function MapView({
   useEffect(() => {
     const map = mapRef.current
     if (!map || !ready) return
-    const data = radiusCenter
-      ? circleGeoJSON(radiusCenter, radiusKm)
-      : { type: 'FeatureCollection', features: [] }
-    const src = map.getSource('radius-overlay')
-    if (src) {
-      src.setData(data)
-    } else {
-      map.addSource('radius-overlay', { type: 'geojson', data })
-      map.addLayer({
-        id: 'radius-fill',
-        type: 'fill',
-        source: 'radius-overlay',
-        paint: { 'fill-color': '#1d7ab5', 'fill-opacity': 0.1 },
-      })
-      map.addLayer({
-        id: 'radius-border',
-        type: 'line',
-        source: 'radius-overlay',
-        paint: { 'line-color': '#1d7ab5', 'line-width': 2, 'line-dasharray': [3, 2] },
-      })
+    if (radiusRef.current) { map.removeLayer(radiusRef.current); radiusRef.current = null }
+    if (radiusCenter && Array.isArray(radiusCenter)) {
+      radiusRef.current = L.circle(toLatLng(radiusCenter), {
+        radius: radiusKm * 1000,
+        color: '#1d7ab5',
+        weight: 2,
+        dashArray: '3 2',
+        fillColor: '#1d7ab5',
+        fillOpacity: 0.1,
+      }).addTo(map)
     }
   }, [radiusCenter, radiusKm, ready])
 
-  // Radius km changes without recenter
-  useEffect(() => {
-    const map = mapRef.current
-    if (!map || !ready || !radiusCenter) return
-    const src = map.getSource('radius-overlay')
-    if (src) src.setData(circleGeoJSON(radiusCenter, radiusKm))
-  }, [radiusKm, radiusCenter, ready])
-
-  // Measure line overlay
+  // Measure overlay
   useEffect(() => {
     const map = mapRef.current
     if (!map || !ready) return
-    const data = measureLineGeoJSON(measurePoints)
-    const src = map.getSource('measure-line')
-    if (src) {
-      src.setData(data)
-    } else {
-      map.addSource('measure-line', { type: 'geojson', data })
-      map.addLayer({
-        id: 'measure-line-layer',
-        type: 'line',
-        source: 'measure-line',
-        paint: { 'line-color': '#8a4fc0', 'line-width': 2, 'line-dasharray': [4, 2] },
-      })
-    }
-
-    // Endpoint dots
-    const dots = {
-      type: 'FeatureCollection',
-      features: measurePoints.map((p) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: p }, properties: {} })),
-    }
-    const dotSrc = map.getSource('measure-dots')
-    if (dotSrc) {
-      dotSrc.setData(dots)
-    } else {
-      map.addSource('measure-dots', { type: 'geojson', data: dots })
-      map.addLayer({
-        id: 'measure-dots-layer',
-        type: 'circle',
-        source: 'measure-dots',
-        paint: {
-          'circle-radius': 5, 'circle-color': '#8a4fc0',
-          'circle-stroke-width': 2, 'circle-stroke-color': '#ffffff',
-        },
-      })
-    }
-
-    // Distance label at midpoint
-    const mid = measureDistKm !== null && measurePoints.length === 2
-      ? {
-          type: 'FeatureCollection',
-          features: [{
-            type: 'Feature',
-            geometry: {
-              type: 'Point',
-              coordinates: [
-                (measurePoints[0][0] + measurePoints[1][0]) / 2,
-                (measurePoints[0][1] + measurePoints[1][1]) / 2,
-              ],
-            },
-            properties: { label: `${measureDistKm} km` },
-          }],
-        }
-      : { type: 'FeatureCollection', features: [] }
-    const lblSrc = map.getSource('measure-label')
-    if (lblSrc) {
-      lblSrc.setData(mid)
-    } else {
-      map.addSource('measure-label', { type: 'geojson', data: mid })
-      map.addLayer({
-        id: 'measure-label-layer',
-        type: 'symbol',
-        source: 'measure-label',
-        layout: {
-          'text-field': ['get', 'label'],
-          'text-font': ['Noto Sans Bold', 'Arial Unicode MS Bold'],
-          'text-size': 12,
-          'text-offset': [0, -1.2],
-        },
-        paint: { 'text-color': '#8a4fc0', 'text-halo-color': '#ffffff', 'text-halo-width': 1.5 },
-      })
+    const { line, dots, label } = measureRef.current
+    if (line) map.removeLayer(line)
+    if (dots) map.removeLayer(dots)
+    if (label) map.removeLayer(label)
+    measureRef.current = { line: null, dots: null, label: null }
+    if (measurePoints.length >= 2) {
+      measureRef.current.line = L.polyline(measurePoints.map(toLatLng), { color: '#8a4fc0', weight: 2, dashArray: '4 2' }).addTo(map)
+      measureRef.current.dots = L.layerGroup(measurePoints.map((point) => L.circleMarker(toLatLng(point), {
+        radius: 5, color: '#8a4fc0', weight: 2, fillColor: '#8a4fc0', fillOpacity: 1,
+      }))).addTo(map)
+      if (measureDistKm !== null) {
+        const mid = [(measurePoints[0][0] + measurePoints[1][0]) / 2, (measurePoints[0][1] + measurePoints[1][1]) / 2]
+        measureRef.current.label = L.marker(toLatLng(mid), {
+          icon: L.divIcon({
+            className: '',
+            html: `<span style="background:#ffffff;border:1px solid #8a4fc0;color:#8a4fc0;border-radius:999px;padding:1px 6px;font-size:11px;font-weight:600;font-family:Inter,sans-serif;">${measureDistKm} km</span>`,
+            iconSize: [46, 20], iconAnchor: [23, 26],
+          }),
+        }).addTo(map)
+      }
     }
   }, [measurePoints, measureDistKm, ready])
 
-  // Optional heat/hotspot overlay
+  // Heat/hotspot overlay
   useEffect(() => {
     const map = mapRef.current
     if (!map || !ready) return
-    const data = {
-      type: 'FeatureCollection',
-      features: showHeat
-        ? heatPoints.map((h) => ({
-            type: 'Feature',
-            geometry: { type: 'Point', coordinates: h.position },
-            properties: { weight: h.intensity },
-          }))
-        : [],
-    }
-    const src = map.getSource('hotspots')
-    if (src) {
-      src.setData(data)
-    } else {
-      map.addSource('hotspots', { type: 'geojson', data })
-      map.addLayer(
-        {
-          id: 'hotspot-heat',
-          type: 'heatmap',
-          source: 'hotspots',
-          paint: {
-            'heatmap-weight': ['get', 'weight'],
-            'heatmap-intensity': 0.9,
-            'heatmap-radius': 45,
-            'heatmap-color': [
-              'interpolate', ['linear'], ['heatmap-density'],
-              0, 'rgba(31,122,84,0)', 0.3, 'rgba(224,122,44,0.55)',
-              0.7, 'rgba(192,57,43,0.7)', 1, 'rgba(139,28,17,0.85)',
-            ],
-          },
+    if (heatRef.current) { map.removeLayer(heatRef.current); heatRef.current = null }
+    if (showHeat && heatPoints?.length && pluginsReady && typeof L.heatLayer === 'function') {
+      heatRef.current = L.heatLayer(heatPoints.map((h) => [h.position[1], h.position[0], h.intensity || 0.5]), {
+        radius: 45,
+        blur: 20,
+        minOpacity: 0.2,
+        maxZoom: 17,
+        gradient: {
+          0.0: 'rgba(31,122,84,0)',
+          0.3: 'rgba(224,122,44,0.55)',
+          0.7: 'rgba(192,57,43,0.7)',
+          1.0: 'rgba(139,28,17,0.85)',
         },
-        'facility-halo'
-      )
+      }).addTo(map)
     }
-  }, [showHeat, heatPoints, ready])
+  }, [showHeat, heatPoints, ready, pluginsReady])
 
   return (
-    <div className={`relative ${className}`}>
-      <div ref={containerRef} className="absolute inset-0 rounded-xl2 overflow-hidden" />
+    <div className={`relative z-0 ${className}`}>
+      <div ref={containerRef} className="absolute inset-0 z-0 rounded-xl2 overflow-hidden" />
       {!ready && (
         <div className="absolute inset-0 grid place-items-center bg-ink-50 rounded-xl2">
           <span className="text-[12.5px] text-ink-400">Loading map…</span>

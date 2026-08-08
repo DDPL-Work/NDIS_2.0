@@ -17,27 +17,27 @@ export default function SimulationControlPanel() {
   const advanceProjectTime = useProjectEngine((s) => s.advanceSimulationTime)
 
   const escalatedCount = complaints.filter((c) => c.state === 'escalated').length
-  const pendingWorkCount = complaints.filter((c) => ['assigned', 'accepted', 'inspection_scheduled', 'work_started'].includes(c.state)).length
+  const pendingWorkCount = complaints.filter((c) => ['assigned', 'accepted', 'inspection_started', 'evidence_uploaded'].includes(c.state)).length
 
-  function handleCreateComplaint() {
-    simulateRandomComplaintCreation()
-    pushToast('Simulation Engine: Generated & Auto-Routed New Citizen Complaint!', 'info')
+  async function handleCreateComplaint() {
+    const ok = await simulateRandomComplaintCreation()
+    if (ok) pushToast('Simulation Engine: Generated & Auto-Routed New Citizen Complaint!', 'info')
   }
 
-  function handleAdvanceTime(hours) {
-    advanceComplaintTime(hours)
+  async function handleAdvanceTime(hours) {
+    const ok = advanceComplaintTime(hours)
     advanceProjectTime(hours)
-    pushToast(`Simulation Engine: Advanced time by ${hours} hours. Recalculated SLAs & Project milestones.`, 'warning')
+    if (ok) pushToast(`Simulation Engine: Advanced time by ${hours} hours. Recalculated SLAs & Project milestones.`, 'warning')
   }
 
-  function handleFieldAction() {
-    const pending = complaints.find((c) => ['assigned', 'accepted', 'inspection_scheduled', 'work_started'].includes(c.state))
+  async function handleFieldAction() {
+    const pending = complaints.find((c) => ['assigned', 'accepted', 'inspection_started', 'evidence_uploaded'].includes(c.state))
     if (!pending) {
       pushToast('No pending jobs available for Engineer action.', 'neutral')
       return
     }
-    simulateEngineerInspectionAction(pending.id)
-    pushToast(`Simulation Engine: Engineer completed job & uploaded evidence for ${pending.id}!`, 'success')
+    const ok = await simulateEngineerInspectionAction(pending.id)
+    if (ok) pushToast(`Simulation Engine: Engineer completed job & uploaded evidence for ${pending.id}!`, 'success')
   }
 
   return (

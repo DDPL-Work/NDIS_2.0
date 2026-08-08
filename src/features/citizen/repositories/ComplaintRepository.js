@@ -1,4 +1,15 @@
-// Single client-side repository boundary for the complaint engine.
+// Single client-side repository boundary for the citizen complaint engine.
+// Spatial duplicate lookups are delegated to the backend GIS endpoint
+// (GET /api/complaints/nearby/?lat=&lng=&radius=) instead of local heuristics.
+import { ComplaintRepository as SpatialRepository } from '../../../gis/repositories/ComplaintRepository'
+
 export const ComplaintRepository = {
-  findNearbyDuplicates: (complaints, categoryId, position, distanceMeters) => complaints.filter((complaint) => complaint.categoryId === categoryId && complaint.location?.position && distanceMeters(position, complaint.location.position) < 250 && !['closed', 'cancelled'].includes(complaint.state)),
+  findNearbyDuplicates: async (position, radius = 250) => {
+    if (!Array.isArray(position) || position.length < 2) return []
+    try {
+      return await SpatialRepository.findNearby({ lat: position[1], lng: position[0], radius })
+    } catch {
+      return []
+    }
+  },
 }

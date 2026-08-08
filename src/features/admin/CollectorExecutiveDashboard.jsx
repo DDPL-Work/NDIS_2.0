@@ -43,9 +43,9 @@ export default function CollectorExecutiveDashboard() {
   // Department Breakdown
   const deptBreakdown = useMemo(() => {
     return DEPARTMENTS.map((d) => {
-      const list = complaints.filter((c) => c.departmentId === d.id)
+      const list = complaints.filter((c) => c.departmentSlug === d.id)
       const resolved = list.filter((c) => ['resolved', 'closed'].includes(c.state)).length
-      const slaMet = list.filter((c) => new Date(c.slaDueAt).getTime() > new Date(c.createdAt).getTime()).length
+      const slaMet = list.filter((c) => c.slaDueAt && new Date(c.slaDueAt).getTime() > new Date(c.createdAt).getTime()).length
       return {
         id: d.id,
         label: d.label,
@@ -89,16 +89,31 @@ export default function CollectorExecutiveDashboard() {
 
   // Map points
   const mapFacilities = useMemo(() => {
-    return complaints.map((c) => ({
-      id: c.id,
-      name: c.title,
-      departmentId: c.departmentId,
-      categoryLabel: c.categoryName,
-      status: c.state === 'resolved' || c.state === 'closed' ? 'active' : 'inactive',
-      gapScore: c.state === 'escalated' ? 0.95 : c.priority === 'urgent' ? 0.85 : 0.45,
-      position: c.location.position,
-    }))
+    return complaints
+      .filter((c) => Array.isArray(c.location?.position) && c.location.position.length >= 2)
+      .map((c) => ({
+        id: c.id,
+        name: c.title,
+        departmentId: c.departmentId,
+        categoryLabel: c.categoryName,
+        status: c.state === 'resolved' || c.state === 'closed' ? 'active' : 'inactive',
+        gapScore: c.state === 'escalated' ? 0.95 : c.priority === 'urgent' ? 0.85 : 0.45,
+        position: c.location.position,
+      }))
   }, [complaints])
+
+  // Data-driven decision support insights (computed from live complaints)
+  const insights = useMemo(() => {
+    const hotspots = {}
+    complaints.forEach((c) => {
+      const block = c.location?.block || 'Unknown Block'
+      hotspots[block] = (hotspots[block] || 0) + 1
+    })
+    const topBlock = Object.entries(hotspots).sort((a, b) => b[1] - a[1])[0]
+    const escalatedCount = complaints.filter((c) => c.state === 'escalated').length
+    const leadingDept = [...deptBreakdown].sort((a, b) => b.slaPct - a.slaPct)[0]
+    return { topBlock, escalatedCount, leadingDept }
+  }, [complaints, deptBreakdown])
 
   return (
     <div className="space-y-6 pb-8">
@@ -154,7 +169,7 @@ export default function CollectorExecutiveDashboard() {
               <CardBody className="!p-0">
                 <div className="divide-y divide-ink-100">
                   {criticalComplaints.map((c) => {
-                    const dept = DEPARTMENT_MAP[c.departmentId]
+                    const dept = DEPARTMENT_MAP[c.departmentSlug] || {} 
                     return (
                       <div key={c.id} className="p-4 flex items-center justify-between gap-3 hover:bg-ink-50/50 transition-colors">
                         <div className="min-w-0 flex-1">
@@ -165,7 +180,7 @@ export default function CollectorExecutiveDashboard() {
                           </div>
                           <h4 className="text-[13.5px] font-semibold text-ink-950 mt-1 truncate">{c.title}</h4>
                           <p className="text-[11.5px] text-ink-500 mt-0.5">
-                            {dept?.label} · {c.location.village}, {c.location.block} · SLA Due: {formatDateTime(c.slaDueAt)}
+                            {dept?.label} · {c.location.village}, {c.location.block} · SLA Due: {c.slaDueAt ? formatDateTime(c.slaDueAt) : '—'}
                           </p>
                         </div>
                         <Button size="sm" variant="outline" icon={Eye} onClick={() => setSelectedComplaintId(c.id)}>
@@ -254,7 +269,11 @@ export default function CollectorExecutiveDashboard() {
                   <ShieldAlert size={14} className="text-saffron-600" /> Preventive Maintenance Warning
                 </span>
                 <p className="text-[11.5px] text-saffron-800 leading-snug">
-                  High density of JJM water pump complaints detected in Silao Block (4 failures in 48h). Sanction motor overhaul.
+                  {insights.topBlock ? (
+                    <>Highest complaint density detected in {insights.topBlock[0]} Block ({insights.topBlock[1]} complaints). Schedule preventive maintenance sweeps.</>
+                  ) : (
+                    <>No complaint density patterns detected in the current dataset.</>
+                  )}
                 </p>
               </div>
 
@@ -263,7 +282,9 @@ export default function CollectorExecutiveDashboard() {
                   <CheckCircle2 size={14} className="text-leaf-600" /> Officer SLA Compliance Target
                 </span>
                 <p className="text-[11.5px] text-leaf-800 leading-snug">
-                  Water & Health departments leading resolution SLA at 92%. Recommend performance recognition for Junior Engineer Manoj Singh.
+                  {insights.leadingDept?.total
+                    ? <>Leading department by SLA is {insights.leadingDept.label} at {insights.leadingDept.slaPct}%. {insights.escalatedCount} tickets currently require escalation review.</>
+                    : <>No SLA performance data available yet for ranking departments.</>}
                 </p>
               </div>
             </CardBody>

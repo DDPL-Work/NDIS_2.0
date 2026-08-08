@@ -52,7 +52,7 @@ export default function MapToolbar({
             <ChevronDown size={12} className={clsx('transition-transform', basemapOpen && 'rotate-180')} />
           </button>
           {basemapOpen && (
-            <div className="absolute left-full top-0 ml-1.5 card !p-1 flex flex-col gap-0.5 w-28 z-50 shadow-xl animate-fade-in">
+            <div className="absolute right-full top-0 mr-1.5 card !p-1 flex flex-col gap-0.5 w-32 z-50 border-ink-200 shadow-popover animate-fade-in">
               {BASEMAPS.map((b) => (
                 <button
                   key={b.id}

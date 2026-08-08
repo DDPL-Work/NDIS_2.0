@@ -19,7 +19,7 @@ export default function DepartmentWorkflowWorkspace() {
   const filteredTickets = useMemo(() => {
     if (activeStateTab === 'all') return complaints
     if (activeStateTab === 'pending') return complaints.filter((c) => ['submitted', 'assigned', 'accepted'].includes(c.state))
-    if (activeStateTab === 'in_progress') return complaints.filter((c) => ['inspection_scheduled', 'work_started'].includes(c.state))
+    if (activeStateTab === 'in_progress') return complaints.filter((c) => ['inspection_started', 'evidence_uploaded'].includes(c.state))
     if (activeStateTab === 'escalated') return complaints.filter((c) => c.state === 'escalated')
     if (activeStateTab === 'completed') return complaints.filter((c) => ['resolved', 'closed'].includes(c.state))
     return complaints

@@ -3,7 +3,7 @@
 export const HEALTH_CONFIG = {
   id: 'health',
   code: 'HLTH',
-  label: 'Health & Family Welfare',
+  label: 'Health Department',
   tagline: 'Healthcare Infrastructure, Emergency Medical Services & Public Health Telemetry',
   color: '#c0392b',
   accent: 'alert',

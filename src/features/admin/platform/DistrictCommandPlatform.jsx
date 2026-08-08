@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react'
 import PageHeader from '../../../components/ui/PageHeader'
 import Badge from '../../../components/ui/Badge'
-import Select from '../../../components/ui/Select'
 import Modal from '../../../components/ui/Modal'
 import { Card, CardHeader, CardBody } from '../../../components/ui/Card'
 import Button from '../../../components/ui/Button'
@@ -22,18 +21,8 @@ import GovernanceTab from './GovernanceTab'
 import { DistrictStatisticsRepository } from './DistrictStatisticsRepository'
 import { DistrictBriefRepository } from './DistrictBriefRepository'
 
-const ROLE_OPTIONS = [
-  { value: 'district_collector', label: 'District Collector (DM)' },
-  { value: 'adm', label: 'Additional District Magistrate (ADM)' },
-  { value: 'supervisor', label: 'CEO Zila Parishad' },
-  { value: 'dept_head', label: 'District Planning Officer' },
-  { value: 'dept_officer', label: 'District Finance Officer' },
-  { value: 'system_admin', label: 'District IT Officer' },
-]
-
 export default function DistrictCommandPlatform() {
   const user = useAuthStore((s) => s.user)
-  const signInAs = useAuthStore((s) => s.signInAs)
   const pushToast = useUiStore((s) => s.pushToast)
 
   // Simulation store hooks
@@ -166,13 +155,7 @@ export default function DistrictCommandPlatform() {
         description="Unified administration platform. Coordinate departments, track vehicle fleet, manage emergency response, and deploy field audits."
         action={
           <div className="flex items-center gap-3">
-            <span className="text-[12.5px] font-semibold text-ink-600">Active Command Role:</span>
-            <Select
-              small
-              value={user?.role || 'district_collector'}
-              onChange={(role) => signInAs(role)}
-              options={ROLE_OPTIONS}
-            />
+            <span className="text-[12.5px] font-semibold text-ink-600">Active command role: {user?.designation || user?.role}</span>
           </div>
         }
       />

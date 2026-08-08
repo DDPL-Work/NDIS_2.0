@@ -8,17 +8,18 @@ import { useAuthorization } from './identity/hooks/useAuthorization'
 // The department layout is deliberately a thin adapter over the application's
 // one shared shell. It does not create a second header, sidebar, or provider.
 export default function DepartmentLayout() {
-  const { dept } = useDepartment()
+  const { dept, deptName } = useDepartment()
   const { can } = useAuthorization()
   const navItems = useMemo(() => getDepartmentNavigation(can), [can])
+  const departmentLabel = deptName || dept?.label || 'Department'
 
   return <AppShell
     navItems={navItems}
-    portalLabel={dept.label}
+    portalLabel={departmentLabel}
     portalIcon={dept.icon || 'Building2'}
     accentClassName="bg-saffron-500"
     title="Department Workspace"
-    subtitle={`${dept.label} · authenticated enterprise operations`}
+    subtitle={`${departmentLabel} · authenticated enterprise operations`}
     showDistrict
     showDepartment
   ><Outlet /></AppShell>

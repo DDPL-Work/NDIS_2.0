@@ -2,7 +2,6 @@
 
 export const DistrictBriefRepository = {
   getDailyBrief(complaints, timestamp) {
-    const total = complaints.length
     const critical = complaints.filter(
       (c) => (c.priority === 'urgent' || c.state === 'escalated') && c.state !== 'resolved' && c.state !== 'closed'
     )

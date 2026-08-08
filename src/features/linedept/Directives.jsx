@@ -8,7 +8,7 @@ import Button from '../../components/ui/Button'
 import Select from '../../components/ui/Select'
 import ProposalTimeline from '../shared/ProposalTimeline'
 import { useAsync } from '../../hooks/useAsync'
-import { workflowApi, authApi } from '../../services/api'
+import { workflowApi, directoryApi } from '../../services/api'
 import { useAuthStore } from '../../app/store/authStore'
 import { useUiStore } from '../../app/store/uiStore'
 import { formatCurrencyINR } from '../../utils/format'
@@ -21,7 +21,7 @@ export default function Directives() {
   const [busy, setBusy] = useState(false)
 
   const { data: directives, loading, refetch } = useAsync(() => workflowApi.getDirectives(user?.departmentId), [user?.departmentId])
-  const { data: engineersData } = useAsync(() => authApi.listFieldEngineers(user?.departmentId), [user?.departmentId])
+  const { data: engineersData } = useAsync(() => directoryApi.listFieldEngineers(user?.departmentId), [user?.departmentId])
   const engineers = engineersData || []
 
   async function acknowledgeAndAssign() {

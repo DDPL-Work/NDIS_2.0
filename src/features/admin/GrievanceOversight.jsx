@@ -12,7 +12,7 @@ import { formatDate, daysUntil } from '../../utils/format'
 const TABS = [
   { value: 'all', label: 'All' },
   { value: 'escalated', label: 'Escalated' },
-  { value: 'in_progress', label: 'In progress' },
+  { value: 'inspection_started', label: 'Inspection' },
   { value: 'resolved', label: 'Resolved' },
 ]
 

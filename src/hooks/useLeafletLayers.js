@@ -1,0 +1,76 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { GISRepository } from '../gis/repositories/GISRepository'
+import { createCatalogLayer } from '../services/LeafletLayerService'
+
+// REF.html toggleLayer() + loadedGeoJSONLayers cache, expressed as React state.
+// A layer is fetched from GET /api/gis/layers/{layer_name}/ exactly once and
+// cached as a Leaflet layer; toggling only adds/removes it from the map.
+export const DEFAULT_LAYERS = ['District_boundary', 'Block_boundary']
+
+export function useLeafletLayers(map, { defaults = DEFAULT_LAYERS } = {}) {
+  const cache = useRef(new Map())          // layer name → Leaflet layer instance
+  const [visible, setVisible] = useState({})
+  const [loading, setLoading] = useState({})
+  const [error, setError] = useState(null)
+  const visibleRef = useRef(visible)
+
+  useEffect(() => {
+    visibleRef.current = visible
+  }, [visible])
+
+  const toggle = useCallback(async (layer, forceVisible) => {
+    const name = typeof layer === 'string' ? layer : layer?.name
+    if (!name || !map) return
+    const shouldShow = forceVisible ?? !visibleRef.current[name]
+
+    if (!shouldShow) {
+      const cached = cache.current.get(name)
+      if (cached && map.hasLayer(cached)) map.removeLayer(cached)
+      setVisible((current) => ({ ...current, [name]: false }))
+      return
+    }
+
+    if (cache.current.has(name)) {
+      const cached = cache.current.get(name)
+      if (!map.hasLayer(cached)) map.addLayer(cached)
+      setVisible((current) => ({ ...current, [name]: true }))
+      return
+    }
+
+    setLoading((current) => ({ ...current, [name]: true }))
+    setError(null)
+    try {
+      const geojson = await GISRepository.layer(name)
+      const leafletLayer = createCatalogLayer(geojson, { layerName: geojson.layerName || name, category: geojson.category })
+      cache.current.set(name, leafletLayer)
+      map.addLayer(leafletLayer)
+      setVisible((current) => ({ ...current, [name]: true }))
+    } catch (requestError) {
+      setError(requestError)
+      setVisible((current) => ({ ...current, [name]: false }))
+    } finally {
+      setLoading((current) => ({ ...current, [name]: false }))
+    }
+  }, [map])
+
+  const clearAll = useCallback(() => {
+    Object.keys(visibleRef.current).forEach((name) => {
+      if (visibleRef.current[name]) toggle(name, false)
+    })
+  }, [toggle])
+
+  const showDefaults = useCallback(() => {
+    defaults.forEach((name) => toggle(name, true))
+  }, [defaults, toggle])
+
+  // District + Block boundaries are ON by default: once the map is ready they
+  // are fetched and added immediately (counter always equals visible layers).
+  useEffect(() => {
+    if (!map) return
+    defaults.forEach((name) => toggle(name, true))
+  }, [map, toggle, defaults])
+
+  const activeCount = Object.values(visible).filter(Boolean).length
+
+  return { visible, loading, error, toggle, clearAll, showDefaults, activeCount, cachedCount: cache.current.size, defaults }
+}

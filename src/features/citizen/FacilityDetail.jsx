@@ -2,11 +2,9 @@
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft, MapPin, Phone, Clock, ShieldCheck, AlertTriangle, Navigation2,
-  HeartPulse, Droplets, GraduationCap, Landmark, Sun, Building2, CheckCircle2,
-  Activity, Users, Zap, Award
+  HeartPulse, Droplets, GraduationCap, Landmark, Sun, Building2,
 } from 'lucide-react'
-import { useAsync } from '../../hooks/useAsync'
-import { gisApi } from '../../services/api'
+import { useFacilityDetail } from '../../hooks/useFacilityDetail'
 import { Card, CardBody, CardHeader } from '../../components/ui/Card'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -29,23 +27,27 @@ function TelemetryCard({ departmentId, attributes }) {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
               <div className="card !p-2 bg-white">
                 <p className="text-[10.5px] uppercase tracking-wide text-ink-400">Total Beds</p>
-                <p className="text-lg font-display font-semibold text-alert-700">{attributes.bed_count ?? 'N/A'}</p>
+                <p className="text-lg font-display font-semibold text-alert-700">{attributes.bed_count ?? '—'}</p>
               </div>
               <div className="card !p-2 bg-white">
                 <p className="text-[10.5px] uppercase tracking-wide text-ink-400">Medical Staff</p>
-                <p className="text-lg font-display font-semibold text-ink-900">{attributes.staff_count ?? 'N/A'}</p>
+                <p className="text-lg font-display font-semibold text-ink-900">{attributes.staff_count ?? '—'}</p>
               </div>
               <div className="card !p-2 bg-white">
                 <p className="text-[10.5px] uppercase tracking-wide text-ink-400">Oxygen Status</p>
-                <Badge tone={attributes.oxygen_supply_status === 'adequate' ? 'positive' : 'warning'} className="mt-1">
-                  {titleCase(attributes.oxygen_supply_status || 'normal')}
-                </Badge>
+                {attributes.oxygen_supply_status ? (
+                  <Badge tone={attributes.oxygen_supply_status === 'adequate' ? 'positive' : 'warning'} className="mt-1">
+                    {titleCase(attributes.oxygen_supply_status)}
+                  </Badge>
+                ) : <p className="mt-1 text-ink-400">—</p>}
               </div>
               <div className="card !p-2 bg-white">
                 <p className="text-[10.5px] uppercase tracking-wide text-ink-400">Emergency Unit</p>
-                <Badge tone={attributes.has_emergency ? 'positive' : 'neutral'} className="mt-1">
-                  {attributes.has_emergency ? '24x7 Ready' : 'Standard'}
-                </Badge>
+                {typeof attributes.has_emergency === 'boolean' ? (
+                  <Badge tone={attributes.has_emergency ? 'positive' : 'neutral'} className="mt-1">
+                    {attributes.has_emergency ? '24x7 Ready' : 'Standard'}
+                  </Badge>
+                ) : <p className="mt-1 text-ink-400">—</p>}
               </div>
             </div>
           </CardBody>
@@ -60,21 +62,23 @@ function TelemetryCard({ departmentId, attributes }) {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
               <div className="card !p-2 bg-white">
                 <p className="text-[10.5px] uppercase tracking-wide text-ink-400">Tank Capacity</p>
-                <p className="text-lg font-display font-semibold text-sky-700">{formatNumber(attributes.capacity_liters)} L</p>
+                <p className="text-lg font-display font-semibold text-sky-700">{attributes.capacity_liters != null ? `${formatNumber(attributes.capacity_liters)} L` : '—'}</p>
               </div>
               <div className="card !p-2 bg-white">
                 <p className="text-[10.5px] uppercase tracking-wide text-ink-400">JJM Connections</p>
-                <p className="text-lg font-display font-semibold text-ink-900">{formatNumber(attributes.connection_count)}</p>
+                <p className="text-lg font-display font-semibold text-ink-900">{attributes.connection_count ?? '—'}</p>
               </div>
               <div className="card !p-2 bg-white">
                 <p className="text-[10.5px] uppercase tracking-wide text-ink-400">Water Quality</p>
-                <Badge tone={attributes.quality_test_status === 'pass' ? 'positive' : 'negative'} className="mt-1">
-                  {titleCase(attributes.quality_test_status || 'pass')}
-                </Badge>
+                {attributes.quality_test_status ? (
+                  <Badge tone={attributes.quality_test_status === 'pass' ? 'positive' : 'negative'} className="mt-1">
+                    {titleCase(attributes.quality_test_status)}
+                  </Badge>
+                ) : <p className="mt-1 text-ink-400">—</p>}
               </div>
               <div className="card !p-2 bg-white">
                 <p className="text-[10.5px] uppercase tracking-wide text-ink-400">Source Type</p>
-                <p className="text-[12px] font-semibold text-ink-800 mt-1">{titleCase(attributes.source_type || 'Borewell')}</p>
+                <p className="text-[12px] font-semibold text-ink-800 mt-1">{attributes.source_type ? titleCase(attributes.source_type) : '—'}</p>
               </div>
             </div>
           </CardBody>
@@ -89,21 +93,23 @@ function TelemetryCard({ departmentId, attributes }) {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
               <div className="card !p-2 bg-white">
                 <p className="text-[10.5px] uppercase tracking-wide text-ink-400">Enrolled Students</p>
-                <p className="text-lg font-display font-semibold text-leaf-700">{formatNumber(attributes.student_count)}</p>
+                <p className="text-lg font-display font-semibold text-leaf-700">{attributes.student_count ?? '—'}</p>
               </div>
               <div className="card !p-2 bg-white">
                 <p className="text-[10.5px] uppercase tracking-wide text-ink-400">Teachers</p>
-                <p className="text-lg font-display font-semibold text-ink-900">{attributes.teacher_count ?? 'N/A'}</p>
+                <p className="text-lg font-display font-semibold text-ink-900">{attributes.teacher_count ?? '—'}</p>
               </div>
               <div className="card !p-2 bg-white">
                 <p className="text-[10.5px] uppercase tracking-wide text-ink-400">Board Affiliation</p>
-                <p className="text-[12px] font-semibold text-ink-800 mt-1">{attributes.board_affiliation || 'BSEB'}</p>
+                <p className="text-[12px] font-semibold text-ink-800 mt-1">{attributes.board_affiliation || '—'}</p>
               </div>
               <div className="card !p-2 bg-white">
                 <p className="text-[10.5px] uppercase tracking-wide text-ink-400">Smart Classrooms</p>
-                <Badge tone={attributes.has_digital_classroom ? 'positive' : 'neutral'} className="mt-1">
-                  {attributes.has_digital_classroom ? 'Available' : 'Pending'}
-                </Badge>
+                {typeof attributes.has_digital_classroom === 'boolean' ? (
+                  <Badge tone={attributes.has_digital_classroom ? 'positive' : 'neutral'} className="mt-1">
+                    {attributes.has_digital_classroom ? 'Available' : 'Pending'}
+                  </Badge>
+                ) : <p className="mt-1 text-ink-400">—</p>}
               </div>
             </div>
           </CardBody>
@@ -118,19 +124,21 @@ function TelemetryCard({ departmentId, attributes }) {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
               <div className="card !p-2 bg-white">
                 <p className="text-[10.5px] uppercase tracking-wide text-ink-400">Monthly Footfall</p>
-                <p className="text-lg font-display font-semibold text-violet-700">{formatNumber(attributes.avg_footfall_monthly)}</p>
+                <p className="text-lg font-display font-semibold text-violet-700">{attributes.avg_footfall_monthly ?? '—'}</p>
               </div>
               <div className="card !p-2 bg-white">
                 <p className="text-[10.5px] uppercase tracking-wide text-ink-400">Heritage Status</p>
-                <Badge tone="info" className="mt-1">{attributes.heritage_protection_status || 'ASI Protected'}</Badge>
+                {attributes.heritage_protection_status ? (
+                  <Badge tone="info" className="mt-1">{attributes.heritage_protection_status}</Badge>
+                ) : <p className="mt-1 text-ink-400">—</p>}
               </div>
               <div className="card !p-2 bg-white">
                 <p className="text-[10.5px] uppercase tracking-wide text-ink-400">Entry Fee</p>
-                <p className="text-[13px] font-semibold text-ink-900 mt-1">{attributes.entry_fee ? `₹${attributes.entry_fee}` : 'Free Entry'}</p>
+                <p className="text-[13px] font-semibold text-ink-900 mt-1">{attributes.entry_fee != null ? `₹${attributes.entry_fee}` : '—'}</p>
               </div>
               <div className="card !p-2 bg-white">
                 <p className="text-[10.5px] uppercase tracking-wide text-ink-400">Visiting Hours</p>
-                <p className="text-[11.5px] font-medium text-ink-700 mt-1">{attributes.visiting_hours || '09:00 - 17:30'}</p>
+                <p className="text-[11.5px] font-medium text-ink-700 mt-1">{attributes.visiting_hours || '—'}</p>
               </div>
             </div>
           </CardBody>
@@ -145,19 +153,21 @@ function TelemetryCard({ departmentId, attributes }) {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
               <div className="card !p-2 bg-white">
                 <p className="text-[10.5px] uppercase tracking-wide text-ink-400">Capacity</p>
-                <p className="text-lg font-display font-semibold text-saffron-700">{attributes.installed_capacity_kw} kW</p>
+                <p className="text-lg font-display font-semibold text-saffron-700">{attributes.installed_capacity_kw != null ? `${attributes.installed_capacity_kw} kW` : '—'}</p>
               </div>
               <div className="card !p-2 bg-white">
                 <p className="text-[10.5px] uppercase tracking-wide text-ink-400">Rooftop Area</p>
-                <p className="text-[13px] font-semibold text-ink-900 mt-1">{formatNumber(attributes.rooftop_area_sqm)} sq.m</p>
+                <p className="text-[13px] font-semibold text-ink-900 mt-1">{attributes.rooftop_area_sqm != null ? `${formatNumber(attributes.rooftop_area_sqm)} sq.m` : '—'}</p>
               </div>
               <div className="card !p-2 bg-white">
                 <p className="text-[10.5px] uppercase tracking-wide text-ink-400">Grid Feed</p>
-                <Badge tone="positive" className="mt-1">{titleCase(attributes.generation_status || 'Generating')}</Badge>
+                {attributes.generation_status ? (
+                  <Badge tone="positive" className="mt-1">{titleCase(attributes.generation_status)}</Badge>
+                ) : <p className="mt-1 text-ink-400">—</p>}
               </div>
               <div className="card !p-2 bg-white">
                 <p className="text-[10.5px] uppercase tracking-wide text-ink-400">Subsidy Scheme</p>
-                <p className="text-[11.5px] font-semibold text-ink-800 mt-1">{attributes.subsidy_scheme_id || 'PM-SURYA'}</p>
+                <p className="text-[11.5px] font-semibold text-ink-800 mt-1">{attributes.subsidy_scheme_id || '—'}</p>
               </div>
             </div>
           </CardBody>
@@ -172,20 +182,22 @@ function TelemetryCard({ departmentId, attributes }) {
             <div className="grid grid-cols-3 gap-3 text-center">
               <div className="card !p-2 bg-white">
                 <p className="text-[10.5px] uppercase tracking-wide text-ink-400">Condition Rating</p>
-                <Badge
-                  tone={attributes.condition_rating === 'good' ? 'positive' : attributes.condition_rating === 'fair' ? 'warning' : 'negative'}
-                  className="mt-1"
-                >
-                  {titleCase(attributes.condition_rating || 'Good')}
-                </Badge>
+                {attributes.condition_rating ? (
+                  <Badge
+                    tone={attributes.condition_rating === 'good' ? 'positive' : attributes.condition_rating === 'fair' ? 'warning' : 'negative'}
+                    className="mt-1"
+                  >
+                    {titleCase(attributes.condition_rating)}
+                  </Badge>
+                ) : <p className="mt-1 text-ink-400">—</p>}
               </div>
               <div className="card !p-2 bg-white">
                 <p className="text-[10.5px] uppercase tracking-wide text-ink-400">Lifecycle State</p>
-                <p className="text-[12.5px] font-semibold text-ink-800 mt-1">{titleCase(attributes.lifecycle_state || 'Operational')}</p>
+                <p className="text-[12.5px] font-semibold text-ink-800 mt-1">{attributes.lifecycle_state ? titleCase(attributes.lifecycle_state) : '—'}</p>
               </div>
               <div className="card !p-2 bg-white">
                 <p className="text-[10.5px] uppercase tracking-wide text-ink-400">Funding Scheme</p>
-                <p className="text-[12.5px] font-semibold text-ink-800 mt-1">{attributes.scheme_id || 'PMGSY'}</p>
+                <p className="text-[12.5px] font-semibold text-ink-800 mt-1">{attributes.scheme_id || '—'}</p>
               </div>
             </div>
           </CardBody>
@@ -195,11 +207,14 @@ function TelemetryCard({ departmentId, attributes }) {
 }
 
 export default function FacilityDetail() {
-  const { id } = useParams()
+  const { slug } = useParams()
   const navigate = useNavigate()
-  const { data: facility, loading } = useAsync(() => gisApi.getFacility(id), [id])
+  const { data: facility, loading, error, refetch } = useFacilityDetail(slug)
 
   if (loading) return <div className="p-6 text-[13px] text-ink-400">Loading facility…</div>
+  if (error) {
+    return <div className="p-8 text-center"><p className="text-[14px] text-ink-600">Unable to load this facility.</p><Button variant="outline" className="mt-3" onClick={refetch}>Try again</Button></div>
+  }
   if (!facility) {
     return (
       <div className="p-8 text-center">
@@ -211,7 +226,11 @@ export default function FacilityDetail() {
     )
   }
 
-  const dept = DEPARTMENT_MAP[facility.departmentId]
+  const dept = DEPARTMENT_MAP[facility.departmentId] || {
+    label: facility.departmentName || 'Department',
+    color: '#546882',
+    icon: 'Building2',
+  }
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-5">

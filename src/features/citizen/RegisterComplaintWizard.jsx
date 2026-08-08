@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo, useCallback } from 'react'
+import { useState, useRef, useMemo, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Check, ArrowRight, ArrowLeft, Navigation, Camera, ShieldCheck, Download, Building2, Eye, EyeOff
@@ -8,10 +8,13 @@ import MapView from '../../components/map/MapView'
 import Button from '../../components/ui/Button'
 import Select from '../../components/ui/Select'
 import { useAuthStore } from '../../app/store/authStore'
-import { useComplaintEngine } from '../../app/store/complaintEngine'
 import { useUiStore } from '../../app/store/uiStore'
-import { CATEGORY_ROUTING_RULES, DEPARTMENT_MAP } from '../../config/constants'
-import { getAllFacilities } from '../../services/mock/facilities'
+import { CATEGORY_ROUTING_RULES, DEPARTMENT_MAP, PRIORITY_CONFIG } from '../../config/constants'
+import { gisApi, workflowApi } from '../../services/api'
+import { ComplaintRepository } from '../../gis/repositories/ComplaintRepository'
+import { departmentSlugFromName, registerReferenceCatalog } from '../../api/mappers/complaintMapper'
+import { backendMasterApi } from '../../api/masterApi'
+import { useDepartmentStore } from '../../store/departments'
 import { distanceMeters } from '../../utils/geo'
 
 const WIZARD_STEPS = [
@@ -26,19 +29,31 @@ const CITIZEN_DEPARTMENTS = [
   ['water', 'Water & Sanitation (JJM)', 'Handpumps, pipelines, tanks and drinking water'], ['electricity', 'Electricity', 'Street lights, transformers and power supply'], ['health', 'Health & Family Welfare', 'Hospitals, ambulances and public health services'], ['education', 'School Education', 'Schools, classrooms and learning facilities'], ['pwd', 'Roads & Public Works', 'Roads, bridges and public buildings'], ['solar', 'Solar & Renewable Energy', 'Solar panels, batteries and renewable systems'], ['tourism', 'Tourism & Heritage', 'Visitor facilities, heritage sites and signs'], ['urban', 'Urban Local Body', 'Sanitation, drains and public spaces'],
 ]
 const ISSUE_CATEGORIES = { water: ['Broken Handpump', 'Pipe Leakage', 'Motor Burnt', 'Water Contamination', 'Low Water Pressure', 'Pipeline Damage', 'Water Tank Overflow', 'Other'], electricity: ['Street Light', 'Transformer', 'Power Failure', 'Electric Pole', 'Electric Wire', 'Meter', 'Other'], health: ['Hospital Cleanliness', 'Medicine Shortage', 'Doctor Absent', 'Oxygen', 'Ambulance', 'Other'], education: ['School Toilet', 'Classroom Damage', 'Furniture', 'Teacher Absent', 'Drinking Water', 'Other'], pwd: ['Pothole', 'Bridge Damage', 'Road Blocked', 'Public Building Damage', 'Other'], solar: ['Solar Panel', 'Battery', 'Controller', 'Power Generation', 'Other'], tourism: ['Tourism Signboard', 'Lighting', 'Visitor Facility', 'Heritage Site', 'Other'], urban: ['Garbage', 'Drain Blockage', 'Sanitation', 'Street Cleaning', 'Other'] }
+const FALLBACK_BLOCKS = [
+  { value: 'silao', label: 'Silao Block' },
+  { value: 'biharsharif', label: 'Bihar Sharif Block' },
+  { value: 'harnaut', label: 'Harnaut Block' },
+]
 const routeFor = (departmentId, category) => CATEGORY_ROUTING_RULES.find((rule) => rule.departmentId === departmentId && rule.categoryName.toLowerCase().includes(category.toLowerCase().split(' ')[0])) || CATEGORY_ROUTING_RULES.find((rule) => rule.departmentId === departmentId) || { categoryId: `${departmentId}_${category.toLowerCase().replace(/\W+/g, '_')}`, categoryName: category, departmentId, defaultPriority: 'medium', slaHours: 24 }
 
 export default function RegisterComplaintWizard() {
   const user = useAuthStore((s) => s.user)
-  const routeComplaintPayload = useComplaintEngine((s) => s.routeComplaintPayload)
   const pushToast = useUiStore((s) => s.pushToast)
   const navigate = useNavigate()
   const mapRef = useRef(null)
+
+  // Service areas are driven by the backend department master data
+  // (backend_guide.md §4.1 — GET /api/departments/), so the numeric FK sent
+  // with the complaint is always the real backend department.
+  const departments = useDepartmentStore((s) => s.departments)
+  const loadDepartments = useDepartmentStore((s) => s.load)
+  useEffect(() => { loadDepartments() }, [loadDepartments])
 
   const [currentStep, setCurrentStep] = useState(1)
 
   // Step 1 State
   const [categoryId, setCategoryId] = useState(CATEGORY_ROUTING_RULES[0].categoryId)
+  const [selectedCategoryKey, setSelectedCategoryKey] = useState(() => `${CATEGORY_ROUTING_RULES[0].categoryId}::${ISSUE_CATEGORIES[CATEGORY_ROUTING_RULES[0].departmentId][0]}`)
   const [selectedDepartmentId, setSelectedDepartmentId] = useState('water')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -54,29 +69,83 @@ export default function RegisterComplaintWizard() {
   const [nearestLandmark] = useState('Public Bus Stand')
   const [isLocating, setIsLocating] = useState(false)
 
+  // Administrative-hierarchy masters (State -> District -> SubDivision ->
+  // Block -> VillageWard).  These load the numeric PKs the complaint create
+  // payload requires; when the backend does not expose the endpoints yet the
+  // lists stay empty and the wizard falls back to the hardcoded options.
+  const [subdivisionId, setSubdivisionId] = useState('')
+  const [subdivisionOptions, setSubdivisionOptions] = useState([])
+  const [subdivisionName, setSubdivisionName] = useState('Bihar Sharif')
+  const [blockOptions, setBlockOptions] = useState([])
+  const [villageWardOptions, setVillageWardOptions] = useState([])
+  const [selectedVillageWard, setSelectedVillageWard] = useState('')
+
+  // Resolve the citizen's district to its numeric PK from /api/districts/,
+  // then load subdivisions -> blocks -> villages/wards for it.
+  const hierarchyReady = useRef(false)
+  useEffect(() => {
+    if (hierarchyReady.current) return
+    hierarchyReady.current = true
+    ;(async () => {
+      try {
+        const districts = await backendMasterApi.districts()
+        const district = districts.find((d) => new RegExp(String(districtId), 'i').test(d.name)) || districts.find((d) => d.id === '24') || districts[0]
+        if (!district) return
+        const subdivisions = await backendMasterApi.subdivisions({ district: district.id })
+        if (!subdivisions.length) return
+        setSubdivisionOptions(subdivisions)
+        const firstSubdivision = subdivisions[0]
+        setSubdivisionId(firstSubdivision.id)
+        const blocks = await backendMasterApi.blocks({ subdivision: firstSubdivision.id })
+        if (!blocks.length) return
+        setBlockOptions(blocks)
+        const firstBlock = blocks[0]
+        setBlockId(firstBlock.id)
+        const wards = await backendMasterApi.villageWards({ block: firstBlock.id })
+        if (!wards.length) return
+        setVillageWardOptions(wards)
+        setSelectedVillageWard(wards[0].id)
+      } catch (masterError) { /* fall back to hardcoded options */ }
+    })()
+  }, [districtId])
+
+  useEffect(() => {
+    if (!subdivisionId || !subdivisionOptions.length) return
+    let cancelled = false
+    backendMasterApi.blocks({ subdivision: subdivisionId }).then((blocks) => {
+      if (cancelled) return
+      setBlockOptions(blocks)
+      if (blocks.length) setBlockId(blocks[0].id)
+      else { setBlockId(''); setVillageWardOptions([]); setSelectedVillageWard('') }
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [subdivisionId, subdivisionOptions.length])
+
+  useEffect(() => {
+    if (!blockId || !blockOptions.length) return
+    let cancelled = false
+    backendMasterApi.villageWards({ block: blockId }).then((wards) => {
+      if (cancelled) return
+      setVillageWardOptions(wards)
+      if (wards.length) setSelectedVillageWard(wards[0].id)
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [blockId, blockOptions.length])
+
   // Step 3 Attachments State
-  const [attachments, setAttachments] = useState([
-    {
-      id: 'att-user-1',
-      type: 'photo',
-      url: 'https://images.unsplash.com/photo-1541888946425-d0fbb186a5b3?auto=format&fit=crop&w=600&q=80',
-      name: 'damage_photo_site.jpg',
-      geotagged: true,
-      coords: [85.4211, 25.0294],
-      distMeters: 14,
-      timestamp: new Date().toISOString(),
-    },
-  ])
+  const [attachments, setAttachments] = useState([])
+  const fileInputRef = useRef(null)
 
   // Step 4 Citizen State
-  const [citizenName, setCitizenName] = useState(user?.name || 'Sunita Devi')
-  const [citizenPhone, setCitizenPhone] = useState('+91 9835210492')
-  const [citizenEmail, setCitizenEmail] = useState('sunita.devi@bihar.gov.in')
-  const [altPhone, setAltPhone] = useState('+91 9431029104')
+  const [citizenName, setCitizenName] = useState(user?.name || '')
+  const [citizenPhone, setCitizenPhone] = useState('')
+  const [citizenEmail, setCitizenEmail] = useState('')
+  const [altPhone, setAltPhone] = useState('')
   const [isMasked, setIsMasked] = useState(false)
 
   // Step 5 Result State
   const [createdTicket, setCreatedTicket] = useState(null)
+  const [nearbyFacilities, setNearbyFacilities] = useState([])
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Auto-selected rule metadata
@@ -84,10 +153,31 @@ export default function RegisterComplaintWizard() {
     return CATEGORY_ROUTING_RULES.find((r) => r.categoryId === categoryId) || CATEGORY_ROUTING_RULES[0]
   }, [categoryId])
 
+  // Department cards rendered from the backend /api/departments/ list; each
+  // row is matched to an app slug (water/health/…) so the existing category
+  // chips and routing rules keep working, while the numeric department id used
+  // in the create payload comes straight from the API.
+  const deptCards = useMemo(() => {
+    if (!departments.length) {
+      return CITIZEN_DEPARTMENTS.map(([id, label, summary]) => ({ id, slug: id, name: label, summary, api: false }))
+    }
+    return departments.map((d) => {
+      const slug = departmentSlugFromName(d.name)
+      const known = CITIZEN_DEPARTMENTS.find(([id]) => id === slug)
+      return {
+        id: String(d.id),
+        slug,
+        name: known ? known[1] : d.name,
+        summary: known ? known[2] : (d.description || 'Line department'),
+        api: true,
+      }
+    })
+  }, [departments])
+
   // Nearest facility computation
   const nearestFacility = useMemo(() => {
-    const facilities = getAllFacilities()
-    if (!facilities.length || !selectedPos) return 'Government School Rajgir (280m)'
+    const facilities = nearbyFacilities.filter((f) => Array.isArray(f.position) && f.position.length >= 2)
+    if (!facilities.length || !selectedPos) return ''
     let minDist = Infinity
     let closest = null
     facilities.forEach((f) => {
@@ -97,8 +187,9 @@ export default function RegisterComplaintWizard() {
         closest = f
       }
     })
-    return closest ? `${closest.name} (${Math.round(minDist)}m away)` : 'Local Panchayat Bhawan'
-  }, [selectedPos])
+    return closest ? `${closest.name} (${Math.round(minDist)}m away)` : ''
+  }, [nearbyFacilities, selectedPos])
+  useEffect(() => { gisApi.searchFacilities({ districtId }).then(setNearbyFacilities).catch(() => setNearbyFacilities([])) }, [districtId])
 
   const handleMapClick = useCallback((lngLat) => {
     const pos = [lngLat.lng, lngLat.lat]
@@ -122,37 +213,80 @@ export default function RegisterComplaintWizard() {
     }
   }, [pushToast])
 
-  const handleSimulateFileUpload = () => {
+  const handleAttachPhoto = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileSelected = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
     const newAtt = {
-      id: `att-sim-${Date.now()}`,
+      id: `att-${Date.now()}`,
       type: 'photo',
-      url: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=600&q=80',
-      name: `inspection_evidence_${Date.now()}.jpg`,
+      url: URL.createObjectURL(file),
+      name: file.name,
+      file, // kept for the evidence upload call after the complaint is created
       geotagged: true,
       coords: selectedPos,
-      distMeters: Math.floor(5 + Math.random() * 15),
+      distMeters: selectedPos ? 0 : null,
       timestamp: new Date().toISOString(),
     }
     setAttachments((prev) => [...prev, newAtt])
-    pushToast('Simulated geotagged photo capture attached.', 'info')
+    pushToast('Photo attached.', 'success')
+    e.target.value = ''
   }
 
-  function handleFinalSubmit() {
+  async function handleFinalSubmit() {
     setIsSubmitting(true)
-    setTimeout(() => {
+    try {
+      // Register the name -> pk reference catalog from the public master-data
+      // endpoints so the create DTO can resolve numeric category/district ids
+      // (the backend rejects free text for those columns).  Non-blocking: if
+      // the fetch fails the complaint still submits with null placeholders.
+      try {
+        const [masterCategories, masterDistricts] = await Promise.all([
+          backendMasterApi.complaintCategories(),
+          backendMasterApi.districts(),
+        ])
+        registerReferenceCatalog([
+          ...masterCategories.map((c) => ({ categoryId: c.id, categoryName: c.name, departmentId: c.departmentId, departmentName: c.departmentName })),
+          ...masterDistricts.map((d) => ({ districtId: d.id, districtName: d.name })),
+        ])
+      } catch (referenceError) { /* non-blocking */ }
+
+      // Resolve integer FK ids from the API departments list first; the
+      // facility fallback only applies when the departments endpoint is down.
+      // The old fallback used the first facility with a numeric department id,
+      // which could silently belong to a different department (e.g. selecting
+      // Health stored the ticket under Urban Development).
+      const selectedDept = deptCards.find((card) => card.api && card.slug === selectedDepartmentId)
+      const deptFacility = nearbyFacilities.find(
+        (f) => (f.department_slug || f.departmentSlug) === selectedDepartmentId && /^\d+$/.test(String(f.departmentId))
+      )
+      const districtFacility = nearbyFacilities.find((f) => /^\d+$/.test(String(f.districtId)))
+
       const payload = {
         categoryId,
         categoryName: selectedRule.categoryName,
-        departmentId: selectedRule.departmentId,
+        departmentId: selectedDept?.id || deptFacility?.departmentId || selectedRule.departmentId,
+        departmentName: selectedDept?.name || deptFacility?.departmentName,
         priority: priority || selectedRule.defaultPriority,
         title: title || selectedRule.categoryName,
         description: description || 'Reported via 5-step Citizen Complaint Wizard.',
         location: {
           position: selectedPos,
           state: 'Bihar',
-          districtId,
-          block: blockId,
-          village: villageName,
+          districtId: districtFacility?.districtId || districtId,
+          districtName: districtFacility?.districtName || 'Nalanda',
+          // subdivision / block / village_ward are integer ForeignKey columns
+          // on the backend (free text is rejected with 400).  When the
+          // admin-hierarchy masters are available the selects hold numeric
+          // PKs; otherwise the fallback display names are kept for the UI,
+          // but the create DTO omits the FK fields entirely so the backend
+          // stores null instead of failing the submission.
+          subdivision: subdivisionOptions.length ? subdivisionId : undefined,
+          block: blockOptions.length ? blockId : undefined,
+          village: villageWardOptions.length ? selectedVillageWard : (villageName || wardName),
           ward: wardName,
           address: streetAddress,
           nearestFacility,
@@ -168,11 +302,23 @@ export default function RegisterComplaintWizard() {
         attachments,
       }
 
-      const ticket = routeComplaintPayload(payload)
+      const ticket = await workflowApi.submitGrievance(payload)
       setCreatedTicket(ticket)
-      setIsSubmitting(false)
+
+      // Evidence uploads go through the dedicated /upload-evidence/ endpoint
+      // (backend_guide.md §10.5) right after the complaint is created.
+      const evidenceFiles = attachments.filter((att) => att.file).map((att) => att.file)
+      if (evidenceFiles.length) {
+        try {
+          await ComplaintRepository.uploadEvidence(ticket.id, evidenceFiles)
+          pushToast(`Evidence uploaded for ${ticket.ticketNumber || ticket.id}.`, 'success')
+        } catch (uploadError) {
+          pushToast(`Ticket created, but evidence upload failed: ${uploadError.message || 'Unknown error'}`, 'warning')
+        }
+      }
+
       pushToast(`Complaint ${ticket.id} registered and routed!`, 'success')
-    }, 600)
+    } catch (error) { pushToast(error.message || 'Unable to register the complaint.', 'error') } finally { setIsSubmitting(false) }
   }
 
   return (
@@ -222,9 +368,39 @@ export default function RegisterComplaintWizard() {
       {!createdTicket && currentStep === 1 && (
         <div className="card p-6 space-y-5 animate-fade-in">
           <div className="border-b border-ink-100 pb-3"><h3 className="text-[15px] font-semibold text-ink-950">Step 1: Tell us what service needs help</h3><p className="text-[12px] text-ink-500">Select the public-service area and the issue you want to report.</p></div>
-          <div className="space-y-2"><span className="text-[12px] font-semibold text-ink-800">Select service area</span><div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">{CITIZEN_DEPARTMENTS.map(([id, label, summary]) => { const selected = selectedDepartmentId === id; return <button key={id} onClick={() => { const first = ISSUE_CATEGORIES[id][0]; const rule = routeFor(id, first); setSelectedDepartmentId(id); setCategoryId(rule.categoryId); setPriority(rule.defaultPriority) }} className={`p-3.5 rounded-xl border text-left transition-all ${selected ? 'border-saffron-500 bg-saffron-50 ring-2 ring-saffron-100' : 'border-ink-200 hover:border-ink-400 hover:-translate-y-0.5'}`}><div className="flex gap-2.5"><div className="grid h-9 w-9 place-items-center rounded-lg text-white" style={{ background: DEPARTMENT_MAP[id]?.color || '#546882' }}><Building2 size={16}/></div><div><b className="block text-[13px]">{label}</b><span className="text-[11px] text-ink-500 leading-snug block mt-1">{summary}</span></div></div></button> })}</div></div>
-          <div className="space-y-2"><span className="text-[12px] font-semibold text-ink-800">Select issue category</span><div className="flex flex-wrap gap-2">{ISSUE_CATEGORIES[selectedDepartmentId].map((category) => { const rule = routeFor(selectedDepartmentId, category); const selected = categoryId === rule.categoryId; return <button key={category} onClick={() => { setCategoryId(rule.categoryId); setPriority(rule.defaultPriority) }} className={`px-3 py-2 rounded-lg text-[12px] font-semibold border ${selected ? 'bg-ink-900 border-ink-900 text-white' : 'border-ink-200 text-ink-700 hover:bg-ink-50'}`}>{category}</button> })}</div></div>
+          <div className="space-y-2"><span className="text-[12px] font-semibold text-ink-800">Select service area</span><div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">{deptCards.map((d) => { const selected = selectedDepartmentId === d.slug; return <button key={d.slug} onClick={() => { const first = (ISSUE_CATEGORIES[d.slug] || ['Other'])[0]; const rule = routeFor(d.slug, first); setSelectedDepartmentId(d.slug); setCategoryId(rule.categoryId); setSelectedCategoryKey(`${rule.categoryId}::${first}`); setPriority(rule.defaultPriority) }} className={`p-3.5 rounded-xl border text-left transition-all ${selected ? 'border-saffron-500 bg-saffron-50 ring-2 ring-saffron-100' : 'border-ink-200 hover:border-ink-400 hover:-translate-y-0.5'}`}><div className="flex gap-2.5"><div className="grid h-9 w-9 place-items-center rounded-lg text-white" style={{ background: DEPARTMENT_MAP[d.slug]?.color || '#546882' }}><Building2 size={16}/></div><div><b className="block text-[13px]">{d.name}</b><span className="text-[11px] text-ink-500 leading-snug block mt-1">{d.summary}</span></div></div></button> })}</div></div>
+          <div className="space-y-2"><span className="text-[12px] font-semibold text-ink-800">Select issue category</span><div className="flex flex-wrap gap-2">{(ISSUE_CATEGORIES[selectedDepartmentId] || ['Other']).map((category) => { const rule = routeFor(selectedDepartmentId, category); const key = `${rule.categoryId}::${category}`; const selected = selectedCategoryKey === key; return <button key={category} onClick={() => { setCategoryId(rule.categoryId); setPriority(rule.defaultPriority); setSelectedCategoryKey(key) }} className={`px-3 py-2 rounded-lg text-[12px] font-semibold border ${selected ? 'bg-ink-900 border-ink-900 text-white' : 'border-ink-200 text-ink-700 hover:bg-ink-50'}`}>{category}</button> })}</div></div>
           <div className="space-y-3 pt-2"><div><label className="block text-[12px] font-semibold text-ink-700 mb-1">Complaint title</label><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={`e.g. ${selectedRule.categoryName} at ${villageName}`} className="w-full rounded-lg border border-ink-200 px-3 py-2 text-[13px]"/></div><div><label className="block text-[12px] font-semibold text-ink-700 mb-1">Describe the problem</label><textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Tell us what happened and when it started." className="w-full rounded-lg border border-ink-200 px-3 py-2 text-[13px]"/></div></div>
+
+          <div className="space-y-2 pt-1 border-t border-ink-100">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <span className="text-[12px] font-semibold text-ink-800">Priority level</span>
+                <p className="text-[11px] text-ink-500 mt-0.5">Set how soon this issue should be addressed. Suggested priority from the routing rules: <b className="text-ink-800">{PRIORITY_CONFIG[priority]?.label}</b>.</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 pt-1">
+              {Object.keys(PRIORITY_CONFIG).map((p) => {
+                const info = PRIORITY_CONFIG[p]
+                const selected = priority === p
+                return (
+                  <button
+                    key={p}
+                    onClick={() => setPriority(p)}
+                    className={`px-3.5 py-2 rounded-lg text-[12px] font-semibold border transition-colors ${
+                      selected ? 'text-white' : 'bg-white text-ink-700 border-ink-200 hover:bg-ink-50'
+                    }`}
+                    style={selected ? { background: info.color, borderColor: info.color } : undefined}
+                  >
+                    {info.label}
+                    <span className={`ml-1.5 font-mono text-[10.5px] ${selected ? 'text-white/80' : 'text-ink-400'}`}>
+                      {info.defaultSlaHours}h SLA
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
         </div>
       )}
       {/* STEP 2: GIS & LOCATION */}
@@ -258,36 +434,73 @@ export default function RegisterComplaintWizard() {
             </div>
 
             <div className="space-y-3 text-[12px]">
+              {subdivisionOptions.length > 0 ? (
+                <div>
+                  <label className="block font-semibold text-ink-700 mb-1">Sub-Division</label>
+                  <Select
+                    value={subdivisionId}
+                    onChange={setSubdivisionId}
+                    options={subdivisionOptions.map((item) => ({ value: item.id, label: item.name }))}
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="block font-semibold text-ink-700 mb-1">Sub-Division</label>
+                  <input
+                    value={subdivisionName}
+                    onChange={(e) => setSubdivisionName(e.target.value)}
+                    className="w-full rounded-lg border border-ink-200 px-3 py-1.5"
+                  />
+                </div>
+              )}
+
               <div>
                 <label className="block font-semibold text-ink-700 mb-1">Administrative Block</label>
-                <Select
-                  value={blockId}
-                  onChange={setBlockId}
-                  options={[
-                    { value: 'silao', label: 'Silao Block' },
-                    { value: 'biharsharif', label: 'Bihar Sharif Block' },
-                    { value: 'harnaut', label: 'Harnaut Block' },
-                  ]}
-                />
+                {blockOptions.length > 0 ? (
+                  <Select
+                    value={blockId}
+                    onChange={setBlockId}
+                    options={blockOptions.map((item) => ({ value: item.id, label: item.name }))}
+                  />
+                ) : (
+                  <Select
+                    value={blockId}
+                    onChange={setBlockId}
+                    options={FALLBACK_BLOCKS}
+                  />
+                )}
               </div>
 
-              <div>
-                <label className="block font-semibold text-ink-700 mb-1">Village / Settlement</label>
-                <input
-                  value={villageName}
-                  onChange={(e) => setVillageName(e.target.value)}
-                  className="w-full rounded-lg border border-ink-200 px-3 py-1.5"
-                />
-              </div>
+              {villageWardOptions.length > 0 ? (
+                <div>
+                  <label className="block font-semibold text-ink-700 mb-1">Village / Ward</label>
+                  <Select
+                    value={selectedVillageWard}
+                    onChange={setSelectedVillageWard}
+                    options={villageWardOptions.map((item) => ({ value: item.id, label: item.name }))}
+                  />
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="block font-semibold text-ink-700 mb-1">Village / Settlement</label>
+                    <input
+                      value={villageName}
+                      onChange={(e) => setVillageName(e.target.value)}
+                      className="w-full rounded-lg border border-ink-200 px-3 py-1.5"
+                    />
+                  </div>
 
-              <div>
-                <label className="block font-semibold text-ink-700 mb-1">Ward Number</label>
-                <input
-                  value={wardName}
-                  onChange={(e) => setWardName(e.target.value)}
-                  className="w-full rounded-lg border border-ink-200 px-3 py-1.5"
-                />
-              </div>
+                  <div>
+                    <label className="block font-semibold text-ink-700 mb-1">Ward Number</label>
+                    <input
+                      value={wardName}
+                      onChange={(e) => setWardName(e.target.value)}
+                      className="w-full rounded-lg border border-ink-200 px-3 py-1.5"
+                    />
+                  </div>
+                </>
+              )}
 
             </div>
           </div>
@@ -302,9 +515,10 @@ export default function RegisterComplaintWizard() {
               <h3 className="text-[15px] font-semibold text-ink-950">Step 3: Attach Geo-Tagged Evidence</h3>
               <p className="text-[12px] text-ink-500">Upload site photos or video. Distance to dropped GIS pin is validated automatically.</p>
             </div>
-            <Button size="sm" variant="saffron" icon={Camera} onClick={handleSimulateFileUpload}>
+            <Button size="sm" variant="saffron" icon={Camera} onClick={handleAttachPhoto}>
               Capture / Attach Photo
             </Button>
+            <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileSelected} />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -314,7 +528,7 @@ export default function RegisterComplaintWizard() {
                 <div className="min-w-0 flex-1 text-[12px]">
                   <p className="font-semibold text-ink-900 truncate">{att.name}</p>
                   <div className="flex items-center gap-1.5 text-leaf-700 font-medium text-[11px] mt-0.5">
-                    <ShieldCheck size={13} /> Geo-Tagged (Valid distance {att.distMeters}m)
+                    <ShieldCheck size={13} /> Geo-Tagged (Valid distance {att.distMeters ?? '—'}m)
                   </div>
                   <p className="text-[10.5px] text-ink-400 font-mono mt-1">{new Date(att.timestamp).toLocaleTimeString()}</p>
                 </div>
@@ -388,7 +602,19 @@ export default function RegisterComplaintWizard() {
             </div>
             <div>
               <span className="text-[11px] font-semibold text-ink-400 uppercase">Location</span>
-              <p className="font-semibold text-ink-900 mt-0.5">{villageName}, {wardName} ({blockId.toUpperCase()})</p>
+              <p className="font-semibold text-ink-900 mt-0.5">
+                {villageWardOptions.find((item) => item.id === selectedVillageWard)?.name || villageName}, {wardName} ({String(blockOptions.find((item) => item.id === blockId)?.name || blockId).toUpperCase()})
+              </p>
+            </div>
+            <div>
+              <span className="text-[11px] font-semibold text-ink-400 uppercase">Priority</span>
+              <p className="font-semibold mt-0.5 flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full" style={{ background: PRIORITY_CONFIG[priority]?.color }} />
+                {PRIORITY_CONFIG[priority]?.label}
+                <span className="font-mono text-[10.5px] text-ink-400 font-normal">
+                  {PRIORITY_CONFIG[priority]?.defaultSlaHours}h SLA
+                </span>
+              </p>
             </div>
           </div>
         </div>

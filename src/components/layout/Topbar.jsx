@@ -42,7 +42,8 @@ function UserMenu() {
         <div className="absolute right-0 mt-2 w-56 card p-1.5 z-30 animate-fade-in">
           <div className="px-2.5 py-2">
             <p className="text-[13px] font-semibold text-ink-900">{user?.name}</p>
-            <p className="text-[11.5px] text-ink-500">{ROLE_LABELS[user?.role]}</p>
+            <p className="text-[11.5px] text-ink-500">{user?.designation || ROLE_LABELS[user?.role]}</p>
+            {user?.department?.label && <p className="text-[10.5px] text-ink-400">{user.department.label}</p>}
           </div>
           <div className="h-px bg-ink-100 my-1" />
           <button
@@ -52,7 +53,7 @@ function UserMenu() {
             }}
             className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-[12.5px] font-medium text-alert-600 hover:bg-alert-50"
           >
-            <LogOut size={14} /> Switch role / Sign out
+            <LogOut size={14} /> Sign out
           </button>
         </div>
       )}
@@ -69,7 +70,7 @@ export default function Topbar({ title, subtitle, showDistrict = true, showDepar
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [cmdOpen, setCmdOpen] = useState(false)
 
-  const { data: notifications, refetch: refetchNotifs } = useAsync(() => notificationApi.listNotifications(), [])
+  const { data: notifications } = useAsync(() => notificationApi.listNotifications(), [])
   const [localNotifs, setLocalNotifs] = useState([])
 
   useEffect(() => {
@@ -79,10 +80,6 @@ export default function Topbar({ title, subtitle, showDistrict = true, showDepar
   const unreadCount = localNotifs.filter((n) => !n.read).length
   const canSwitchDepartment = [ROLES.DISTRICT_COLLECTOR, ROLES.DM, ROLES.ADM, ROLES.STATE_ADMIN, ROLES.SYSTEM_ADMIN].includes(user?.role)
   const currentDepartment = DEPARTMENTS.find((department) => department.id === user?.departmentId)
-
-  function handleMarkAllRead() {
-    setLocalNotifs((cur) => cur.map((n) => ({ ...n, read: true })))
-  }
 
   return (
     <>
@@ -154,7 +151,6 @@ export default function Topbar({ title, subtitle, showDistrict = true, showDepar
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         notifications={localNotifs}
-        onMarkAllRead={handleMarkAllRead}
       />
 
       <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />

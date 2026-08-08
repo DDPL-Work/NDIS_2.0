@@ -7,7 +7,7 @@ const TEMPLATES = [
   { event: 'workflow.transitioned', text: (p) => `Proposal ${p} was approved.` },
   { event: 'grievance.sla_breached', text: (p) => `Grievance ${p} escalated — SLA window elapsed.` },
   { event: 'asset.ingested', text: (p) => `CSV batch ${p} ingestion completed with validation warnings.` },
-  { event: 'directive.issued', text: (p) => `New directive received from DM office — action required.` },
+  { event: 'directive.issued', text: () => `New directive received from DM office — action required.` },
 ]
 
 let _cache = null

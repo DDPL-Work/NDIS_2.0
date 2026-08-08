@@ -16,7 +16,7 @@ export function simulateCsvIngestion(fileName, departmentId) {
   const totalRows = randInt(rng, 40, 320)
   const rejected = randInt(rng, 0, Math.round(totalRows * 0.12))
   const accepted = totalRows - rejected
-  const rejectedRows = Array.from({ length: Math.min(rejected, 8) }, (_, i) => ({
+  const rejectedRows = Array.from({ length: Math.min(rejected, 8) }, () => ({
     row: randInt(rng, 2, totalRows),
     reason: REASON_CODES[randInt(rng, 0, REASON_CODES.length - 1)],
   }))

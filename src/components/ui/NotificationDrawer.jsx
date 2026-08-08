@@ -60,7 +60,7 @@ export default function NotificationDrawer({ open, onClose, notifications = [], 
             ))}
           </div>
 
-          {unreadCount > 0 && (
+          {onMarkAllRead && unreadCount > 0 && (
             <button onClick={onMarkAllRead} className="text-ink-600 hover:text-ink-950 font-medium flex items-center gap-1">
               <Check size={12} /> Mark all read
             </button>

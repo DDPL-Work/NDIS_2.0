@@ -1,61 +1,142 @@
 // Situation Matrix — cross-department deficit GIS view for Admin portal.
 // FR-AP-01 (LLD Vol 3 §17): facility map + gap-score heatmap + hotspot overlay.
-// Phase 2 additions: facility detail slide-out panel, district boundary polygon,
-// gap-score filter slider, map tools toolbar.
-import { useState, useMemo, useRef, useCallback } from 'react'
-import { Flame, Layers, SlidersHorizontal, X, MapPin, AlertTriangle, ClipboardCheck } from 'lucide-react'
+// Backend data sources (backend_guide.md): /api/departments/, /api/gis/catalog/,
+// /api/gis/layers/{name}/, /api/facilities/ (department/catalog filters),
+// /api/complaints/heatmap/.  Reuses the citizen GIS pipeline verbatim:
+// DepartmentRepository/useDepartments, GISRepository (catalog, layers,
+// facilities, complaints), useLeafletLayers, CitizenLayerPanel,
+// FacilityInfoPanel and the shared facility mapper — no duplicate GIS logic.
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
+import { Flame, Layers, SlidersHorizontal, MapPin } from 'lucide-react'
 import MapView from '../../components/map/MapView'
 import MapToolbar from '../../components/map/MapToolbar'
 import { DepartmentLegend, GapScoreLegend } from '../../components/map/MapLegend'
 import PageHeader from '../../components/ui/PageHeader'
 import Badge from '../../components/ui/Badge'
-import GapScoreRing from '../../components/ui/GapScoreRing'
-import StatusBadge from '../../components/ui/StatusBadge'
+import FacilityInfoPanel from '../../components/map/FacilityInfoPanel'
+import CitizenLayerPanel from '../citizen/CitizenLayerPanel'
 import { useAsync } from '../../hooks/useAsync'
-import { useMapTools, MAP_TOOLS, BASEMAPS } from '../../hooks/useMapTools'
-import { gisApi, analyticsApi, workflowApi } from '../../services/api'
+import { useMapTools } from '../../hooks/useMapTools'
+import { useDepartments, departmentMapFrom } from '../../hooks/useDepartments'
+import { useGISCatalog } from '../../hooks/useGISCatalog'
+import { useLeafletLayers } from '../../hooks/useLeafletLayers'
+import { useFacilityClickHandler } from '../../hooks/useFacilityClickHandler'
+import GISSearchPanel from '../../gis/components/GISSearchPanel'
+import { GISRepository } from '../../gis/repositories/GISRepository'
 import { useAuthStore } from '../../app/store/authStore'
-import { DEPARTMENTS, DISTRICTS, DEPARTMENT_MAP } from '../../config/constants'
-import { formatDate } from '../../utils/format'
+import { DEPARTMENTS, DISTRICTS } from '../../config/constants'
 
 export default function SituationMatrix() {
   const user = useAuthStore((s) => s.user)
   const districtId = user?.districtId || 'nalanda'
-  const district = DISTRICTS.find((d) => d.id === districtId)
+  const district = DISTRICTS.find((d) => d.id === districtId) || DISTRICTS[0]
 
-  const [activeDepts, setActiveDepts] = useState(DEPARTMENTS.map((d) => d.id))
+  // Backend department ids (multi-select; seeded once /api/departments/ loads)
+  const [activeDepts, setActiveDepts] = useState(null)
   const [colorBy, setColorBy] = useState('gap')
   const [showHeat, setShowHeat] = useState(false)
   const [gapThreshold, setGapThreshold] = useState(0) // 0 = show all
   const [selectedFacility, setSelectedFacility] = useState(null)
   const [showBoundary, setShowBoundary] = useState(true)
+  const [leafletMap, setLeafletMap] = useState(null)
+  const [spatialResults, setSpatialResults] = useState(null)
 
   const mapRef = useRef(null)
   const tools = useMapTools()
 
-  const { data: facilities, loading } = useAsync(() => gisApi.getAllFacilities(districtId), [districtId])
-  const { data: hotspots } = useAsync(() => analyticsApi.getHotspots(districtId), [districtId])
-  const { data: boundary } = useAsync(() => gisApi.getDistrictBoundary(districtId), [districtId])
+  // Backend data sources — same shared hooks as the citizen GIS map.
+  const { data: departmentsData } = useDepartments()
+  const { data: catalog } = useGISCatalog()
+  const layers = useLeafletLayers(leafletMap)
+
+  // Fallback to the legacy constants while /api/departments/ loads so the
+  // first paint stays identical; backend departments take over once loaded.
+  const departments = departmentsData && departmentsData.length ? departmentsData : DEPARTMENTS
+  const departmentColors = useMemo(() => Object.fromEntries(departments.map((d) => [String(d.id), d.color])), [departments])
+  const deptMap = useMemo(
+    () => departmentMapFrom(departmentsData && departmentsData.length ? departmentsData : DEPARTMENTS),
+    [departmentsData]
+  )
+
+  // Seed the legend from the backend department ids exactly once.  Departments
+  // behave like multi-select checkboxes: toggling one never disables the rest.
+  useEffect(() => {
+    if (departmentsData?.length && activeDepts === null) {
+      setActiveDepts(departmentsData.map((d) => String(d.id)))
+    }
+  }, [departmentsData, activeDepts])
+  const activeIds = activeDepts || DEPARTMENTS.map((d) => d.id)
+
+  function toggleDept(id) {
+    setActiveDepts((cur) => {
+      const base = cur || DEPARTMENTS.map((d) => d.id)
+      const normalizedId = String(id)
+      return base.includes(normalizedId)
+        ? base.filter((x) => x !== normalizedId)
+        : [...base, normalizedId]
+    })
+  }
+
+  // One facility-type layer enabled in the layer panel narrows the markers to
+  // that catalog layer's facilities (catalog_entry filter, backend_guide §6.1);
+  // boundary layers never filter facilities.
+  const facilityCatalogFilter = useMemo(() => {
+    if (!catalog) return null
+    const enabledNames = Object.entries(layers.visible).filter(([, value]) => value).map(([name]) => name)
+    const allLayers = Object.values(catalog.categories || {}).flat()
+    const matches = allLayers.filter((layer) => enabledNames.includes(layer.name) && layer.category !== 'Administrative & Boundaries')
+    return matches.length === 1 ? matches[0] : null
+  }, [catalog, layers.visible])
+
+  // Facilities come from GET /api/facilities/ per active department
+  // (?department={pk}, optionally &catalog_entry={id}) and are merged client
+  // side — a department that is toggled off never contributes markers.
+  const { data: facilities, loading } = useAsync(async () => {
+    if (!activeDepts?.length) return []
+    const filter = facilityCatalogFilter ? { catalogEntry: facilityCatalogFilter.id } : {}
+    const results = await Promise.all(activeDepts.map((departmentId) => GISRepository.facilities({ districtId, departmentId, ...filter })))
+    const merged = new Map()
+    results.flat().forEach((facility) => merged.set(facility.id, facility))
+    return [...merged.values()]
+  }, [activeDepts?.join(','), districtId, facilityCatalogFilter?.id || 'none'])
+
+  // Hotspot heatmap overlay — same backend endpoint as /api/complaints/heatmap/
+  // (weighted spatial points), normalized to { position, intensity }.
+  const { data: heatmap } = useAsync(() => GISRepository.complaintHeatmap({ districtId }), [districtId])
+  const hotspots = useMemo(() => {
+    const points = heatmap?.points
+    if (!Array.isArray(points)) return []
+    return points
+      .map((point) => {
+        const position = Array.isArray(point.position)
+          ? point.position
+          : Array.isArray(point.coordinates)
+            ? point.coordinates
+            : [point.longitude ?? point.lng, point.latitude ?? point.lat]
+        return { position, intensity: Number(point.intensity ?? point.weight ?? 0.5) }
+      })
+      .filter((point) => Array.isArray(point.position) && point.position.length >= 2)
+  }, [heatmap])
+
   const { data: facilityGrievances } = useAsync(
-    () => selectedFacility ? workflowApi.listGrievances({ facilityId: selectedFacility.id }) : Promise.resolve([]),
+    () => selectedFacility ? GISRepository.complaints({ facility_id: selectedFacility.id }) : Promise.resolve([]),
     [selectedFacility?.id]
   )
 
   const filtered = useMemo(() => {
     if (!facilities) return []
     return facilities.filter(
-      (f) => activeDepts.includes(f.departmentId) && f.gapScore >= gapThreshold
+      (f) => Array.isArray(f.position) && f.position.length >= 2 && f.gapScore >= gapThreshold
     )
-  }, [facilities, activeDepts, gapThreshold])
+  }, [facilities, gapThreshold])
 
-  function toggleDept(id) {
-    setActiveDepts((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]))
-  }
-
-  const handleFacilityClick = useCallback((id) => {
-    if (!facilities) return
-    setSelectedFacility(facilities.find((f) => f.id === id) || null)
-  }, [facilities])
+  // Marker click → shared role-aware handler; admin roles open the right-side
+  // FacilityInfoPanel (never the citizen Facility Detail page).
+  const handleFacilityClick = useFacilityClickHandler({
+    onOpenPanel: useCallback((facility) => {
+      setSelectedFacility(facility)
+    }, []),
+  })
 
   const handleMapClick = useCallback((lngLat) => {
     tools.handleMapClick(lngLat)
@@ -66,12 +147,27 @@ export default function SituationMatrix() {
     mapRef.current?.flyTo(district.center, district.zoom)
   }, [district])
 
+  // Boundary toggle drives the District_boundary catalog layer (served by
+  // GET /api/gis/layers/District_boundary/), matching citizen behaviour.
+  const toggleBoundary = useCallback(() => {
+    setShowBoundary((value) => {
+      const next = !value
+      layers.toggle('District_boundary', next)
+      return next
+    })
+  }, [layers])
+
   return (
     <div className="flex flex-col h-full">
       <PageHeader
         eyebrow="Admin Portal · FR-AP-01"
         title="Situation Matrix"
         description={`Cross-department deficit view for ${district?.label}. Deficit radius: ${tools.radiusKm}km (configurable via map toolbar).`}
+        action={
+          <div className="w-[340px]">
+            <GISSearchPanel user={user} allowedDepartments={activeIds} center={district?.center} onResults={setSpatialResults} onResultClick={(result) => mapRef.current?.showResult(result)} />
+          </div>
+        }
       />
       <div className="flex-1 px-6 pb-6 min-h-0 flex gap-3">
         {/* Map area */}
@@ -82,12 +178,16 @@ export default function SituationMatrix() {
             zoom={district?.zoom}
             facilities={filtered}
             colorBy={colorBy}
+            departmentColors={departmentColors}
             showHeat={showHeat}
-            heatPoints={hotspots || []}
+            heatPoints={hotspots}
             className="h-full"
             onFacilityClick={handleFacilityClick}
             onMapClick={handleMapClick}
             selectedId={selectedFacility?.id}
+            searchResults={spatialResults?.results || []}
+            onSearchResultOpen={handleFacilityClick}
+            onReady={setLeafletMap}
             activeTool={tools.activeTool}
             radiusCenter={tools.radiusCenter}
             radiusKm={tools.radiusKm}
@@ -97,16 +197,32 @@ export default function SituationMatrix() {
             basemapUrl={tools.currentBasemap.url}
           />
 
-          {/* Top-left: department legend + boundary toggle */}
+          {/* Top-left: department legend + gap legend + boundary toggle + layers */}
           <div className="absolute top-4 left-4 flex flex-col gap-2 max-w-xs z-10">
-            <DepartmentLegend activeIds={activeDepts} onToggle={toggleDept} />
+            <DepartmentLegend
+              departments={departments.map((d) => ({ id: String(d.id), name: d.name || d.label, color: d.color }))}
+              activeIds={activeIds}
+              onToggle={toggleDept}
+            />
             {colorBy === 'gap' && <GapScoreLegend />}
             <button
-              onClick={() => setShowBoundary((v) => !v)}
+              onClick={toggleBoundary}
               className={`card !px-2.5 !py-1.5 text-[11.5px] font-medium flex items-center gap-1.5 w-full ${showBoundary ? 'text-ink-900' : 'text-ink-400'}`}
             >
               <MapPin size={12} /> {showBoundary ? 'Hide' : 'Show'} district boundary
             </button>
+            <div className="card overflow-hidden">
+              <CitizenLayerPanel
+                catalog={catalog}
+                visible={layers.visible}
+                loading={layers.loading}
+                toggle={layers.toggle}
+                showDefaults={layers.showDefaults}
+                clearAll={layers.clearAll}
+                activeCount={layers.activeCount}
+                selectedDepartments={departments.filter((d) => activeIds.includes(String(d.id)))}
+              />
+            </div>
           </div>
 
           {/* Top-right controls */}
@@ -176,98 +292,16 @@ export default function SituationMatrix() {
           </div>
         </div>
 
-        {/* Facility detail slide-out panel */}
+        {/* Facility detail slide-out panel — shared admin FacilityInfoPanel */}
         {selectedFacility && (
-          <div className="w-80 shrink-0 card overflow-y-auto animate-slide-in-right">
-            <div className="flex items-start justify-between p-4 border-b border-ink-100">
-              <div>
-                <h3 className="text-[14px] font-semibold text-ink-950 leading-snug">{selectedFacility.name}</h3>
-                <p className="text-[12px] text-ink-500 mt-0.5">{selectedFacility.categoryLabel}</p>
-              </div>
-              <button onClick={() => setSelectedFacility(null)} className="text-ink-400 hover:text-ink-700 ml-2 shrink-0">
-                <X size={16} />
-              </button>
-            </div>
-
-            <div className="p-4 space-y-4">
-              {/* Gap score ring */}
-              <div className="flex items-center gap-4">
-                <GapScoreRing score={selectedFacility.gapScore} size={64} strokeWidth={7} />
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-400">Gap score</p>
-                  <p className="text-[13px] font-semibold text-ink-900 mt-0.5">
-                    {selectedFacility.gapScore >= 0.66 ? 'High deficit' : selectedFacility.gapScore >= 0.33 ? 'Moderate' : 'Well served'}
-                  </p>
-                </div>
-              </div>
-
-              {/* Details */}
-              <div className="space-y-2 text-[12.5px]">
-                <Row label="Status"><StatusBadge status={selectedFacility.status} /></Row>
-                <Row label="Department">
-                  <span className="flex items-center gap-1.5">
-                    <span
-                      className="inline-block h-2.5 w-2.5 rounded-full"
-                      style={{ background: DEPARTMENT_MAP[selectedFacility.departmentId]?.color }}
-                    />
-                    {DEPARTMENT_MAP[selectedFacility.departmentId]?.label}
-                  </span>
-                </Row>
-                <Row label="Village">{selectedFacility.village}</Row>
-                <Row label="Block">{selectedFacility.block}</Row>
-                <Row label="Geo-tagged">
-                  <span className={selectedFacility.position ? 'text-leaf-600 font-medium' : 'text-ink-400'}>
-                    {selectedFacility.position ? '✓ Yes' : 'No'}
-                  </span>
-                </Row>
-                <Row label="Last inspection">
-                  {selectedFacility.lastInspectionAt ? formatDate(selectedFacility.lastInspectionAt) : <span className="text-ink-400">Never</span>}
-                </Row>
-              </div>
-
-              {/* Open grievances */}
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-400 mb-2 flex items-center gap-1.5">
-                  <AlertTriangle size={11} /> Open grievances
-                </p>
-                {(facilityGrievances || []).length === 0 ? (
-                  <p className="text-[12px] text-ink-400">No open grievances</p>
-                ) : (
-                  <div className="space-y-1.5">
-                    {facilityGrievances.slice(0, 3).map((g) => (
-                      <div key={g.id} className="flex items-center justify-between text-[12px] bg-alert-50 rounded-lg px-2.5 py-1.5">
-                        <span className="text-ink-700 truncate">{g.title}</span>
-                        <StatusBadge status={g.state} />
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Coordinates */}
-              {selectedFacility.position && (
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-400 mb-1 flex items-center gap-1.5">
-                    <MapPin size={11} /> Coordinates
-                  </p>
-                  <p className="kbd-mono text-[11px] text-ink-600">
-                    {selectedFacility.position[1].toFixed(5)}°N, {selectedFacility.position[0].toFixed(5)}°E
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
+          <FacilityInfoPanel
+            facility={selectedFacility}
+            grievances={facilityGrievances || []}
+            department={deptMap[selectedFacility.departmentId] ? { ...deptMap[selectedFacility.departmentId], label: deptMap[selectedFacility.departmentId].name } : null}
+            onClose={() => setSelectedFacility(null)}
+          />
         )}
       </div>
-    </div>
-  )
-}
-
-function Row({ label, children }) {
-  return (
-    <div className="flex items-start justify-between gap-2">
-      <span className="text-ink-500 shrink-0">{label}</span>
-      <span className="text-ink-800 font-medium text-right">{children}</span>
     </div>
   )
 }

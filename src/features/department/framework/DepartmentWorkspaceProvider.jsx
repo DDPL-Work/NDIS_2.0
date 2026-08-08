@@ -7,12 +7,22 @@ import { useComplaintEngine } from '../../../app/store/complaintEngine'
 import { useProjectEngine } from '../../../app/store/projectEngine'
 import { useIdentityStore } from '../identity/identityStore'
 import { useAuthorization } from '../identity/hooks/useAuthorization'
+import { departmentSlugFromName } from '../../../api/mappers/complaintMapper'
 
 export default function DepartmentWorkspaceProvider({ departmentIdOverride, children }) {
   const user = useAuthStore((s) => s.user)
-  // The authenticated session is the only department source. An override is
-  // retained solely for embedded/test use, never supplied by routing.
-  const activeDeptId = departmentIdOverride || user?.departmentId || 'health'
+  // The authenticated session is the only department source. The department
+  // slug is derived from the backend profile name (never hardcoded); an
+  // override is retained solely for embedded/test use, never from routing.
+  const activeDeptId = useMemo(() => {
+    if (departmentIdOverride) return departmentIdOverride
+    const rawId = String(user?.departmentId || '')
+    if (rawId && DepartmentRegistry.get(rawId)?.id === rawId) return rawId
+    const profileName = typeof user?.department === 'object' ? user.department.name || user.department.label : ''
+    const slug = departmentSlugFromName(user?.departmentName || profileName || '')
+    if (slug && DepartmentRegistry.get(slug)?.id === slug) return slug
+    return rawId || 'health'
+  }, [departmentIdOverride, user?.departmentId, user?.departmentName, user?.department])
   const employees = useIdentityStore((s) => s.employees)
   const roles = useIdentityStore((s) => s.roles)
   const { permissions, can } = useAuthorization()
@@ -37,14 +47,18 @@ export default function DepartmentWorkspaceProvider({ departmentIdOverride, chil
   const knowledge = useProjectEngine((s) => s.knowledge)
   const departmentNotifications = useProjectEngine((s) => s.departmentNotifications)
 
-  // Load configuration dynamically from registry
+  // Load configuration dynamically from registry, but always display the
+  // department name from the authenticated user profile (GET /api/auth/me/)
+  // — never the static registry label. This flows into every dept.label read.
   const deptConfig = useMemo(() => {
-    return DepartmentRegistry.get(activeDeptId)
-  }, [activeDeptId])
+    const config = DepartmentRegistry.get(activeDeptId) || {}
+    const name = String(user?.departmentName || '').trim()
+    return { ...config, label: name || config.label }
+  }, [activeDeptId, user?.departmentName])
 
-  // Filter complaints for active department
+  // Filter complaints for active department (backend ids vs. app slugs)
   const departmentComplaints = useMemo(() => {
-    return complaints.filter((c) => c.departmentId === activeDeptId)
+    return complaints.filter((c) => c.departmentSlug === activeDeptId)
   }, [complaints, activeDeptId])
 
   // Filter project-related items
@@ -119,6 +133,7 @@ export default function DepartmentWorkspaceProvider({ departmentIdOverride, chil
   const contextValue = useMemo(() => {
     return {
       dept: deptConfig,
+      deptName: String(user?.departmentName || deptConfig?.label || '').trim(),
       currentDepartment: deptConfig,
       currentDepartmentConfig: deptConfig,
       user,
