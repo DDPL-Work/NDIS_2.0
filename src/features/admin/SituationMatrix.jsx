@@ -21,7 +21,9 @@ import { useDepartments, departmentMapFrom } from '../../hooks/useDepartments'
 import { useGISCatalog } from '../../hooks/useGISCatalog'
 import { useLeafletLayers } from '../../hooks/useLeafletLayers'
 import { useFacilityClickHandler } from '../../hooks/useFacilityClickHandler'
+import { useRoute } from '../../hooks/useRoute'
 import GISSearchPanel from '../../gis/components/GISSearchPanel'
+import RouteSummary from '../../gis/components/RouteSummary'
 import { GISRepository } from '../../gis/repositories/GISRepository'
 import { useAuthStore } from '../../app/store/authStore'
 import { DEPARTMENTS, DISTRICTS } from '../../config/constants'
@@ -43,6 +45,8 @@ export default function SituationMatrix() {
 
   const mapRef = useRef(null)
   const tools = useMapTools()
+  const routing = useRoute()
+  const routeActiveId = routing.routeActiveId
 
   // Backend data sources — same shared hooks as the citizen GIS map.
   const { data: departmentsData } = useDepartments()
@@ -165,7 +169,7 @@ export default function SituationMatrix() {
         description={`Cross-department deficit view for ${district?.label}. Deficit radius: ${tools.radiusKm}km (configurable via map toolbar).`}
         action={
           <div className="w-[340px]">
-            <GISSearchPanel user={user} allowedDepartments={activeIds} center={district?.center} onResults={setSpatialResults} onResultClick={(result) => mapRef.current?.showResult(result)} />
+            <GISSearchPanel user={user} allowedDepartments={activeIds} center={district?.center} onResults={setSpatialResults} onResultClick={(result) => mapRef.current?.showResult(result)} onShowRoute={routing.showRoute} onClearRoute={routing.clearRoute} routeActiveId={routeActiveId} routeLoading={routing.status === 'loading'} onRouteStart={routing.setRouteStart} onRouteDestination={routing.setRouteDestination} routeStartId={routing.routeStartId} routeDestinationId={routing.routeDestinationId} />
           </div>
         }
       />
@@ -187,6 +191,7 @@ export default function SituationMatrix() {
             selectedId={selectedFacility?.id}
             searchResults={spatialResults?.results || []}
             onSearchResultOpen={handleFacilityClick}
+            onSearchResultRoute={routing.showRoute}
             onReady={setLeafletMap}
             activeTool={tools.activeTool}
             radiusCenter={tools.radiusCenter}
@@ -195,7 +200,13 @@ export default function SituationMatrix() {
             measureDistKm={tools.measureDistKm}
             clusterEnabled={tools.clusterEnabled}
             basemapUrl={tools.currentBasemap.url}
+            route={routing.route}
           />
+
+          {/* Route summary (floating, above the map but below panels) */}
+          <div className="absolute bottom-4 left-4 z-[115]">
+            <RouteSummary status={routing.status} mode={routing.mode} route={routing.route} startFacility={routing.startFacility} destinationFacility={routing.destinationFacility} errorMessage={routing.errorMessage} onShowShortest={routing.showFacilityRoute} onSwap={routing.swapFacilities} onClear={routing.clearRoute} />
+          </div>
 
           {/* Top-left: department legend + gap legend + boundary toggle + layers */}
           <div className="absolute top-4 left-4 flex flex-col gap-2 max-w-xs z-10">
@@ -211,7 +222,7 @@ export default function SituationMatrix() {
             >
               <MapPin size={12} /> {showBoundary ? 'Hide' : 'Show'} district boundary
             </button>
-            <div className="card overflow-hidden">
+            <div className="card !p-0 overflow-hidden">
               <CitizenLayerPanel
                 catalog={catalog}
                 visible={layers.visible}
@@ -221,6 +232,7 @@ export default function SituationMatrix() {
                 clearAll={layers.clearAll}
                 activeCount={layers.activeCount}
                 selectedDepartments={departments.filter((d) => activeIds.includes(String(d.id)))}
+                closedDivider={false}
               />
             </div>
           </div>

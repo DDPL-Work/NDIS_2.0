@@ -6,6 +6,7 @@ export const PORTALS = {
   ADMIN: 'admin',
   LINEDEPT: 'linedept',
   ENGINEER: 'engineer',
+  STATEADMIN: 'state-admin',
 }
 
 // LLD Vol 2 §14.1 Expanded Roles (10 Roles)
@@ -20,6 +21,11 @@ export const ROLES = {
   FIELD_INSPECTOR: 'field_inspector',
   SUPERVISOR: 'supervisor',
   STATE_ADMIN: 'state_admin',
+  STATE_SUPER_ADMIN: 'state_super_admin',
+  STATE_FINANCE_ADMIN: 'state_finance_admin',
+  STATE_DEPT_ADMIN: 'state_dept_admin',
+  STATE_MONITORING_OFFICER: 'state_monitoring_officer',
+  STATE_GIS_ADMIN: 'state_gis_admin',
   SYSTEM_ADMIN: 'system_admin',
 }
 
@@ -34,6 +40,11 @@ export const ROLE_LABELS = {
   [ROLES.FIELD_INSPECTOR]: 'Field Inspector / Junior Engineer',
   [ROLES.SUPERVISOR]: 'Field Supervisor',
   [ROLES.STATE_ADMIN]: 'State Admin',
+  [ROLES.STATE_SUPER_ADMIN]: 'State Super Admin',
+  [ROLES.STATE_FINANCE_ADMIN]: 'State Finance Admin',
+  [ROLES.STATE_DEPT_ADMIN]: 'State Department Admin',
+  [ROLES.STATE_MONITORING_OFFICER]: 'State Monitoring Officer',
+  [ROLES.STATE_GIS_ADMIN]: 'State GIS Admin',
   [ROLES.SYSTEM_ADMIN]: 'System Administrator',
 }
 
@@ -48,7 +59,12 @@ export const ROLE_PORTAL = {
   [ROLES.ENGINEER]: PORTALS.ENGINEER,
   [ROLES.FIELD_INSPECTOR]: PORTALS.ENGINEER,
   [ROLES.SUPERVISOR]: PORTALS.LINEDEPT,
-  [ROLES.STATE_ADMIN]: PORTALS.ADMIN,
+  [ROLES.STATE_ADMIN]: PORTALS.STATEADMIN,
+  [ROLES.STATE_SUPER_ADMIN]: PORTALS.STATEADMIN,
+  [ROLES.STATE_FINANCE_ADMIN]: PORTALS.STATEADMIN,
+  [ROLES.STATE_DEPT_ADMIN]: PORTALS.STATEADMIN,
+  [ROLES.STATE_MONITORING_OFFICER]: PORTALS.STATEADMIN,
+  [ROLES.STATE_GIS_ADMIN]: PORTALS.STATEADMIN,
   [ROLES.SYSTEM_ADMIN]: PORTALS.ADMIN,
 }
 
@@ -254,7 +270,7 @@ export const COMPLAINT_STATE_LABELS = {
   resolved: 'Resolved Awaiting Citizen',
   citizen_verified: 'Citizen Verified',
   citizen_confirmation: 'Citizen Verification',
-  closed: 'Closed',
+  closed: 'Resolved by Citizen',
   rejected: 'Rejected',
   cancelled: 'Cancelled',
   transferred: 'Transferred',
@@ -276,7 +292,9 @@ export const STATUS_TONE = {
   citizen_verified: 'positive',
   resolved: 'positive',
   citizen_confirmation: 'warning',
-  closed: 'neutral',
+  // Citizen closed the complaint after verifying the fix — the final,
+  // citizen-confirmed resolution (so it renders as resolved, not neutral).
+  closed: 'positive',
   rejected: 'negative',
   cancelled: 'neutral',
   transferred: 'info',

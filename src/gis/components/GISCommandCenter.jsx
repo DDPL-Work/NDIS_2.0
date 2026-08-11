@@ -7,9 +7,11 @@ import GISResultsDrawer from './GISResultsDrawer'
 import GISAnalyticsPanel from './GISAnalyticsPanel'
 import GISInfoCard from './GISInfoCard'
 import GISAssistant from './GISAssistant'
+import RouteSummary from './RouteSummary'
 import { useGISCatalog } from '../../hooks/useGISCatalog'
 import { useVectorLayers } from '../../hooks/useVectorLayers'
 import { useMediaQuery } from '../../hooks/useMediaQuery'
+import { useRoute } from '../../hooks/useRoute'
 
 const MODES = [
   { id: 'all', label: 'All' },
@@ -33,6 +35,8 @@ export default function GISCommandCenter({ facilities = [], complaints = [], pro
   const [bookmarks, setBookmarks] = useState([])
   const [resultsOpen, setResultsOpen] = useState(false)
   const [analyticsOpen, setAnalyticsOpen] = useState(true)
+  const routing = useRoute()
+  const routeActiveId = routing.routeActiveId
 
   // Below 1400px the side docks auto-collapse to their 48px rails so the map
   // keeps the majority of the viewport.
@@ -77,7 +81,7 @@ export default function GISCommandCenter({ facilities = [], complaints = [], pro
         <button onClick={() => setRightOpen((value) => !value)} aria-label="Toggle layer manager" title="Layer manager" className={`rounded-md p-1.5 transition-colors ${rightOpen ? 'bg-saffron-500 text-white' : 'text-ink-500 hover:bg-ink-100'}`}><PanelRight size={15} /></button>
         <div className="mx-1 h-5 w-px shrink-0 bg-ink-100" />
         <div className="min-w-0 flex-1 max-w-[560px]">
-          <GISSearchPanel compact bare center={center} user={user} allowedDepartments={allowedDepartments} onResults={runOutcome} />
+          <GISSearchPanel compact bare center={center} user={user} allowedDepartments={allowedDepartments} onResults={runOutcome} onShowRoute={routing.showRoute} onClearRoute={routing.clearRoute} routeActiveId={routeActiveId} routeLoading={routing.status === 'loading'} onRouteStart={routing.setRouteStart} onRouteDestination={routing.setRouteDestination} routeStartId={routing.routeStartId} routeDestinationId={routing.routeDestinationId} />
         </div>
         <div className="mx-1 h-5 w-px shrink-0 bg-ink-100" />
 
@@ -122,13 +126,16 @@ export default function GISCommandCenter({ facilities = [], complaints = [], pro
         {/* CENTER — Map (flex:1, min-width:0, always fills remaining space) */}
         <main className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
           <div className="absolute inset-0">
-            <MapView ref={mapRef} center={center} zoom={zoom} facilities={visiblePoints} searchResults={outcome?.results || []} onSearchResultOpen={(row) => setSelected(row)} heatPoints={heatPoints} showHeat={flags.heatmap} clusterEnabled={flags.cluster} vectorLayers={vector.layers} selectedId={selected?.id} onFacilityClick={(facility) => setSelected(facility)} className="h-full" />
+            <MapView ref={mapRef} center={center} zoom={zoom} facilities={visiblePoints} searchResults={outcome?.results || []} onSearchResultOpen={(row) => setSelected(row)} onSearchResultRoute={routing.showRoute} heatPoints={heatPoints} showHeat={flags.heatmap} clusterEnabled={flags.cluster} vectorLayers={vector.layers} selectedId={selected?.id} onFacilityClick={(facility) => setSelected(facility)} route={routing.route} className="h-full" />
           </div>
           {selected && (
             <div className="absolute right-3 top-3 z-20 w-[300px] max-w-full">
-              <GISInfoCard item={selected} bookmarked={bookmarks.some((row) => String(row.id) === String(selected.id))} onClose={() => setSelected(null)} onBookmark={toggleBookmark} onOpen={onOpen} />
+              <GISInfoCard item={selected} bookmarked={bookmarks.some((row) => String(row.id) === String(selected.id))} onClose={() => setSelected(null)} onBookmark={toggleBookmark} onOpen={onOpen} onShowRoute={routing.showRoute} onClearRoute={routing.clearRoute} routeActive={routeActiveId != null && routeActiveId === String(selected.id)} routeLoading={routing.status === 'loading'} onRouteStart={routing.setRouteStart} onRouteDestination={routing.setRouteDestination} onSwap={routing.swapFacilities} startFacility={routing.startFacility} destinationFacility={routing.destinationFacility} />
             </div>
           )}
+          <div className="absolute bottom-3 left-3 z-20">
+            <RouteSummary status={routing.status} mode={routing.mode} route={routing.route} startFacility={routing.startFacility} destinationFacility={routing.destinationFacility} errorMessage={routing.errorMessage} onShowShortest={routing.showFacilityRoute} onSwap={routing.swapFacilities} onClear={routing.clearRoute} />
+          </div>
         </main>
 
         {/* RIGHT DOCK — Layer Manager (fixed 320px, shrink-0, collapsible to 48px) */}
@@ -148,7 +155,7 @@ export default function GISCommandCenter({ facilities = [], complaints = [], pro
 
       {/* Bottom panels */}
       <GISAnalyticsPanel points={visiblePoints} complaints={complaints} projects={projects} open={analyticsOpen} onToggle={() => setAnalyticsOpen((value) => !value)} />
-      <GISResultsDrawer outcome={outcome} history={history} bookmarks={bookmarks} open={resultsOpen} onToggle={() => setResultsOpen((value) => !value)} onSelect={(row) => { setSelected(row); mapRef.current?.showResult(row); setResultsOpen(false) }} onToggleBookmark={toggleBookmark} onClose={() => setOutcome(null)} />
+      <GISResultsDrawer outcome={outcome} history={history} bookmarks={bookmarks} open={resultsOpen} onToggle={() => setResultsOpen((value) => !value)} onSelect={(row) => { setSelected(row); mapRef.current?.showResult(row); setResultsOpen(false) }} onToggleBookmark={toggleBookmark} onClose={() => setOutcome(null)} onShowRoute={routing.showRoute} onClearRoute={routing.clearRoute} routeActiveId={routeActiveId} routeLoading={routing.status === 'loading'} onRouteStart={routing.setRouteStart} onRouteDestination={routing.setRouteDestination} routeStartId={routing.routeStartId} routeDestinationId={routing.routeDestinationId} />
     </div>
   )
 }

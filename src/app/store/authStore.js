@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { AuthService } from '../../services/auth/AuthService'
+import { getDefaultRoute } from '../../app/authRoutes'
 
 let restoreInFlight = null
 
@@ -14,6 +15,13 @@ export const useAuthStore = create(persist((set, get) => ({
     catch (error) { set({ status: 'error', error: error.message }); throw error }
   },
   async signUp(payload) { set({ status: 'loading', error: null }); try { const result = await AuthService.signup(payload); set({ status: 'idle' }); return result } catch (error) { set({ status: 'error', error: error.message }); throw error } },
+  // Demo access — offline persona for the mock-data build; never used by the
+  // production SSO flow. Role/permissions are still fed through the same
+  // permission checks as a real session.
+  demoSignIn(persona) {
+    set({ user: persona.user, status: 'authenticated', error: null })
+    return getDefaultRoute(persona.user.role)
+  },
   async restoreSession() {
     // The initial persisted state is deliberately "restoring".  Do not use
     // that status as a guard: doing so prevented the very first restore after

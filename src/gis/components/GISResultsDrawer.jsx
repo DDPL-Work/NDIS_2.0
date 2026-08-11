@@ -8,7 +8,7 @@ const TABS = [
   { id: 'bookmarks', label: 'Bookmarks' },
 ]
 
-export default function GISResultsDrawer({ outcome, history = [], bookmarks = [], open, onToggle, onSelect, onToggleBookmark, onClose }) {
+export default function GISResultsDrawer({ outcome, history = [], bookmarks = [], open, onToggle, onSelect, onToggleBookmark, onClose, onShowRoute, onClearRoute, routeActiveId, routeLoading = false, onRouteStart, onRouteDestination, routeStartId, routeDestinationId }) {
   const [tab, setTab] = useState('results')
   const results = outcome?.results || []
   const bookmarkedIds = useMemo(() => new Set(bookmarks.map((item) => item.id)), [bookmarks])
@@ -43,10 +43,36 @@ export default function GISResultsDrawer({ outcome, history = [], bookmarks = []
                   {tab === 'history' ? (
                     <span className="min-w-0 flex-1"><span className="block truncate text-[12px] text-ink-800">{row.query}</span><span className="block text-[10px] text-ink-400">{row.count} results · {new Date(row.at).toLocaleTimeString()}</span></span>
                   ) : (
-                    <button onClick={() => onSelect(row)} className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1 py-0.5 text-left hover:bg-ink-50">
-                      <MapPin size={13} className="shrink-0 text-ink-400" />
-                      <span className="min-w-0"><span className="block truncate text-[12px] font-medium text-ink-800">{row.name || row.title}</span><span className="block truncate text-[10px] text-ink-400">{row.categoryLabel || row.departmentId || row.type} · {row.position ? formatCoord(row.position) : null}</span></span>
-                    </button>
+                    <>
+                      <button onClick={() => onSelect(row)} className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1 py-0.5 text-left hover:bg-ink-50">
+                        <MapPin size={13} className="shrink-0 text-ink-400" />
+                        <span className="min-w-0"><span className="block truncate text-[12px] font-medium text-ink-800">{row.name || row.title}</span><span className="block truncate text-[10px] text-ink-400">{row.categoryLabel || row.departmentId || row.type} · {row.position ? formatCoord(row.position) : null}</span></span>
+                      </button>
+                      {onRouteStart && onRouteDestination && row.position && (
+                        String(routeStartId) === String(row.id) || String(routeDestinationId) === String(row.id) ? (
+                          <span className={`shrink-0 rounded-md px-1.5 py-1 text-[10px] font-semibold ${String(routeStartId) === String(row.id) ? 'bg-leaf-50 text-leaf-700' : 'bg-alert-50 text-alert-600'}`}>{String(routeStartId) === String(row.id) ? 'Start' : 'Dest'}</span>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={routeLoading}
+                            onClick={() => (routeStartId == null ? onRouteStart(row) : onRouteDestination(row))}
+                            className="shrink-0 rounded-md px-1.5 py-1 text-[10px] font-semibold text-ink-600 transition-colors hover:bg-ink-100 disabled:opacity-50"
+                          >
+                            {routeStartId == null ? 'Start' : 'To'}
+                          </button>
+                        )
+                      )}
+                      {onShowRoute && row.position && (
+                        <button
+                          type="button"
+                          disabled={routeLoading}
+                          onClick={() => (String(routeActiveId) === String(row.id) ? onClearRoute?.() : onShowRoute(row))}
+                          className={`shrink-0 rounded-md px-1.5 py-1 text-[10px] font-semibold transition-colors disabled:opacity-50 ${String(routeActiveId) === String(row.id) ? 'bg-ink-100 text-ink-700 hover:bg-ink-200' : 'text-sky-700 hover:bg-sky-50'}`}
+                        >
+                          {String(routeActiveId) === String(row.id) ? 'Clear Route' : 'Show Route'}
+                        </button>
+                      )}
+                    </>
                   )}
                   {tab !== 'history' && (
                     <button onClick={() => onToggleBookmark(row)} aria-label={bookmarkedIds.has(row.id) ? 'Remove bookmark' : 'Bookmark'} className="shrink-0 rounded-md p-1 text-ink-300 hover:bg-ink-100 hover:text-saffron-600"><Bookmark size={13} className={bookmarkedIds.has(row.id) ? 'fill-saffron-500 text-saffron-500' : ''} /></button>

@@ -4,7 +4,30 @@ import Icon from '../ui/Icon'
 import { useUiStore } from '../../app/store/uiStore'
 import { ChevronsLeft } from 'lucide-react'
 
-export default function Sidebar({ items, portalLabel, portalIcon, accentClassName = 'bg-ink-900' }) {
+// `items` may be a flat list of nav items, or `sections` may be supplied as
+// [{ label, items: [...] }] to render grouped items with section headers.
+function SidebarLink({ item, collapsed }) {
+  return (
+    <NavLink
+      key={item.to}
+      to={item.to}
+      end={item.end}
+      title={collapsed ? item.label : undefined}
+      className={({ isActive }) =>
+        clsx(
+          'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-colors',
+          collapsed && 'justify-center px-0',
+          isActive ? 'bg-ink-900 text-white' : 'text-ink-600 hover:bg-ink-100 hover:text-ink-900'
+        )
+      }
+    >
+      <Icon name={item.icon} size={16} />
+      {!collapsed && <span className="truncate">{item.label}</span>}
+    </NavLink>
+  )
+}
+
+export default function Sidebar({ items = [], sections, portalLabel, portalIcon, accentClassName = 'bg-ink-900' }) {
   const collapsed = useUiStore((s) => s.sidebarCollapsed)
   const toggle = useUiStore((s) => s.toggleSidebar)
 
@@ -23,24 +46,18 @@ export default function Sidebar({ items, portalLabel, portalIcon, accentClassNam
       </div>
 
       <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
-        {items.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
-            title={collapsed ? item.label : undefined}
-            className={({ isActive }) =>
-              clsx(
-                'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-colors',
-                collapsed && 'justify-center px-0',
-                isActive ? 'bg-ink-900 text-white' : 'text-ink-600 hover:bg-ink-100 hover:text-ink-900'
-              )
-            }
-          >
-            <Icon name={item.icon} size={16} />
-            {!collapsed && <span className="truncate">{item.label}</span>}
-          </NavLink>
-        ))}
+        {sections
+          ? sections.map((section) => (
+              <div key={section.label} className="mb-1">
+                {!collapsed && (
+                  <p className="px-2.5 pt-2 pb-1 text-[10.5px] font-semibold uppercase tracking-wider text-ink-400">{section.label}</p>
+                )}
+                <div className="space-y-0.5">
+                  {section.items.map((item) => <SidebarLink key={item.to} item={item} collapsed={collapsed} />)}
+                </div>
+              </div>
+            ))
+          : items.map((item) => <SidebarLink key={item.to} item={item} collapsed={collapsed} />)}
       </nav>
 
       <button

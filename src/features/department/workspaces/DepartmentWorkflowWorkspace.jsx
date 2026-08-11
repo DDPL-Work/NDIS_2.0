@@ -1,13 +1,13 @@
 import { useState, useMemo } from 'react'
-import { Inbox, Filter, Search, Clock, AlertTriangle, CheckCircle2, Eye } from 'lucide-react'
 import PageHeader from '../../../components/ui/PageHeader'
 import DataTable from '../../../components/ui/DataTable'
 import StatusBadge from '../../../components/ui/StatusBadge'
 import Badge from '../../../components/ui/Badge'
-import Button from '../../../components/ui/Button'
 import Modal from '../../../components/ui/Modal'
 import ComplaintDetailHub from '../../shared/ComplaintDetailHub'
 import { useDepartment } from '../framework/DepartmentContext'
+import { usePagination } from '../../../hooks/usePagination'
+import Pagination from '../../../components/ui/Pagination'
 import { formatDateTime } from '../../../utils/format'
 
 export default function DepartmentWorkflowWorkspace() {
@@ -24,6 +24,8 @@ export default function DepartmentWorkflowWorkspace() {
     if (activeStateTab === 'completed') return complaints.filter((c) => ['resolved', 'closed'].includes(c.state))
     return complaints
   }, [complaints, activeStateTab])
+
+  const { page, setPage, pageEntries, pageCount, pageSize, total } = usePagination(filteredTickets, 10)
 
   const columns = [
     { key: 'id', label: 'Ticket Code', render: (r) => <span className="kbd-mono text-[12px] font-bold text-ink-900">{r.id}</span> },
@@ -81,9 +83,10 @@ export default function DepartmentWorkflowWorkspace() {
         <div className="card">
           <DataTable
             columns={columns}
-            rows={filteredTickets}
+            rows={pageEntries}
             onRowClick={(row) => setSelectedTicketId(row.id)}
           />
+          <Pagination page={page} pageCount={pageCount} pageSize={pageSize} total={total} onChange={setPage} />
         </div>
       </div>
 

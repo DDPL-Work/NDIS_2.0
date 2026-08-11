@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo } from 'react'
 import { spatialQueryService } from '../services/spatialQueryService'
 import { useUiStore } from '../app/store/uiStore'
 import { DISTRICTS } from '../config/constants'
+import { getDevicePosition } from '../utils/geo'
 
 const DEFAULT_RADIUS = 10
 const DEFAULT_LIMIT = 10
@@ -11,17 +12,6 @@ const DEFAULT_LIMIT = 10
 function districtCenterFor(user) {
   const district = DISTRICTS.find((d) => d.id === user?.districtId) || DISTRICTS[0]
   return district?.center || [85.4434, 25.1372]
-}
-
-function getDevicePosition() {
-  return new Promise((resolve) => {
-    if (typeof navigator === 'undefined' || !navigator.geolocation) return resolve(null)
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ lng: pos.coords.longitude, lat: pos.coords.latitude }),
-      () => resolve(null),
-      { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 }
-    )
-  })
 }
 
 // One shared spatial-query hook for every GIS portal.  Calling runSearch is

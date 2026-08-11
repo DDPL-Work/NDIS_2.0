@@ -1,23 +1,23 @@
 import { apiRequest } from '../services/httpClient'
-import { mapFacility, mapFacilityList } from './mappers/facilityMapper'
+import { mapFacility } from './mappers/facilityMapper'
 import { registerReferenceCatalog } from './mappers/complaintMapper'
 import { mapGeoJson, mapGisCatalog, mapGisLayer, mapSpatialFeature, mapSpatialFeatureList } from './mappers/gisMapper'
+import { cachedFacilities } from './facilityCache'
 const query = (params = {}) => { const value = new URLSearchParams(Object.entries(params).filter(([, item]) => item !== undefined && item !== null && item !== '').map(([key, item]) => [key, String(item)])); return value.toString() ? `?${value}` : '' }
 export const backendGisApi = {
   async facilities(params) {
     // The production collection (~8.3k rows, ~43 MB) exceeds the default 15s
     // request timeout on typical connections; without this the fetch aborts
     // and the map silently renders zero markers.
-    const response = await apiRequest(`/facilities/${query({ search: params?.query || params?.search, district: params?.districtId, department: params?.departmentId, category: params?.categoryId, catalog_entry: params?.catalogEntry, page: params?.page, limit: params?.limit })}`, { authenticated: false, timeout: 120000 })
-    const mapped = mapFacilityList(response, params)
+    //
+    // All consumers (map, lists, admin overviews, dept reports) share ONE
+    // cached response via cachedFacilities — the payload is downloaded once
+    // per (district, department, filters) window instead of on every mount.
+    // Mapping/normalisation also runs exactly once per cache entry.
+    const mapped = await cachedFacilities(params)
     // Facilities carry numeric department/district ids; they feed the name ->
     // pk reference catalog used by complaint creation (see complaintMapper).
     registerReferenceCatalog(mapped)
-    // if (import.meta.env.DEV) {
-    //   const apiRows = facilityRows(response)
-    //   console.info('[GIS diagnostics] Facilities API', { count: apiRows.length, first: apiRows[0], responseKeys: Object.keys(response || {}), rawResponse: response, params })
-    //   console.info('[GIS diagnostics] Facilities after mapper', { count: mapped.length, first: mapped[0] })
-    // }
     return mapped
   },
   async facility(id) {

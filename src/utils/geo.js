@@ -37,3 +37,16 @@ export function boundsFromPoints(points) {
     [Math.max(...lngs), Math.max(...lats)],
   ]
 }
+
+// Shared device-geolocation helper ({ lng, lat } in [lng, lat] app convention).
+// Resolves null when unsupported, denied, or timed out — callers decide the UX.
+export function getDevicePosition() {
+  return new Promise((resolve) => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) return resolve(null)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lng: pos.coords.longitude, lat: pos.coords.latitude }),
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+    )
+  })
+}

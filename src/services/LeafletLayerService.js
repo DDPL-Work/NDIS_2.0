@@ -84,10 +84,14 @@ export function createCatalogLayer(geojson, { layerName = '', category = '' } = 
   })
 }
 
+// Deterministic hash colour used when a department has no assigned colour —
+// picks from a small set of well-spaced hues so co-located departments never
+// render as near-identical shades on the map.
+const FALLBACK_HUES = [214, 14, 152, 32, 267, 96, 322, 58, 182, 288, 128, 245]
 export function colorForId(id) {
   let hash = 0
   for (const char of String(id || 'unknown')) hash = ((hash << 5) - hash) + char.charCodeAt(0)
-  return `hsl(${Math.abs(hash) % 360} 58% 42%)`
+  return `hsl(${FALLBACK_HUES[Math.abs(hash) % FALLBACK_HUES.length]} 58% 42%)`
 }
 
 export function facilityColor(facility, { colorBy = 'department', departmentColors = {} } = {}) {
@@ -195,6 +199,7 @@ export function searchResultPopupHtml(facility) {
       </table>
       <div style="display:flex;gap:6px;margin-top:8px;padding-top:6px;border-top:1px solid #e4e8ed;">
         <button data-action="open-details" style="flex:1;background:#0b3558;color:#fff;border:none;border-radius:6px;padding:4px 0;font-size:11px;font-weight:600;cursor:pointer;">Open Details</button>
+        <button data-action="show-route" style="flex:1;background:#1d7ab5;color:#fff;border:none;border-radius:6px;padding:4px 0;font-size:11px;font-weight:600;cursor:pointer;">Show Route</button>
         <button data-action="navigate" style="flex:1;background:#fff;color:#0b3558;border:1px solid #c9d2dc;border-radius:6px;padding:4px 0;font-size:11px;font-weight:600;cursor:pointer;">Navigate</button>
       </div>
     </div>`
@@ -205,6 +210,7 @@ export function searchResultPopupHtml(facility) {
 // separate layer (parents clear it on new searches).
 export function createSearchResultMarkers(results, {
   onOpenDetails,
+  onShowRoute,
   map,
 } = {}) {
   const group = L.layerGroup()
@@ -218,12 +224,13 @@ export function createSearchResultMarkers(results, {
     marker.bindPopup(searchResultPopupHtml(facility), {
       closeButton: false,
       offset: [0, -8],
-      maxWidth: 260,
+      maxWidth: 300,
     })
     marker.on('popupopen', () => {
       const node = marker.getPopup()?.getElement()
       if (!node) return
       node.querySelector('[data-action="open-details"]')?.addEventListener('click', () => onOpenDetails?.(facility))
+      node.querySelector('[data-action="show-route"]')?.addEventListener('click', () => onShowRoute?.(facility))
       node.querySelector('[data-action="navigate"]')?.addEventListener('click', () => {
         const position = facility.position
         const url = position

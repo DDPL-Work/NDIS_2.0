@@ -56,6 +56,24 @@ import DepartmentPlanningWorkspace from './features/department/workspaces/Depart
 import DepartmentExecutionWorkspace from './features/department/workspaces/DepartmentExecutionWorkspace'
 import { useCan } from './features/department/identity/hooks/useAuthorization'
 
+// State Administration Panel
+import StateAdminLayout from './features/stateadmin/layout/StateAdminLayout'
+import StateDashboardWorkspace from './features/stateadmin/workspaces/StateDashboardWorkspace'
+import StateMasterWorkspace from './features/stateadmin/workspaces/StateMasterWorkspace'
+import StateBudgetWorkspace from './features/stateadmin/workspaces/StateBudgetWorkspace'
+import StateFinanceWorkspace from './features/stateadmin/workspaces/StateFinanceWorkspace'
+import StateNotificationsWorkspace from './features/stateadmin/workspaces/StateNotificationsWorkspace'
+import StateAuditWorkspace from './features/stateadmin/workspaces/StateAuditWorkspace'
+import StateProjectsWorkspace from './features/stateadmin/workspaces/StateProjectsWorkspace'
+import StateApprovalsWorkspace from './features/stateadmin/workspaces/StateApprovalsWorkspace'
+import StateOrdersWorkspace from './features/stateadmin/workspaces/StateOrdersWorkspace'
+import StateAuthorityWorkspace from './features/stateadmin/workspaces/StateAuthorityWorkspace'
+import StateAnalyticsWorkspace from './features/stateadmin/workspaces/StateAnalyticsWorkspace'
+import StateReportsWorkspace from './features/stateadmin/workspaces/StateReportsWorkspace'
+import StateGisWorkspace from './features/stateadmin/workspaces/StateGisWorkspace'
+import StateUsersWorkspace from './features/stateadmin/workspaces/StateUsersWorkspace'
+import { STATE_PORTAL_ROLES } from './config/stateConstants'
+
 function useFilteredNav(items) {
   const role = useAuthStore((s) => s.user?.role)
   return items.filter((item) => !item.roles || item.roles.includes(role))
@@ -192,6 +210,57 @@ export default function App() {
              Navigation, dashboards, and permissions are resolved
              dynamically from DepartmentRegistry configuration.
           ═══════════════════════════════════════════════════════════ */}
+          {/* State Administration Panel Routes */}
+          <Route element={<RequireRole roles={STATE_PORTAL_ROLES} />}>
+            <Route path="/state-admin" element={<StateAdminLayout />}>
+              <Route index element={<StateDashboardWorkspace />} />
+              <Route path="dashboard" element={<Navigate to="/state-admin" replace />} />
+              <Route path="budget/state" element={<StateBudgetWorkspace mode="state" />} />
+              <Route path="budget/departments" element={<StateBudgetWorkspace mode="departments" />} />
+              <Route path="budget/districts" element={<StateBudgetWorkspace mode="districts" />} />
+              <Route path="budget/history" element={<StateBudgetWorkspace mode="history" />} />
+              <Route path="budget/scheme-mapping" element={<StateBudgetWorkspace mode="scheme-mapping" />} />
+              <Route path="finance/sanctions" element={<StateFinanceWorkspace mode="sanctions" />} />
+              <Route path="finance/releases" element={<StateFinanceWorkspace mode="releases" />} />
+              <Route path="finance/reappropriation" element={<StateFinanceWorkspace mode="reappropriation" />} />
+              <Route path="finance/ledger" element={<StateFinanceWorkspace mode="ledger" />} />
+              <Route path="master/departments" element={<StateMasterWorkspace mode="departments" />} />
+              <Route path="master/department-hierarchy" element={<StateMasterWorkspace mode="hierarchy" />} />
+              <Route path="master/department-users" element={<StateMasterWorkspace mode="department-users" />} />
+              <Route path="master/department-heads" element={<StateMasterWorkspace mode="department-heads" />} />
+              <Route path="master/districts" element={<StateMasterWorkspace mode="districts" />} />
+              <Route path="master/district-officers" element={<StateMasterWorkspace mode="district-officers" />} />
+              <Route path="master/schemes" element={<StateMasterWorkspace mode="schemes" />} />
+              <Route path="master/scheme-categories" element={<StateMasterWorkspace mode="scheme-categories" />} />
+              <Route path="master/scheme-guidelines" element={<StateMasterWorkspace mode="scheme-guidelines" />} />
+              <Route path="master/financial-years" element={<StateMasterWorkspace mode="financial-years" />} />
+              <Route path="master/budget-heads" element={<StateMasterWorkspace mode="budget-heads" />} />
+              <Route path="notifications" element={<StateNotificationsWorkspace />} />
+              <Route path="audit" element={<StateAuditWorkspace />} />
+              <Route path="projects/registry" element={<StateProjectsWorkspace mode="registry" />} />
+              <Route path="projects/templates" element={<StateProjectsWorkspace mode="templates" />} />
+              <Route path="projects/monitoring" element={<StateProjectsWorkspace mode="monitoring" />} />
+              <Route path="projects/categories" element={<StateProjectsWorkspace mode="categories" />} />
+              <Route path="approvals/pending" element={<StateApprovalsWorkspace mode="pending" />} />
+              <Route path="approvals/escalated" element={<StateApprovalsWorkspace mode="escalated" />} />
+              <Route path="approvals/history" element={<StateApprovalsWorkspace mode="history" />} />
+              <Route path="orders/circulars" element={<StateOrdersWorkspace mode="circulars" />} />
+              <Route path="orders/notifications" element={<StateOrdersWorkspace mode="notifications" />} />
+              <Route path="orders/financial" element={<StateOrdersWorkspace mode="financial" />} />
+              <Route path="orders/administrative" element={<StateOrdersWorkspace mode="administrative" />} />
+              <Route path="orders/all" element={<StateOrdersWorkspace mode="all" />} />
+              <Route path="orders/documents" element={<StateOrdersWorkspace mode="documents" />} />
+              <Route path="gis/layers" element={<StateGisWorkspace mode="layers" />} />
+              <Route path="gis/assets" element={<StateGisWorkspace mode="assets" />} />
+              <Route path="gis/district-assets" element={<StateGisWorkspace mode="district-assets" />} />
+              <Route path="gis/department-assets" element={<StateGisWorkspace mode="department-assets" />} />
+              <Route path="analytics" element={<StateAnalyticsWorkspace />} />
+              <Route path="reports" element={<StateReportsWorkspace />} />
+              <Route path="users" element={<StateUsersWorkspace />} />
+              <Route path="authority" element={<StateAuthorityWorkspace />} />
+            </Route>
+          </Route>
+
           <Route path="/department" element={<Navigate to="/linedept" replace />} />
           <Route path="/department/:departmentId/*" element={<Navigate to="/linedept" replace />} />
 

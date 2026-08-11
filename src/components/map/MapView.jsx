@@ -27,6 +27,7 @@ const MapView = forwardRef(function MapView({
   heatPoints = [],
   searchResults = [],
   onSearchResultOpen = () => {},
+  onSearchResultRoute,   // Show Route action from the result marker popup
   className = '',
   onReady,             // additive: fires once the Leaflet map is initialised
   // Tool props
@@ -39,6 +40,7 @@ const MapView = forwardRef(function MapView({
   basemapUrl,
   departmentColors = {},
   vectorLayers = [],
+  route = null,          // { coordinates: [[lat,lng],...], origin: {lat,lng}, destination: {lat,lng} } | null
 }, ref) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)              // Leaflet map instance
@@ -51,6 +53,7 @@ const MapView = forwardRef(function MapView({
   const vectorLayerRef = useRef(null)
   const locMarkerRef = useRef(null)
   const searchLayerRef = useRef(null)
+  const routeLayerRef = useRef(null)
   const [ready, setReady] = useState(false)
   // leaflet.heat / leaflet.markercluster attach to a global `L`; loaded async
   // once window.L is available (see services/leafletPlugins.js).
@@ -245,7 +248,7 @@ const MapView = forwardRef(function MapView({
     if (searchLayerRef.current) { map.removeLayer(searchLayerRef.current); searchLayerRef.current = null }
     const valid = (searchResults || []).filter((item) => Array.isArray(item.position) && item.position.length >= 2)
     if (!valid.length) return
-    const layer = createSearchResultMarkers(valid, { onOpenDetails: onSearchResultOpen, map })
+    const layer = createSearchResultMarkers(valid, { onOpenDetails: onSearchResultOpen, onShowRoute: onSearchResultRoute, map })
     searchLayerRef.current = layer
     map.addLayer(layer)
     const bounds = L.latLngBounds(valid.map((item) => toLatLng(item.position)))
@@ -254,7 +257,7 @@ const MapView = forwardRef(function MapView({
     } else {
       map.fitBounds(bounds, { padding: [48, 48], maxZoom: 14 })
     }
-  }, [searchResults, ready, onSearchResultOpen])
+  }, [searchResults, ready, onSearchResultOpen, onSearchResultRoute])
 
   // Auto-fit to the visible facilities (current behaviour, kept identical)
   useEffect(() => {
@@ -265,6 +268,40 @@ const MapView = forwardRef(function MapView({
     map.fitBounds(bounds, { padding: [48, 48], maxZoom: 14 })
     if (import.meta.env.DEV) console.info('[GIS diagnostics] Leaflet map bounds', { visibleCount: valid.length })
   }, [facilities, ready])
+
+  // Road route overlay — the ONLY layer this effect manages.  Facility
+  // markers, search-result pins, catalog layers and boundaries are untouched.
+  // A new route replaces the previous one; null clears it.  The map fits
+  // origin + geometry + destination without zooming past maxZoom 16.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !ready) return
+    const group = routeLayerRef.current
+    if (group) { map.removeLayer(group); routeLayerRef.current = null }
+    const coordinates = route?.coordinates
+    if (!Array.isArray(coordinates) || coordinates.length < 2) return
+
+    const upper = L.layerGroup()
+    const casing = L.polyline(coordinates, { color: '#ffffff', weight: 8, opacity: 0.95 })
+    const line = L.polyline(coordinates, { color: '#0b3558', weight: 4.5, opacity: 0.9 })
+    upper.addLayer(casing).addLayer(line)
+
+    const ff = route.mode === 'facility_to_facility'
+    if (route.origin?.lat != null && route.origin?.lng != null) {
+      upper.addLayer(L.circleMarker([route.origin.lat, route.origin.lng], {
+        radius: 7, color: '#ffffff', weight: 2, fillColor: ff ? '#1f7a54' : '#1d7ab5', fillOpacity: 1,
+      }).bindTooltip(route.origin.name || (ff ? 'Start' : 'Your location'), { direction: 'top', offset: [0, -6] }))
+    }
+    if (route.destination?.lat != null && route.destination?.lng != null) {
+      upper.addLayer(L.circleMarker([route.destination.lat, route.destination.lng], {
+        radius: 7, color: '#ffffff', weight: 2, fillColor: '#e07a2c', fillOpacity: 1,
+      }).bindTooltip(route.destination.name || 'Destination', { direction: 'top', offset: [0, -6] }))
+    }
+
+    routeLayerRef.current = upper
+    map.addLayer(upper)
+    map.fitBounds(L.latLngBounds(coordinates), { padding: [40, 40], maxZoom: 16 })
+  }, [route, ready])
 
   // Backend GIS catalog layers (Point / LineString / Polygon / MultiPolygon
   // GeoJSON from the server, rendered untouched — no geometry transforms).

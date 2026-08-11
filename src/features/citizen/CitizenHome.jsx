@@ -19,9 +19,11 @@ import { useFacilities } from '../../hooks/useFacilities'
 import { useAsync } from '../../hooks/useAsync'
 import { useFacilityClickHandler } from '../../hooks/useFacilityClickHandler'
 import { useDepartments, departmentMapFrom } from '../../hooks/useDepartments'
+import { useRoute } from '../../hooks/useRoute'
 import { createPulseMarker } from '../../services/LeafletLayerService'
 import { GISRepository } from '../../gis/repositories/GISRepository'
 import CitizenLayerPanel from './CitizenLayerPanel'
+import RouteSummary from '../../gis/components/RouteSummary'
 import { useAuthStore } from '../../app/store/authStore'
 import { useI18n } from '../../i18n/i18n'
 import { DEPARTMENTS, DISTRICTS, ROLES } from '../../config/constants'
@@ -71,6 +73,8 @@ export default function CitizenHome() {
   const [isLocating, setIsLocating] = useState(false)
   const [gisResults, setGisResults] = useState(null)
   const [leafletMap, setLeafletMap] = useState(null)
+  const routing = useRoute()
+  const routeActiveId = routing.routeActiveId
 
   // Backend data sources
   const { data: departmentsData } = useDepartments()
@@ -198,7 +202,7 @@ export default function CitizenHome() {
       {/* Left: search + list */}
       <div className="w-[380px] shrink-0 border-r border-ink-100 bg-white flex flex-col">
         <div className="p-4 border-b border-ink-100">
-          <GISSearchPanel center={referencePoint} user={user} allowedDepartments={activeIds} compact onResults={setGisResults} onResultClick={(result) => mapRef.current?.showResult(result)} />
+          <GISSearchPanel center={referencePoint} user={user} allowedDepartments={activeIds} compact onResults={setGisResults} onResultClick={(result) => mapRef.current?.showResult(result)} onShowRoute={routing.showRoute} onClearRoute={routing.clearRoute} routeActiveId={routeActiveId} routeLoading={routing.status === 'loading'} onRouteStart={routing.setRouteStart} onRouteDestination={routing.setRouteDestination} routeStartId={routing.routeStartId} routeDestinationId={routing.routeDestinationId} />
 
           <div className="flex items-center gap-1.5 mt-3 overflow-x-auto pb-0.5">
             {departments.map((d) => {
@@ -295,6 +299,7 @@ export default function CitizenHome() {
           selectedId={selectedId}
           searchResults={gisResults?.results || []}
           onSearchResultOpen={handleFacilityClick}
+          onSearchResultRoute={routing.showRoute}
           onFacilityClick={handleFacilityClick}
           onMapClick={tools.handleMapClick}
           activeTool={tools.activeTool}
@@ -307,7 +312,12 @@ export default function CitizenHome() {
           departmentColors={departmentColors}
           onReady={setLeafletMap}
           className="h-full"
+          route={routing.route}
         />
+
+        <div className="absolute left-6 bottom-6 z-[120]">
+          <RouteSummary status={routing.status} mode={routing.mode} route={routing.route} startFacility={routing.startFacility} destinationFacility={routing.destinationFacility} errorMessage={routing.errorMessage} onShowShortest={routing.showFacilityRoute} onSwap={routing.swapFacilities} onClear={routing.clearRoute} />
+        </div>
 
         {/* Right-side information panel for administrative roles only.
             Citizens never see this panel — they navigate to Facility Detail. */}

@@ -21,7 +21,7 @@ function HazardBadge({ safe }) {
 // One shared AI GIS search box.  Every portal (citizen, department, executive,
 // DM situation matrix, admin) renders this same component and therefore calls
 // the same backend /api/spatial-query/ service — no portal-local search logic.
-export default function GISSearchPanel({ facilities = [], center, user, allowedDepartments, onResults, onResultClick, compact = false, bare = false }) {
+export default function GISSearchPanel({ facilities = [], center, user, allowedDepartments, onResults, onResultClick, onShowRoute, onClearRoute, routeActiveId, routeLoading = false, onRouteStart, onRouteDestination, routeStartId, routeDestinationId, compact = false, bare = false }) {
   const { results, loading, error, runSearch, clear } = useSpatialQuery({ user })
   const [query, setQuery] = useState('')
   const [radius, setRadius] = useState('10')
@@ -103,25 +103,59 @@ export default function GISSearchPanel({ facilities = [], center, user, allowedD
               <p className="px-3 py-4 text-center text-[11.5px] text-ink-400">No matching facilities found.</p>
             ) : (
               <ul className="divide-y divide-ink-50">
-                {results.map((row) => (
-                  <li key={row.id}>
-                    <button
-                      type="button"
-                      onClick={() => onResultClick?.(row)}
-                      className="flex w-full items-center gap-2 px-2.5 py-2 text-left hover:bg-ink-50/60"
-                    >
-                      <MapPin size={13} className="shrink-0 text-sky-600" />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[12px] font-semibold text-ink-900">{row.name}</span>
-                        <span className="block truncate text-[10.5px] text-ink-500">{row.categoryLabel} · {row.departmentName}</span>
-                      </span>
-                      <span className="shrink-0 flex items-center gap-1.5">
-                        <span className="text-[10.5px] text-ink-500">{row.distanceKm != null ? `${row.distanceKm.toFixed(2)} km` : row.distanceM != null ? `${(row.distanceM / 1000).toFixed(2)} km` : ''}</span>
-                        <HazardBadge safe={row.hazardSafe} />
-                      </span>
-                    </button>
-                  </li>
-                ))}
+{results.map((row) => {
+                  const routeActive = String(routeActiveId) === String(row.id)
+                  const canPick = Boolean(onRouteStart || onRouteDestination)
+                  const isStart = routeStartId != null && routeStartId === String(row.id)
+                  const isDestination = routeDestinationId != null && routeDestinationId === String(row.id)
+                  const distanceLabel = row.distanceKm != null ? `${row.distanceKm.toFixed(2)} km` : row.distanceM != null ? `${(row.distanceM / 1000).toFixed(2)} km` : ''
+                  return (
+                    <li key={row.id} className="flex items-center gap-1.5 px-2.5 py-1.5">
+                      <button
+                        type="button"
+                        onClick={() => onResultClick?.(row)}
+                        className="flex min-w-0 flex-1 items-center gap-2 text-left hover:bg-ink-50/60"
+                      >
+                        <MapPin size={13} className="shrink-0 text-sky-600" />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[12px] font-semibold text-ink-900">{row.name}</span>
+                          <span className="block truncate text-[10.5px] text-ink-500">{row.categoryLabel} · {row.departmentName}</span>
+                        </span>
+                        <span className="shrink-0 flex items-center gap-1.5">
+                          <span className="text-[10.5px] text-ink-500" title="Straight-line distance from search origin">{distanceLabel}</span>
+                          <HazardBadge safe={row.hazardSafe} />
+                        </span>
+                      </button>
+                      {canPick && isStart && (
+                        <span className="shrink-0 rounded-md bg-leaf-50 px-2 py-1 text-[10px] font-semibold text-leaf-700" title="Selected as route start">Start</span>
+                      )}
+                      {canPick && isDestination && (
+                        <span className="shrink-0 rounded-md bg-alert-50 px-2 py-1 text-[10px] font-semibold text-alert-600" title="Selected as route destination">Dest</span>
+                      )}
+{canPick && !isStart && !isDestination && (
+                        <button
+                          type="button"
+                          disabled={routeLoading}
+                          onClick={() => (routeStartId == null ? onRouteStart?.(row) : onRouteDestination?.(row))}
+                          title={routeStartId == null ? 'Set this facility as the route start' : 'Set this facility as the route destination'}
+                          className={`shrink-0 rounded-md px-2 py-1 text-[10px] font-semibold transition-colors disabled:opacity-50 ${routeStartId == null ? 'text-ink-600 hover:bg-ink-100' : 'text-leaf-700 hover:bg-leaf-50'}`}
+                        >
+                          {routeStartId == null ? 'Start From Here' : 'Route To Here'}
+                        </button>
+                      )}
+                      {onShowRoute && (
+                        <button
+                          type="button"
+                          disabled={routeLoading && !routeActive}
+                          onClick={() => (routeActive ? onClearRoute?.() : onShowRoute(row))}
+                          className={`shrink-0 rounded-md px-2 py-1 text-[10.5px] font-semibold transition-colors disabled:opacity-50 ${routeActive ? 'bg-ink-100 text-ink-700 hover:bg-ink-200' : 'text-sky-700 hover:bg-sky-50'}`}
+                        >
+                          {routeActive ? 'Clear Route' : 'Show Route'}
+                        </button>
+                      )}
+                    </li>
+                  )
+                })}
               </ul>
             )}
           </div>

@@ -19,7 +19,7 @@ const layerBelongsToDepartments = (layer, departments = []) => {
   return departments.some((department) => layerBelongsToDepartment(layer, department))
 }
 
-export default function CitizenLayerPanel({ catalog, visible = {}, loading = {}, toggle, showDefaults, clearAll, activeCount = 0, selectedDepartments = [] }) {
+export default function CitizenLayerPanel({ catalog, visible = {}, loading = {}, toggle, showDefaults, clearAll, activeCount = 0, selectedDepartments = [], closedDivider = true }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const term = query.trim().toLowerCase()
@@ -35,7 +35,7 @@ export default function CitizenLayerPanel({ catalog, visible = {}, loading = {},
     .filter(([, layers]) => layers.length > 0)
 
   return (
-    <div className="border-b border-ink-100">
+    <div className={clsx(open || closedDivider ? 'border-b border-ink-100' : '')}>
       <button
         onClick={() => setOpen((value) => !value)}
         className="w-full flex items-center justify-between px-4 py-2.5 text-[12px] font-semibold text-ink-800 hover:bg-ink-50 transition-colors"

@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import {
-  Inbox, CheckCircle2, AlertTriangle, Clock, MapPin, Search, Filter, Layers,
-  ChevronRight, Building2, User, Flame, ArrowRight, RefreshCw
+  Inbox, CheckCircle2, AlertTriangle, Clock, MapPin, Search,
+  Building2, Flame, RefreshCw
 } from 'lucide-react'
 import PageHeader from '../../components/ui/PageHeader'
 import StatCard from '../../components/ui/StatCard'
@@ -15,8 +15,10 @@ import Modal from '../../components/ui/Modal'
 import ComplaintDetailHub from '../shared/ComplaintDetailHub'
 import { useAuthStore } from '../../app/store/authStore'
 import { useComplaintEngine } from '../../app/store/complaintEngine'
-import { DEPARTMENT_MAP, DEPARTMENTS } from '../../config/constants'
-import { formatDate, formatDateTime } from '../../utils/format'
+import { usePagination } from '../../hooks/usePagination'
+import Pagination from '../../components/ui/Pagination'
+import { DEPARTMENT_MAP } from '../../config/constants'
+import { formatDateTime } from '../../utils/format'
 
 export default function DepartmentOfficerQueue() {
   const user = useAuthStore((s) => s.user)
@@ -62,6 +64,8 @@ export default function DepartmentOfficerQueue() {
       return true
     })
   }, [deptComplaints, priorityFilter, stateFilter, query])
+
+  const { page, setPage, pageEntries, pageCount, pageSize, total } = usePagination(filtered, 10)
 
   // KPIs
   const stats = useMemo(() => {
@@ -223,11 +227,14 @@ export default function DepartmentOfficerQueue() {
               </div>
             )}
             {hydrationStatus !== 'loading' && hydrationStatus !== 'error' && filtered.length > 0 && (
-              <DataTable
-                columns={columns}
-                rows={filtered}
-                onRowClick={(row) => setSelectedComplaintId(row.id)}
-              />
+              <>
+                <DataTable
+                  columns={columns}
+                  rows={pageEntries}
+                  onRowClick={(row) => setSelectedComplaintId(row.id)}
+                />
+                <Pagination page={page} pageCount={pageCount} pageSize={pageSize} total={total} onChange={setPage} />
+              </>
             )}
           </div>
         )}

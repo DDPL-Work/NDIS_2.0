@@ -1,6 +1,5 @@
 import { useState, useMemo } from 'react'
 import PageHeader from '../../../components/ui/PageHeader'
-import Badge from '../../../components/ui/Badge'
 import Modal from '../../../components/ui/Modal'
 import { Card, CardHeader, CardBody } from '../../../components/ui/Card'
 import Button from '../../../components/ui/Button'
@@ -8,6 +7,8 @@ import ComplaintDetailHub from '../../shared/ComplaintDetailHub'
 import { useAuthStore } from '../../../app/store/authStore'
 import { useComplaintEngine } from '../../../app/store/complaintEngine'
 import { useUiStore } from '../../../app/store/uiStore'
+import { usePagination } from '../../../hooks/usePagination'
+import Pagination from '../../../components/ui/Pagination'
 
 // Import Sub-Tabs
 import OverviewTab from './OverviewTab'
@@ -147,6 +148,8 @@ export default function DistrictCommandPlatform() {
     )
   }, [searchQuery, complaints])
 
+  const { page, setPage, pageEntries, pageCount, pageSize, total } = usePagination(filteredComplaints, 8)
+
   return (
     <div className="space-y-6 pb-10">
       <PageHeader
@@ -184,7 +187,7 @@ export default function DistrictCommandPlatform() {
               {filteredComplaints.length === 0 ? (
                 <p className="p-4 text-[12.5px] text-ink-500">No matching items found. Try another keyword.</p>
               ) : (
-                filteredComplaints.map((c) => (
+                pageEntries.map((c) => (
                   <div key={c.id} className="p-3 flex items-center justify-between text-[12.5px]">
                     <div>
                       <span className="font-bold">{c.id}</span>
@@ -196,6 +199,7 @@ export default function DistrictCommandPlatform() {
                   </div>
                 ))
               )}
+              <Pagination page={page} pageCount={pageCount} pageSize={pageSize} total={total} onChange={setPage} className="!border-t-0 !px-0 !pb-0" />
             </CardBody>
           </Card>
         </div>
