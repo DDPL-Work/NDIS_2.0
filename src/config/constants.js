@@ -220,6 +220,21 @@ export const PROPOSAL_STATE_LABELS = {
   completed: 'Completed',
   citizen_feedback_open: 'Citizen Feedback Open',
   closed: 'Closed',
+  // Backend ProposalStatus.TextChoices — values are preserved verbatim and
+  // presented through the backend's own lifecycle (backend_guide2.1 §6.2).
+  DRAFT_DPR: 'Draft DPR',
+  PENDING_REVIEW: 'Pending Review',
+  APPROVED: 'Approved',
+  REJECTED: 'Rejected',
+  SANCTIONED: 'Sanctioned',
+  IN_EXECUTION: 'In Execution',
+  COMPLETED: 'Completed',
+  // Project Execution statuses (lowercase choices from the live serializer
+  // metadata, OPTIONS /projects/ — verified during Phase 2.1).
+  planning: 'Planning',
+  in_execution: 'In Execution',
+  suspended: 'Suspended',
+  handed_over: 'Handed Over',
 }
 
 export const GRIEVANCE_STATES = ['submitted', 'assigned', 'in_progress', 'escalated', 'resolved', 'closed']
@@ -304,6 +319,19 @@ export const STATUS_TONE = {
   active: 'positive',
   inactive: 'neutral',
   pending: 'warning',
+  // Backend proposal status tones (uppercase choices from the live API)
+  DRAFT_DPR: 'neutral',
+  PENDING_REVIEW: 'warning',
+  APPROVED: 'positive',
+  SANCTIONED: 'info',
+  IN_EXECUTION: 'info',
+  COMPLETED: 'positive',
+  REJECTED: 'negative',
+  // Project Execution status tones (lowercase choices from the live API)
+  planning: 'neutral',
+  in_execution: 'info',
+  suspended: 'warning',
+  handed_over: 'info',
 }
 
 export const PRIORITY_CONFIG = {

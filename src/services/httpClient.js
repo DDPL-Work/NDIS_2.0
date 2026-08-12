@@ -13,14 +13,18 @@ async function refreshAccessToken() {
   const old = tokenManager.get(); tokenManager.save({ access: body.access, refresh: body.refresh || refresh, user: old.user }); return body.access
 }
 
-export async function apiRequest(path, { method = 'GET', body, headers = {}, authenticated = true, retry = true, timeout = 15000 } = {}) {
+export async function apiRequest(path, { method = 'GET', body, headers = {}, authenticated = true, retry = true, timeout = 15000, raw = false } = {}) {
   let access = tokenManager.get().access
   if (authenticated && tokenManager.isExpired() && tokenManager.get().refresh) access = await refreshAccessToken()
   const controller = new AbortController(); const timer = window.setTimeout(() => controller.abort(), timeout)
   try {
     const isFormData = typeof FormData !== 'undefined' && body instanceof FormData
     const response = await fetch(`${API_BASE_URL}${path}`, { method, signal: controller.signal, headers: { Accept: 'application/json', ...(body && !isFormData ? { 'Content-Type': 'application/json' } : {}), ...(authenticated && access ? { Authorization: `Bearer ${access}` } : {}), ...headers }, ...(body ? { body: isFormData ? body : JSON.stringify(body) } : {}) })
-    if (response.status === 401 && authenticated && retry && tokenManager.get().refresh) { try { await refreshAccessToken(); return apiRequest(path, { method, body, headers, authenticated, retry: false, timeout }) } catch { tokenManager.clear(); window.dispatchEvent(new Event('ndisp-auth-expired')) } }
+    if (response.status === 401 && authenticated && retry && tokenManager.get().refresh) { try { await refreshAccessToken(); return apiRequest(path, { method, body, headers, authenticated, retry: false, timeout, raw }) } catch { tokenManager.clear(); window.dispatchEvent(new Event('ndisp-auth-expired')) } }
+    if (raw) {
+      if (!response.ok) { const data = await response.json().catch(() => ({})); throw new ApiError(response.status, data) }
+      return response
+    }
     const data = response.status === 204 ? null : await response.json().catch(() => ({})); if (!response.ok) throw new ApiError(response.status, data); return data
   } catch (error) { if (error.name === 'AbortError') throw new Error('The request timed out. Please try again.'); throw error } finally { window.clearTimeout(timer) }
 }

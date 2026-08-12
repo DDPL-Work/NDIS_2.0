@@ -8,6 +8,7 @@ const RADIUS_OPTIONS = [
   { value: '5', label: '5 km' },
   { value: '2', label: '2 km' },
   { value: '20', label: '20 km' },
+  // { value: '5000', label: '5000 km' }
 ]
 
 function HazardBadge({ safe }) {

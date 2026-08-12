@@ -3,6 +3,7 @@
 import { backendGisApi } from '../api/gisApi'
 import { backendNotificationApi } from '../api/notificationApi'
 import { backendDashboardApi } from '../api/dashboardApi'
+import { backendProposalApi } from '../api/proposalApi'
 import { ComplaintRepository } from '../gis/repositories/ComplaintRepository'
 import { unsupported } from '../api/apiClient'
 
@@ -32,11 +33,16 @@ export const workflowApi = {
   startComplaintInspection: (id, payload) => ComplaintRepository.startInspection(id, payload),
   resolveComplaint: (id, payload) => ComplaintRepository.resolve(id, payload),
   escalateComplaint: (id, payload) => ComplaintRepository.escalate(id, payload),
-  listProposals: () => unsupported('proposals'),
-  getProposal: () => unsupported('proposals'),
+  listProposals: (params) => backendProposalApi.list(params),
+  getProposal: (id) => backendProposalApi.get(id),
   getDirectives: () => unsupported('directives'),
-  submitProposal: () => unsupported('proposals'),
-  transitionProposal: () => unsupported('proposal workflow'),
+  // Legacy callers passed a full proposal payload; the backend contract for
+  // creating a proposal is POST /api/proposals/ (Step 1 — need identification).
+  // Submission is the separate /submit/ workflow action used by the wizard.
+  submitProposal: (payload) => backendProposalApi.create(payload),
+  // There is no single backend equivalent for a free-form state transition —
+  // the backend exposes submit/approve/reject/sanction actions instead.
+  transitionProposal: () => unsupported('proposal workflow transitions'),
 }
 
 // The documented dashboard APIs are aggregate sources.  Views that require

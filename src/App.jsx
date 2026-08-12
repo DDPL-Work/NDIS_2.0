@@ -49,6 +49,7 @@ import DepartmentGisWorkspace from './features/department/workspaces/DepartmentG
 import DepartmentAssetWorkspace from './features/department/workspaces/DepartmentAssetWorkspace'
 import DepartmentWorkflowWorkspace from './features/department/workspaces/DepartmentWorkflowWorkspace'
 import DepartmentReportWorkspace from './features/department/workspaces/DepartmentReportWorkspace'
+import DepartmentProjectDetail from './features/department/workspaces/DepartmentProjectDetail'
 import DepartmentSettingsWorkspace from './features/department/workspaces/DepartmentSettingsWorkspace'
 import DepartmentResourceWorkspace from './features/department/workspaces/DepartmentResourceWorkspace'
 import DepartmentWorkforceWorkspace from './features/department/workspaces/DepartmentWorkforceWorkspace'
@@ -162,6 +163,7 @@ export default function App() {
                 <Route path="workflow" element={<DepartmentPage permission="projects.view"><DepartmentWorkflowWorkspace /></DepartmentPage>} />
                 <Route path="planning" element={<DepartmentPage permission="projects.view"><DepartmentPlanningWorkspace /></DepartmentPage>} />
                 <Route path="planning/new" element={<DepartmentPage permission="projects.create"><DepartmentPlanningWorkspace view="new" /></DepartmentPage>} />
+                <Route path="planning/proposals/:id" element={<DepartmentPage permission="projects.view"><DepartmentPlanningWorkspace view="proposal" /></DepartmentPage>} />
                 <Route path="planning/drafts" element={<DepartmentPage permission="projects.view"><DepartmentPlanningWorkspace view="drafts" /></DepartmentPage>} />
                 <Route path="planning/submitted" element={<DepartmentPage permission="projects.view"><DepartmentPlanningWorkspace view="submitted" /></DepartmentPage>} />
                 <Route path="planning/returned" element={<DepartmentPage permission="projects.view"><DepartmentPlanningWorkspace view="returned" /></DepartmentPage>} />
@@ -172,6 +174,7 @@ export default function App() {
                 <Route path="planning/analytics" element={<DepartmentPage permission="projects.view"><DepartmentPlanningWorkspace view="dashboard" /></DepartmentPage>} />
                 <Route path="data-upload" element={<DepartmentPage permission="projects.create"><DataUpload /></DepartmentPage>} />
                 <Route path="projects" element={<DepartmentPage permission="projects.view"><DepartmentExecutionWorkspace /></DepartmentPage>} />
+                <Route path="projects/:id" element={<DepartmentPage permission="projects.view"><DepartmentProjectDetail /></DepartmentPage>} />
                 <Route path="inventory" element={<DepartmentPage permission="inventory.view"><DepartmentResourceWorkspace mode="inventory" /></DepartmentPage>} />
                 <Route path="budget" element={<DepartmentPage permission="budget.view"><DepartmentResourceWorkspace mode="budget" /></DepartmentPage>} />
                 <Route path="reports" element={<DepartmentPage permission="reports.view"><DepartmentReportWorkspace /></DepartmentPage>} />
