@@ -1,22 +1,32 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, CheckCircle2, CloudSun, FileText, Gauge, Landmark, Send } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, CloudSun, FileText, Gauge, Landmark, Link2, PackageCheck, Send } from 'lucide-react'
 import PageHeader from '../../../components/ui/PageHeader'
 import Button from '../../../components/ui/Button'
 import Badge from '../../../components/ui/Badge'
 import StatusBadge from '../../../components/ui/StatusBadge'
+import WorkflowStepper from '../../../components/ui/WorkflowStepper'
 import { Card, CardBody, CardHeader } from '../../../components/ui/Card'
 import { useDepartment } from '../framework/DepartmentContext'
 import { useAsync } from '../../../hooks/useAsync'
 import { useDataVersion, DATA_SCOPES } from '../../../app/store/dataVersionStore'
 import { useUiStore } from '../../../app/store/uiStore'
 import { backendProjectApi } from '../../../api/projectApi'
+import { backendProposalApi } from '../../../api/proposalApi'
 import { backendSiteDiaryApi } from '../../../api/siteDiaryApi'
 import { backendExecutionRiskApi } from '../../../api/executionRiskApi'
 import { formatCurrencyINR, formatDate } from '../../../utils/format'
 
 const inputClass = 'w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-sky-500'
 const SEVERITY_TONE = { low: 'positive', medium: 'warning', high: 'negative', critical: 'negative' }
+
+// Presentation-only mapping of the backend's project status vocabulary onto the
+// shared workflow stepper. The backend status itself is never rewritten.
+const STEPPER_STATE = {
+  SANCTIONED: 'budget_approved',
+  IN_EXECUTION: 'tasked',
+  COMPLETED: 'closed',
+}
 
 // Payload for POST /api/projects/{id}/daily-progress/ — fields verified live
 // during Phase 2.1. `physical_progress` is the writable serializer field
@@ -43,6 +53,7 @@ export default function DepartmentProjectDetail() {
   const projectsVersion = useDataVersion((s) => s.versions[DATA_SCOPES.PROJECTS] || 0)
   const diariesVersion = useDataVersion((s) => s.versions[DATA_SCOPES.SITE_DIARIES] || 0)
   const risksVersion = useDataVersion((s) => s.versions[DATA_SCOPES.RISKS] || 0)
+  const proposalsVersion = useDataVersion((s) => s.versions[DATA_SCOPES.PROPOSALS] || 0)
   const [form, setForm] = useState(initialForm)
   const [saving, setSaving] = useState(false)
   const [actionError, setActionError] = useState(null)
@@ -55,6 +66,14 @@ export default function DepartmentProjectDetail() {
 
   const riskFetcher = useMemo(() => () => backendExecutionRiskApi.list({ project: id }), [id])
   const { data: risks } = useAsync(riskFetcher, [id, risksVersion])
+
+  // Phase 3 lifecycle trace: the source DPR that produced this project. The
+  // backend links them through the numeric proposal reference on the project.
+  const sourceProposalFetcher = useMemo(() => {
+    if (!project?.proposalId) return async () => null
+    return () => backendProposalApi.get(project.proposalId)
+  }, [project?.proposalId])
+  const { data: sourceProposal } = useAsync(sourceProposalFetcher, [project?.proposalId, proposalsVersion])
 
   const submitProgress = async (event) => {
     event.preventDefault()
@@ -109,6 +128,29 @@ export default function DepartmentProjectDetail() {
         <Card><CardBody><p className="text-xs uppercase tracking-wide text-ink-400">Status</p><p className="mt-1"><StatusBadge status={project.status} /></p></CardBody></Card>
       </div>
       <div className="px-6"><Card><CardHeader title="Project information" icon={Landmark} /><CardBody><div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">{fields.map(([label, value]) => <div key={label}><p className="text-[10.5px] uppercase tracking-wide text-ink-400">{label}</p><p className="mt-0.5 font-medium text-ink-900">{value}</p></div>)}</div></CardBody></Card></div>
+      {project.status === 'COMPLETED' && (
+        <div className="px-6"><div className="flex items-start gap-2.5 rounded-lg border border-leaf-200 bg-leaf-50 px-4 py-3 text-sm text-leaf-800"><PackageCheck size={17} className="mt-0.5 shrink-0" /><div><strong>Project completed — asset handover stage.</strong><p className="mt-0.5 text-xs text-leaf-700">The backend marked this project COMPLETED at 100% physical progress. Register the commissioned asset and its maintenance plan in the Asset workspace.</p><Button size="sm" variant="outline" className="mt-2 !text-leaf-800 !border-leaf-300" icon={PackageCheck} onClick={() => navigate('/linedept/assets')}>Open Asset workspace</Button></div></div></div>
+      )}
+      <div className="px-6"><Card>
+        <CardHeader title="DPR to execution lifecycle" subtitle="Traceability from the source proposal through sanction to this execution record" icon={Link2} action={sourceProposal && <Button size="sm" variant="outline" icon={FileText} onClick={() => navigate(`/linedept/planning/proposals/${sourceProposal.id}`)}>Open source DPR</Button>} />
+        <CardBody className="space-y-4">
+          <WorkflowStepper currentState={STEPPER_STATE[project.status] || 'tasked'} />
+          <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+            {[
+              ['Source DPR', sourceProposal ? <span className="kbd-mono text-[12px]">{sourceProposal.proposalId}</span> : (project.proposalIdStr || project.proposalId ? <span className="kbd-mono text-[12px]">{project.proposalIdStr || project.proposalId}</span> : '—')],
+              ['DPR status', sourceProposal ? <StatusBadge status={sourceProposal.status} /> : (project.proposalIdStr ? '—' : 'Not linked on the backend')],
+              ['Sanction order', project.sanctionOrder ? <Badge tone="info">{project.sanctionOrder}</Badge> : '—'],
+              ['Sanctioned amount', formatCurrencyINR(project.budgetSanctioned)],
+              ['DPR cost', sourceProposal ? (sourceProposal.costFormatted || formatCurrencyINR(sourceProposal.estimatedCost)) : '—'],
+              ['Approved by', sourceProposal?.approvedByName || '—'],
+              ['Linked complaints', sourceProposal ? (sourceProposal.linkedComplaintIds?.length || 0) : '—'],
+              ['Population impact', sourceProposal ? (sourceProposal.populationImpact || '—') : '—'],
+            ].map(([label, value]) => <div key={label}><p className="text-[10.5px] uppercase tracking-wide text-ink-400">{label}</p><p className="mt-0.5 font-medium text-ink-900">{value}</p></div>)}
+          </div>
+          {sourceProposal?.reviewNotes && <div className="rounded-lg border border-saffron-200 bg-saffron-50 px-4 py-3 text-sm text-saffron-800"><strong>Reviewer note:</strong> {sourceProposal.reviewNotes}{sourceProposal.reviewedByName ? <span className="block text-xs text-saffron-600">— {sourceProposal.reviewedByName}</span> : null}</div>}
+          {sourceProposal?.delegatedPowerNote && <p className="rounded-lg bg-leaf-50 px-3 py-2 text-xs text-leaf-800"><Landmark className="mr-1 inline" size={13} />{sourceProposal.delegatedPowerNote}</p>}
+        </CardBody>
+      </Card></div>
       <div className="px-6 grid gap-6 lg:grid-cols-2">
         <Card><CardHeader title="Daily progress" subtitle="Physical progress, labour, materials, weather and optional risk signal" icon={Gauge} /><CardBody>
           <form onSubmit={submitProgress} className="space-y-3">

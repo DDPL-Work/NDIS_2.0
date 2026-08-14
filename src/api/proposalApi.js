@@ -59,5 +59,5 @@ export const backendProposalApi = {
   async submit(id) { const response = await apiRequest(`/proposals/${id}/submit/`, { method: 'POST' }); touched([DATA_SCOPES.PROPOSALS, DATA_SCOPES.PLANNING])(); return response },
   async approve(id) { const response = await apiRequest(`/proposals/${id}/approve/`, { method: 'POST' }); touched([DATA_SCOPES.PROPOSALS, DATA_SCOPES.PLANNING])(); return response },
   async reject(id, payload = {}) { const response = await apiRequest(`/proposals/${id}/reject/`, { method: 'POST', body: payload }); touched([DATA_SCOPES.PROPOSALS, DATA_SCOPES.PLANNING])(); return response },
-  async sanction(id, payload) { const response = await apiRequest(`/proposals/${id}/sanction/`, { method: 'POST', body: payload }); touched([DATA_SCOPES.PROPOSALS, DATA_SCOPES.PLANNING])(); return response },
+  async sanction(id, payload) { const response = await apiRequest(`/proposals/${id}/sanction/`, { method: 'POST', body: payload }); touched([DATA_SCOPES.PROPOSALS, DATA_SCOPES.PLANNING, DATA_SCOPES.PROJECTS, DATA_SCOPES.DASHBOARD])(); return response },
 }

@@ -169,6 +169,7 @@ export default function App() {
                 <Route path="planning/returned" element={<DepartmentPage permission="projects.view"><DepartmentPlanningWorkspace view="returned" /></DepartmentPage>} />
                 <Route path="planning/approved" element={<DepartmentPage permission="projects.view"><DepartmentPlanningWorkspace view="approved" /></DepartmentPage>} />
                 <Route path="planning/rejected" element={<DepartmentPage permission="projects.view"><DepartmentPlanningWorkspace view="rejected" /></DepartmentPage>} />
+                <Route path="planning/sanctioned" element={<DepartmentPage permission="projects.view"><DepartmentPlanningWorkspace view="sanctioned" /></DepartmentPage>} />
                 <Route path="planning/dpr" element={<DepartmentPage permission="projects.view"><DepartmentPlanningWorkspace view="dashboard" /></DepartmentPage>} />
                 <Route path="planning/funding" element={<DepartmentPage permission="projects.view"><DepartmentPlanningWorkspace view="dashboard" /></DepartmentPage>} />
                 <Route path="planning/analytics" element={<DepartmentPage permission="projects.view"><DepartmentPlanningWorkspace view="dashboard" /></DepartmentPage>} />

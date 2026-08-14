@@ -11,10 +11,16 @@ const toQuery = (params = {}) => {
   return value.toString() ? `?${value}` : ''
 }
 
+const touched = () => {
+  invalidateData(DATA_SCOPES.BILLS)
+  invalidateData(DATA_SCOPES.PROJECTS)
+  invalidateData(DATA_SCOPES.REPORTS)
+}
+
 export const backendBillApi = {
   async list(params = {}) { return mapBillList(await apiRequest(`/bills/${toQuery(params)}`)) },
   async get(id) { return mapBill(await apiRequest(`/bills/${id}/`)) },
-  async create(payload) { const record = mapBill(await apiRequest('/bills/', { method: 'POST', body: payload })); invalidateData(DATA_SCOPES.BILLS); invalidateData(DATA_SCOPES.PROJECTS); return record },
-  async update(id, payload) { const record = mapBill(await apiRequest(`/bills/${id}/`, { method: 'PATCH', body: payload })); invalidateData(DATA_SCOPES.BILLS); invalidateData(DATA_SCOPES.PROJECTS); return record },
-  async remove(id) { await apiRequest(`/bills/${id}/`, { method: 'DELETE' }); invalidateData(DATA_SCOPES.BILLS); invalidateData(DATA_SCOPES.PROJECTS) },
+  async create(payload) { const record = mapBill(await apiRequest('/bills/', { method: 'POST', body: payload })); touched(); return record },
+  async update(id, payload) { const record = mapBill(await apiRequest(`/bills/${id}/`, { method: 'PATCH', body: payload })); touched(); return record },
+  async remove(id) { await apiRequest(`/bills/${id}/`, { method: 'DELETE' }); touched() },
 }

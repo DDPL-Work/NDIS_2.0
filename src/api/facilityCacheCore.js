@@ -36,7 +36,26 @@ export function createFacilityCache({ transport, freshMs = FRESH_MS, retainMs = 
     return promise
   }
 
-  return (params = {}) => {
+  // Mutation-aware eviction: facility writes drop only the entries that could
+  // contain the touched rows (matching department/district, plus the unfiltered
+  // collection), keeping every other department's cached payload intact so the
+  // ~43 MB download is not re-triggered for unrelated sectors.
+  const invalidate = ({ departmentId, districtId } = {}) => {
+    let dropped = 0
+    for (const key of [...store.keys()]) {
+      const parts = key.split(':')
+      const district = parts[1] || 'all'
+      const department = parts[2] || 'all'
+      if (departmentId && department !== 'all' && department !== String(departmentId)) continue
+      if (districtId && district !== 'all' && district !== String(districtId)) continue
+      store.delete(key)
+      dropped += 1
+    }
+    if (dropped) { log('INVALIDATE', `${dropped} entry(ies)`) }
+    return dropped
+  }
+
+  const read = (params = {}) => {
     const key = facilityCacheKey(params)
     const entry = store.get(key)
     if (!entry) { log('MISS', key); return startRequest(key, params) }
@@ -55,4 +74,6 @@ export function createFacilityCache({ transport, freshMs = FRESH_MS, retainMs = 
     log('HIT', key)
     return entry.promise
   }
+  read.invalidate = invalidate
+  return read
 }

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { Bell, LogOut, ChevronDown, Globe, MapPin, Search } from 'lucide-react'
 import Select from '../ui/Select'
 import Badge from '../ui/Badge'
@@ -81,6 +81,18 @@ export default function Topbar({ title, subtitle, showDistrict = true, showDepar
   const canSwitchDepartment = [ROLES.DISTRICT_COLLECTOR, ROLES.DM, ROLES.ADM, ROLES.STATE_ADMIN, ROLES.SYSTEM_ADMIN].includes(user?.role)
   const currentDepartment = DEPARTMENTS.find((department) => department.id === user?.departmentId)
 
+  // District options come from the configured hierarchy (slug ids); when the
+  // authenticated profile carries the numeric backend district pk, its label
+  // is resolved from the profile itself so the selector never renders an
+  // undefined pair ("Nalanda (undefined)").
+  const districtOptions = useMemo(() => {
+    const base = DISTRICTS.map((d) => ({ value: d.id, label: d.phase ? `${d.label} (${d.phase})` : d.label }))
+    if (user?.districtId && !base.some((option) => option.value === user.districtId) && user?.district?.label) {
+      return [...base, { value: user.districtId, label: user.district.label }]
+    }
+    return base
+  }, [user?.districtId, user?.district?.label])
+
   return (
     <>
       <header className="h-14 border-b border-ink-100 bg-white/90 backdrop-blur flex items-center justify-between px-5 shrink-0 z-20">
@@ -115,10 +127,7 @@ export default function Topbar({ title, subtitle, showDistrict = true, showDepar
                 small
                 value={user?.districtId}
                 onChange={setDistrict}
-                options={DISTRICTS.map((d) => ({
-                  value: d.id,
-                  label: `${d.label}${d.phase !== 'Pilot' ? ` (${d.phase})` : ''}`,
-                }))}
+                options={districtOptions}
               />
             </div>
           )}

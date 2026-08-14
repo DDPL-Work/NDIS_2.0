@@ -14,6 +14,9 @@ export const DATA_SCOPES = {
   BILLS: 'bills',
   RISKS: 'risks',
   REPORTS: 'reports',
+  DASHBOARD: 'dashboard',
+  FACILITIES: 'facilities',
+  GIS: 'gis',
 }
 
 export const useDataVersion = create((set) => ({

@@ -72,12 +72,6 @@ export default function DistrictCommandPlatform() {
     { reg: 'BR-21G-0911', type: 'PWD Survey Jeep', driver: 'Madan Singh', phone: '80024 XXXXX', fuel: 45, status: 'Under Repair' },
   ]
 
-  const projects = [
-    { name: 'Silao Block Hospital New Building Block', deptLabel: 'Health', progress: 75, budget: 14500000, risk: 'Low' },
-    { name: 'Rajgir Kund Road Widening Highway', deptLabel: 'PWD / Roads', progress: 42, budget: 28000000, risk: 'Medium' },
-    { name: 'JJM Pipeline Last-Mile Connection Silao', deptLabel: 'Water', progress: 91, budget: 8500000, risk: 'Low' },
-  ]
-
   const schemes = [
     { name: 'Jal Jeevan Mission (JJM)', coverage: '1.84 Lakh Taps', progress: 82, issues: 4 },
     { name: 'Pradhan Mantri Gram Sadak Yojana (PMGSY)', coverage: '96 Roads', progress: 94, issues: 1 },
@@ -232,7 +226,6 @@ export default function DistrictCommandPlatform() {
         )}
         {activeTab === 'projects' && (
           <MonitoringTab
-            projects={projects}
             schemes={schemes}
             budgetUtil={budgetUtil}
           />

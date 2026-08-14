@@ -67,7 +67,7 @@ export default function DepartmentCoverage({ rows = [], loading, error, onRetry 
 }
 
 function DepartmentCoverageRow({ row }) {
-  const counts = `${formatNumber(row.facilityCount)} facilities · ${row.openProposals == null ? '—' : formatNumber(row.openProposals)} open proposals · ${formatNumber(row.openGrievances)} open grievances`
+  const counts = `${formatNumber(row.facilityCount)} facilities · ${formatNumber(row.projectCount == null ? 0 : row.projectCount)} projects · ${row.openProposals == null ? '—' : formatNumber(row.openProposals)} open proposals · ${formatNumber(row.openGrievances)} open grievances`
   return (
     <Link
       to={`/department/${row.id}`}

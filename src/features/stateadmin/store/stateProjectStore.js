@@ -2,8 +2,17 @@
 // Projects and proposals carry their financial fields (sanctioned / released /
 // committed / utilized) as book-keeping mirrors of the finance engine records;
 // the finance engine remains the source of truth for numbers.
+//
+// Phase 3: a proposal approval now creates BOTH the project registry record AND
+// the financial sanction record in the finance engine (projectId-linked), so
+// the state pipeline State Budget -> Department Authorization -> Sanction ->
+// Project is one continuous chain. The finance engine's own rules still decide
+// whether the sanction is accepted; if the department authorization cannot
+// cover the estimate, a notification instructs the finance desk to raise the
+// sanction manually.
 import { create } from 'zustand'
 import { useStateFinanceStore } from './stateFinanceStore'
+import { useStateMasterStore } from './stateMasterStore'
 import { SEED_PROJECTS, SEED_PROPOSALS, cr } from './seed/stateSeedData'
 import { PROJECT_STATUSES } from '../../../config/stateConstants'
 import { canActAt, nextStepFor } from '../services/approvalService'
@@ -110,6 +119,35 @@ export const useStateProjectStore = create((set, get) => ({
         proposalId: proposal.id,
       }
       set((s) => ({ projects: [project, ...s.projects] }))
+      // Phase 3: raise the financial sanction for the approved proposal in the
+      // finance engine. The finance engine remains the source of truth — its
+      // own authority and authorization rules decide acceptance. When the
+      // department budget cannot cover the estimate, approval is NOT blocked;
+      // a notification asks the finance desk to sanction manually.
+      const finance = useStateFinanceStore.getState()
+      const scheme = useStateMasterStore.getState().schemes.find((s) => s.id === proposal.schemeId)
+      const budgetHeadId = proposal.budgetHeadId || scheme?.budgetHeadId
+      if (budgetHeadId) {
+        try {
+          const sanction = finance.createSanction({
+            fy: finance.fy,
+            departmentId: proposal.departmentId,
+            districtId: proposal.districtId,
+            schemeId: proposal.schemeId,
+            budgetHeadId,
+            projectId: project.id,
+            description: `Sanction against approved proposal ${proposal.id} — ${proposal.name}.`,
+            amount: proposal.estimatedCost,
+            goNumber: proposal.goNumber || '',
+            actor,
+          })
+          set((s) => ({ projects: s.projects.map((p) => (p.id === project.id ? { ...p, sanctionNo: sanction.sanctionNo } : p)) }))
+        } catch (sanctionError) {
+          finance.addNotification({ type: 'approval_pending', message: `Proposal ${proposal.id} approved but financial sanction was not auto-created: ${sanctionError.message}`, departmentId: proposal.departmentId })
+        }
+      } else {
+        finance.addNotification({ type: 'approval_pending', message: `Proposal ${proposal.id} approved — no budget head mapped to scheme ${proposal.schemeId || '—'}; create the sanction in Finance.`, departmentId: proposal.departmentId })
+      }
     }
     set((s) => ({ proposals: s.proposals.map((p) => (p.id === id ? updated : p)) }))
     useStateFinanceStore.getState().writeAudit({ actor, action: `PROPOSAL_${action.toUpperCase()}`, entity: 'project_proposal', entityId: proposal.id, oldValue: proposal.status, newValue: nextStatus, reason: remarks })

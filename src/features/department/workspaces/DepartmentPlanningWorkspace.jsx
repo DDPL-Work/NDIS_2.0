@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, CheckCircle2, ClipboardList, FilePlus2, FileUp, Landmark, MapPin, Send, Sparkles, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CheckCircle2, ClipboardList, FilePlus2, FileUp, FolderGit2, Landmark, MapPin, Send, Sparkles, X } from 'lucide-react'
 import PageHeader from '../../../components/ui/PageHeader'
 import DataTable from '../../../components/ui/DataTable'
 import Badge from '../../../components/ui/Badge'
@@ -16,6 +16,7 @@ import { useDataVersion, DATA_SCOPES } from '../../../app/store/dataVersionStore
 import { useUiStore } from '../../../app/store/uiStore'
 import { backendPlanningApi } from '../../../api/planningApi'
 import { backendProposalApi } from '../../../api/proposalApi'
+import { backendProjectApi } from '../../../api/projectApi'
 
 const STEPS = ['Need identification', 'Survey & inspection', 'Technical DPR', 'Financial estimation', 'Clearances', 'Attachments', 'Review & submit']
 const inputClass = 'w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-sky-500'
@@ -29,7 +30,7 @@ const departmentPk = (user) => {
 
 const formFromProposal = (p) => ({
   title: p.title || '',
-  category: p.category || 'Infrastructure',
+  category: p.category || '',
   village: p.village || '',
   block: p.block || '',
   population: p.populationImpact ? String(p.populationImpact) : '',
@@ -43,7 +44,7 @@ const formFromProposal = (p) => ({
   longitude: p.longitude != null ? String(p.longitude) : '',
   technicalScope: p.technicalScope || '',
   engineeringNotes: p.engineeringNotes || '',
-  timeline: p.estimatedTimeline || '90 days',
+  timeline: p.estimatedTimeline || '',
   civilWorks: String(p.civilWorks || 0),
   equipment: String(p.equipmentCost || 0),
   electrical: String(p.electricalCost || 0),
@@ -58,9 +59,9 @@ const formFromProposal = (p) => ({
 
 const emptyForm = (prefill = {}) => ({
   title: prefill.title || '',
-  category: 'Infrastructure',
+  category: '',
   village: prefill.village || '',
-  block: prefill.block || 'Silao',
+  block: prefill.block || '',
   population: '',
   gapScore: prefill.gapScore || '',
   linkedComplaints: '',
@@ -72,7 +73,7 @@ const emptyForm = (prefill = {}) => ({
   longitude: '',
   technicalScope: '',
   engineeringNotes: '',
-  timeline: '90 days',
+  timeline: '',
   civilWorks: '',
   equipment: '',
   electrical: '',
@@ -247,7 +248,7 @@ function DprWizard({ proposalId: initialId, prefill = {}, onCreated, onDone }) {
       {Array.isArray(proposal?.attachments) && proposal.attachments.length > 0 && <div className="mt-4"><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-500">Registered attachments</p><div className="space-y-2">{proposal.attachments.map((item, index) => { const fileName = item.file_name || item.name || (item.file ? item.file.split('/').pop() : `Attachment ${index + 1}`); return <div key={index} className="flex items-center justify-between rounded-lg border border-ink-150 px-3 py-2 text-sm"><span className="truncate">{fileName}</span>{item.file && <a className="text-sky-700 hover:underline" href={item.file} target="_blank" rel="noreferrer">Open</a>}</div> })}</div></div>}
     </div>,
     <div className="space-y-3" key="review">
-      <div className="rounded-xl border border-ink-150 p-4 text-sm"><strong>{review.title || 'Untitled DPR'}</strong><p className="mt-2 text-ink-600">{proposal?.problemStatement || review.surveyNotes || 'No need assessment entered yet.'}</p><div className="mt-3 grid grid-cols-2 gap-2 text-xs"><span>Priority: <b>{proposal?.priority || '—'}</b></span><span>Funding: <b>{proposal?.fundingSource || '—'}</b></span><span>Beneficiaries: <b>{proposal?.populationImpact || review.population || '—'}</b></span><span>Backend cost: <b>{proposal?.costFormatted || formatCurrencyINR(total)}</b></span><span>Status: <b>{proposal?.statusDisplay || 'Draft DPR'}</b></span><span>Stage: <b>{proposal?.stageDisplay || '—'}</b></span></div>{proposal?.delegatedPowerNote && <p className="mt-3 rounded-lg bg-leaf-50 px-3 py-2 text-xs text-leaf-800"><Landmark className="mr-1 inline" size={13} />{proposal.delegatedPowerNote}</p>}</div>
+      <div className="rounded-xl border border-ink-150 p-4 text-sm"><strong>{review.title || 'Untitled DPR'}</strong><p className="mt-2 text-ink-600">{proposal?.problemStatement || review.surveyNotes || 'No need assessment entered yet.'}</p><div className="mt-3 grid grid-cols-2 gap-2 text-xs"><span>Priority: <b>{proposal?.priority || '—'}</b></span><span>Funding: <b>{proposal?.fundingSource || '—'}</b></span><span>Beneficiaries: <b>{proposal?.populationImpact || review.population || '—'}</b></span><span>Backend cost: <b>{proposal?.costFormatted || formatCurrencyINR(total)}</b></span><span>Status: <b>{proposal?.statusDisplay || '—'}</b></span><span>Stage: <b>{proposal?.stageDisplay || '—'}</b></span></div>{proposal?.delegatedPowerNote && <p className="mt-3 rounded-lg bg-leaf-50 px-3 py-2 text-xs text-leaf-800"><Landmark className="mr-1 inline" size={13} />{proposal.delegatedPowerNote}</p>}</div>
       {proposal?.reviewNotes && <div className="rounded-lg border border-saffron-200 bg-saffron-50 px-4 py-3 text-sm text-saffron-800"><strong>Reviewer note:</strong> {proposal.reviewNotes}</div>}
       <p className="text-sm text-ink-500">Submitting moves this DPR to <b>Pending Review</b> for the District Magistrate.</p>
     </div>,
@@ -284,7 +285,11 @@ const buildFormData = (files) => {
   return formData
 }
 
-const VIEW_STATUS = { drafts: 'DRAFT_DPR', submitted: 'PENDING_REVIEW', approved: 'APPROVED', rejected: 'REJECTED' }
+const VIEW_STATUS = { drafts: 'DRAFT_DPR', submitted: 'PENDING_REVIEW', approved: 'APPROVED', rejected: 'REJECTED', sanctioned: null }
+
+// Sanctioned DPRs continue into project execution on the backend. The lifecycle
+// view joins proposals with the projects the backend materialized for them.
+const SANCTIONED_STATUSES = ['SANCTIONED', 'IN_EXECUTION', 'COMPLETED']
 
 const VIEW_TITLES = {
   dashboard: 'Development Planning ERP',
@@ -293,7 +298,18 @@ const VIEW_TITLES = {
   approved: 'Approved Proposals',
   rejected: 'Rejected Proposals',
   returned: 'Returned Proposals',
+  sanctioned: 'Sanctioned & In Execution',
 }
+
+const PLANNING_VIEWS = [
+  { value: 'dashboard', label: 'Dashboard' },
+  { value: 'drafts', label: 'Drafts' },
+  { value: 'submitted', label: 'Pending review' },
+  { value: 'approved', label: 'Approved' },
+  { value: 'sanctioned', label: 'In execution' },
+  { value: 'rejected', label: 'Rejected' },
+  { value: 'returned', label: 'Returned' },
+]
 
 export default function DepartmentPlanningWorkspace({ view = 'dashboard' }) {
   const { dept } = useDepartment()
@@ -304,25 +320,54 @@ export default function DepartmentPlanningWorkspace({ view = 'dashboard' }) {
   const [searchParams] = useSearchParams()
   const planningVersion = useDataVersion((s) => s.versions[DATA_SCOPES.PLANNING] || 0)
   const proposalsVersion = useDataVersion((s) => s.versions[DATA_SCOPES.PROPOSALS] || 0)
+  const projectsVersion = useDataVersion((s) => s.versions[DATA_SCOPES.PROJECTS] || 0)
   const deptPk = useMemo(() => departmentPk(user), [user])
+  const districtPk = useMemo(() => {
+    const raw = (user && typeof user.district === 'object' && user.district) ? (user.district.id ?? user.district.districtId) : (user?.districtId ?? user?.district)
+    const parsed = Number(raw)
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined
+  }, [user])
 
   const dashboardFetcher = useMemo(() => () => backendPlanningApi.dashboard(), [])
   const { data: dashboard, loading: dashboardLoading, error: dashboardError, refetch: refetchDashboard } = useAsync(dashboardFetcher, [planningVersion])
 
+  // The DPR repository is always the department/district-scoped proposal list
+  // (GET /api/proposals/?department=&district=), including on the dashboard —
+  // planning/dashboard supplies only the KPI counts and suggested needs.
   const status = VIEW_STATUS[view]
-  const proposalFetcher = useMemo(() => {
-    if (view === 'dashboard') return async () => null
-    return () => backendProposalApi.list({ ...(status ? { status } : {}), ...(deptPk ? { departmentId: deptPk } : {}) })
-  }, [view, status, deptPk])
-  const { data: proposals, loading: proposalsLoading, error: proposalsError, refetch: refetchProposals } = useAsync(proposalFetcher, [view, status, deptPk, proposalsVersion, planningVersion])
+  const proposalFetcher = useMemo(() => () => backendProposalApi.list({
+    ...(status ? { status } : {}),
+    ...(deptPk ? { departmentId: deptPk } : {}),
+    ...(districtPk ? { districtId: districtPk } : {}),
+  }), [view, status, deptPk, districtPk])
+  const { data: proposals, loading: proposalsLoading, error: proposalsError, refetch: refetchProposals } = useAsync(proposalFetcher, [view, status, deptPk, districtPk, proposalsVersion, planningVersion])
+
+  // Phase 3 lifecycle bridge: projects the backend materialized for the
+  // department's sanctioned DPRs (matched on proposal reference or numeric id).
+  const projectFetcher = useMemo(() => {
+    if (view !== 'sanctioned') return async () => null
+    return () => backendProjectApi.list(deptPk ? { departmentId: deptPk } : {})
+  }, [view, deptPk])
+  const { data: lifecycleProjects } = useAsync(projectFetcher, [view, deptPk, projectsVersion])
+
+  const projectByProposal = useMemo(() => {
+    const map = new Map()
+    ;(lifecycleProjects || []).forEach((project) => {
+      ;[project.proposalIdStr, String(project.proposalId || '')].filter(Boolean).forEach((key) => map.set(key, project))
+    })
+    return map
+  }, [lifecycleProjects])
+
+  const linkedProject = (row) => projectByProposal.get(String(row.id)) || projectByProposal.get(row.proposalId) || null
 
   const needs = dashboard?.suggestedDevelopmentNeeds || []
   const kpi = dashboard?.kpiSummary || {}
   const rows = useMemo(() => {
-    if (view === 'dashboard') return dashboard?.dprRepository || []
     const list = proposals || []
-    return view === 'returned' ? list.filter((p) => p.reviewNotes) : list
-  }, [view, dashboard, proposals])
+    if (view === 'returned') return list.filter((p) => p.reviewNotes)
+    if (view === 'sanctioned') return list.filter((p) => SANCTIONED_STATUSES.includes(p.status))
+    return list
+  }, [view, proposals])
 
   const convertToDpr = (need) => {
     const params = new URLSearchParams({ title: need.title, village: need.village || '', block: need.block || '', gapScore: String(need.gap_score ?? '') })
@@ -359,9 +404,39 @@ export default function DepartmentPlanningWorkspace({ view = 'dashboard' }) {
     { key: 'actions', label: '', render: (row) => <Button size="sm" variant="outline" onClick={() => navigate(`/linedept/planning/proposals/${row.id}`)}>View / Resume</Button> },
   ]
 
+  // Sanctioned DPRs continue as backend projects — the execution ERP row carries
+  // its sanction order, live progress and status, and cross-links to it.
+  const lifecycleColumns = [
+    { key: 'proposalId', label: 'DPR ID', render: (row) => <span className="kbd-mono text-[12px]">{row.proposalId}</span> },
+    { key: 'title', label: 'DPR title', render: (row) => <span className="font-medium text-ink-900">{row.title}</span> },
+    { key: 'status', label: 'DPR status', render: (row) => <StatusBadge status={row.status} /> },
+    { key: 'project', label: 'Linked project', render: (row) => { const project = linkedProject(row); return project ? <span className="font-medium text-ink-900">{project.title}</span> : '—' } },
+    { key: 'projectStatus', label: 'Project status', render: (row) => { const project = linkedProject(row); return project ? <StatusBadge status={project.status} /> : '—' } },
+    { key: 'progress', label: 'Progress', render: (row) => { const project = linkedProject(row); return project ? <span className="font-semibold text-leaf-700">{project.progress}%</span> : '—' } },
+    { key: 'sanction', label: 'Sanction', render: (row) => { const project = linkedProject(row); return project?.sanctionOrder ? <Badge tone="info">{project.sanctionOrder}</Badge> : (row.costFormatted || formatCurrencyINR(row.estimatedCost)) } },
+    { key: 'actions', label: '', render: (row) => { const project = linkedProject(row); return (
+      <div className="flex gap-1.5" onClick={(event) => event.stopPropagation()}>
+        <Button size="sm" variant="ghost" onClick={() => navigate(`/linedept/planning/proposals/${row.id}`)}>View DPR</Button>
+        {project && <Button size="sm" variant="outline" icon={FolderGit2} onClick={() => navigate(`/linedept/projects/${project.id}`)}>View project</Button>}
+      </div>
+    ) } },
+  ]
+
+  const columns = view === 'sanctioned' ? lifecycleColumns : tableColumns
+
   return (
     <div className="space-y-6 pb-8">
       <PageHeader eyebrow={`${dept.code} · Planning & Proposals`} title={VIEW_TITLES[view]} description="Development needs flow through DPR preparation, DM review and sanction on the live backend." action={canCreate && <Button icon={FilePlus2} onClick={() => navigate('/linedept/planning/new')}>New proposal</Button>} />
+      <div className="px-6">
+        <div className="flex flex-wrap gap-1 rounded-lg border border-ink-100 bg-white p-1 text-[12.5px] font-medium w-fit">
+          {PLANNING_VIEWS.map((item) => {
+            const active = item.value === view || (view === 'dashboard' && item.value === 'dashboard')
+            return (
+              <button key={item.value} onClick={() => navigate(item.value === 'dashboard' ? '/linedept/planning' : `/linedept/planning/${item.value}`)} className={`px-3 py-1.5 rounded-md transition-colors ${active ? 'bg-ink-900 text-white font-semibold' : 'text-ink-600 hover:bg-ink-50'}`}>{item.label}</button>
+            )
+          })}
+        </div>
+      </div>
       {view === 'dashboard' && (
         <>
           <div className="px-6 grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -389,13 +464,18 @@ export default function DepartmentPlanningWorkspace({ view = 'dashboard' }) {
           </div>
         </>
       )}
+      {view === 'sanctioned' && (
+        <div className="px-6">
+          <div className="flex items-start gap-2 rounded-lg border border-sky-100 bg-sky-50 px-4 py-3 text-sm text-sky-800"><FolderGit2 size={16} className="mt-0.5 shrink-0" /><span>Sanctioned DPRs are materialized as execution projects by the backend. Open the linked project to record daily progress, site diaries, measurement books, bills and risks; completed projects hand over into the Asset workspace.</span></div>
+        </div>
+      )}
       <div className="px-6">
         <Card>
-          <CardHeader title="DPR repository" subtitle={view === 'dashboard' ? `${(dashboard?.dprRepository || []).length} active proposals from the backend` : `${rows.length} proposals in this view`} icon={ClipboardList} />
+          <CardHeader title="DPR repository" subtitle={view === 'dashboard' ? `${rows.length} proposals from the backend` : `${rows.length} proposals in this view`} icon={ClipboardList} />
           <CardBody className="!p-0">
             {proposalsError ? errorBox(proposalsError.message, refetchProposals)
               : proposalsLoading && !rows.length ? <p className="px-4 py-4 text-sm text-ink-500">Loading proposals…</p>
-              : <DataTable rows={rows} columns={tableColumns} emptyLabel="No proposals in this view yet" />}
+              : <DataTable rows={rows} columns={columns} emptyLabel="No proposals in this view yet" />}
           </CardBody>
         </Card>
       </div>

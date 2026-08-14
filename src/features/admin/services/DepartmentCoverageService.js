@@ -8,10 +8,11 @@
 //                                           facilityMapper gap scores are reused)
 //   - GET /api/department/{id}/complain/    complaint rollup (totals, per-status
 //                                           summary, rows) for open counts/trend
+//   - GET /api/projects/?department={id}     department project registry
+//   - GET /api/proposals/?department={id}    department proposal registry
 //
-// The backend exposes no proposal or uptime/p95 telemetry endpoints, so those
-// fields stay null and the UI renders an unavailable state instead of making up
-// numbers (see components).
+// Uptime/p95 telemetry has no backend endpoint; the UI renders an unavailable
+// state instead of making up numbers (see components).
 
 // Backend UPPERCASE statuses that end the complaint lifecycle. "Open" is the
 // complement — every status NOT listed here is an in-flight grievance. This
@@ -70,10 +71,20 @@ export function openComplaintsFrom(rollup) {
   return Math.max(0, rollup.total - terminal)
 }
 
-export function buildDepartmentRows(departments, facilityGroups, rollups) {
+// Backend UPPERCASE statuses that end the proposal lifecycle. "Open" is the
+// complement — same idea as the complaint definition above.
+export const PROPOSAL_TERMINAL_STATUSES = ['COMPLETED', 'REJECTED']
+
+export function openProposalsFrom(proposals = []) {
+  return proposals.filter((proposal) => !PROPOSAL_TERMINAL_STATUSES.includes(String(proposal.status || '').toUpperCase())).length
+}
+
+export function buildDepartmentRows(departments, facilityGroups, rollups, projectGroups = [], proposalGroups = []) {
   return departments.map((dept, index) => {
     const facilities = facilityGroups[index] || []
     const rollup = rollups[index] || { total: 0, statusSummary: {}, complaints: [] }
+    const projects = projectGroups[index] || []
+    const proposals = proposalGroups[index] || []
     const positioned = facilities.filter((f) => Number.isFinite(f.longitude) && Number.isFinite(f.latitude))
     const gapScore = positioned.length
       ? positioned.reduce((sum, f) => sum + Number(f.gapScore || 0), 0) / positioned.length
@@ -83,7 +94,9 @@ export function buildDepartmentRows(departments, facilityGroups, rollups) {
       name: dept.name,
       ...visualForDepartment(dept.name, dept.color),
       facilityCount: facilities.length,
-      openProposals: null, // no proposals API is deployed on the backend
+      projectCount: projects.length,
+      proposalCount: proposals.length,
+      openProposals: openProposalsFrom(proposals),
       openGrievances: openComplaintsFrom(rollup),
       grievanceTotal: rollup.total,
       gapScore,

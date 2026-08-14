@@ -34,7 +34,7 @@ export const backendProjectApi = {
   async summary() { return mapProjectSummary(await apiRequest('/projects/summary/')) },
   // Daily physical progress, labour, materials, weather, risk signal.
   // Reaching 100% transitions the project to COMPLETED on the backend.
-  async dailyProgress(id, payload) { const response = await apiRequest(`/projects/${id}/daily-progress/`, { method: 'POST', body: payload }); touched([DATA_SCOPES.PROJECTS, DATA_SCOPES.SITE_DIARIES])(); return response },
+  async dailyProgress(id, payload) { const response = await apiRequest(`/projects/${id}/daily-progress/`, { method: 'POST', body: payload }); touched([DATA_SCOPES.PROJECTS, DATA_SCOPES.SITE_DIARIES, DATA_SCOPES.REPORTS, DATA_SCOPES.DASHBOARD])(); return response },
   // Budget sanction — issues sanction order number and sets IN_EXECUTION.
-  async sanction(id, payload) { const response = await apiRequest(`/projects/${id}/sanction/`, { method: 'POST', body: payload }); touched([DATA_SCOPES.PROJECTS])(); return response },
+  async sanction(id, payload) { const response = await apiRequest(`/projects/${id}/sanction/`, { method: 'POST', body: payload }); touched([DATA_SCOPES.PROJECTS, DATA_SCOPES.PROPOSALS, DATA_SCOPES.DASHBOARD])(); return response },
 }

@@ -1,8 +1,10 @@
 // Approvals Page — Vol 3 §15.3 Workflow Approval Pipeline.
 // Backend-driven: rows come from GET /api/proposals/ and decisions are the
 // backend's own approve / reject / sanction actions (backend_guide2.1 §6.3).
+// Phase 3: the "In execution" tab joins sanctioned DPRs with the execution
+// projects the backend materialized for them (projectApi / projects list).
 import { useMemo, useState } from 'react'
-import { CheckCircle2, Info } from 'lucide-react'
+import { CheckCircle2, FolderGit2, Info } from 'lucide-react'
 import PageHeader from '../../components/ui/PageHeader'
 import Tabs from '../../components/ui/Tabs'
 import DataTable from '../../components/ui/DataTable'
@@ -16,17 +18,21 @@ import { useUiStore } from '../../app/store/uiStore'
 import { useAsync } from '../../hooks/useAsync'
 import { useDataVersion, DATA_SCOPES } from '../../app/store/dataVersionStore'
 import { backendProposalApi } from '../../api/proposalApi'
+import { backendProjectApi } from '../../api/projectApi'
 import { backendDepartmentApi } from '../../api/departmentApi'
 import { formatCurrencyINR, formatDate } from '../../utils/format'
 
 const TABS = [
   { value: 'under_review', label: 'Pending review' },
   { value: 'approved', label: 'Approved' },
+  { value: 'execution', label: 'In execution' },
   { value: 'rejected', label: 'Rejected' },
   { value: 'all', label: 'All proposals' },
 ]
 
-const TAB_STATUS = { under_review: 'PENDING_REVIEW', approved: 'APPROVED', rejected: 'REJECTED', all: null }
+const TAB_STATUS = { under_review: 'PENDING_REVIEW', approved: 'APPROVED', execution: null, rejected: 'REJECTED', all: null }
+
+const EXECUTION_STATUSES = ['SANCTIONED', 'IN_EXECUTION', 'COMPLETED']
 
 // Legacy 8-stage stepper vocabulary — presentation only, the backend status
 // is never rewritten. Statuses without a sensible stepper stage hide it.
@@ -49,6 +55,7 @@ export default function Approvals() {
   const [busyAction, setBusyAction] = useState(null)
   const [actionError, setActionError] = useState(null)
   const versions = useDataVersion((s) => (s.versions[DATA_SCOPES.PROPOSALS] || 0) + (s.versions[DATA_SCOPES.PLANNING] || 0))
+  const projectsVersion = useDataVersion((s) => s.versions[DATA_SCOPES.PROJECTS] || 0)
 
   const { data: departments } = useAsync(() => backendDepartmentApi.list(), [])
   const deptOptions = useMemo(() => [{ value: 'all', label: 'All departments' }, ...(departments || []).map((d) => ({ value: d.id, label: d.name }))], [departments])
@@ -57,7 +64,27 @@ export default function Approvals() {
   const deptPk = deptFilter === 'all' ? undefined : Number(deptFilter)
   const fetcher = useMemo(() => () => backendProposalApi.list({ ...(status ? { status } : {}), ...(deptPk ? { departmentId: deptPk } : {}) }), [status, deptPk])
   const { data: proposals, loading, error, refetch } = useAsync(fetcher, [tab, deptPk, versions])
-  const rows = proposals || []
+  const rows = useMemo(() => {
+    const list = proposals || []
+    return tab === 'execution' ? list.filter((p) => EXECUTION_STATUSES.includes(p.status)) : list
+  }, [tab, proposals])
+
+  // Execution tab joins sanctioned DPRs with their backend execution projects.
+  const projectFetcher = useMemo(() => {
+    if (tab !== 'execution') return async () => null
+    return () => backendProjectApi.list(deptPk ? { departmentId: deptPk } : {})
+  }, [tab, deptPk])
+  const { data: executionProjects } = useAsync(projectFetcher, [tab, deptPk, projectsVersion])
+
+  const projectByProposal = useMemo(() => {
+    const map = new Map()
+    ;(executionProjects || []).forEach((project) => {
+      ;[project.proposalIdStr, String(project.proposalId || '')].filter(Boolean).forEach((key) => map.set(key, project))
+    })
+    return map
+  }, [executionProjects])
+
+  const linkedProject = (proposal) => projectByProposal.get(String(proposal.id)) || projectByProposal.get(proposal.proposalId) || null
 
   async function runAction(action, fn, okMessage) {
     setBusyAction(action)
@@ -92,6 +119,19 @@ export default function Approvals() {
     { key: 'status', label: 'Status', render: (r) => <StatusBadge status={r.status} /> },
   ]
 
+  const executionColumns = [
+    { key: 'proposalId', label: 'ID', render: (r) => <span className="kbd-mono text-[12px]">{r.proposalId}</span> },
+    { key: 'title', label: 'DPR', render: (r) => <span className="font-medium text-ink-900">{r.title}</span> },
+    { key: 'dept', label: 'Department', render: (r) => r.departmentName || '—' },
+    { key: 'status', label: 'DPR status', render: (r) => <StatusBadge status={r.status} /> },
+    { key: 'project', label: 'Linked project', render: (r) => { const project = linkedProject(r); return project ? <span className="font-medium text-ink-900">{project.title}</span> : '—' } },
+    { key: 'projectStatus', label: 'Project status', render: (r) => { const project = linkedProject(r); return project ? <StatusBadge status={project.status} /> : '—' } },
+    { key: 'progress', label: 'Progress', render: (r) => { const project = linkedProject(r); return project ? <span className="font-semibold text-leaf-700">{project.progress}%</span> : '—' } },
+    { key: 'sanction', label: 'Sanction', render: (r) => { const project = linkedProject(r); return project?.sanctionOrder ? <Badge tone="info">{project.sanctionOrder}</Badge> : '—' } },
+  ]
+
+  const tableColumns = tab === 'execution' ? executionColumns : columns
+
   const isPending = selected?.status === 'PENDING_REVIEW'
   const isApproved = selected?.status === 'APPROVED'
 
@@ -122,7 +162,7 @@ export default function Approvals() {
           ) : loading && !rows.length ? (
             <p className="px-4 py-4 text-sm text-ink-500">Loading proposals…</p>
           ) : (
-            <DataTable columns={columns} rows={rows} onRowClick={setSelected} emptyLabel="No proposals in this view" />
+            <DataTable columns={tableColumns} rows={rows} onRowClick={setSelected} emptyLabel="No proposals in this view" />
           )}
         </div>
       </div>
@@ -226,6 +266,29 @@ export default function Approvals() {
                 )}
               </div>
             )}
+
+            {EXECUTION_STATUSES.includes(selected.status) && (() => {
+              const project = linkedProject(selected)
+              return (
+                <div>
+                  <div className="h-px bg-ink-100" />
+                  <h4 className="mt-2 text-[12.5px] font-semibold text-ink-800">Execution Project</h4>
+                  {project ? (
+                    <div className="mt-2 rounded-lg border border-ink-100 p-3 space-y-2 text-[12.5px]">
+                      <div className="flex items-center gap-2"><FolderGit2 size={15} className="text-sky-600 shrink-0" /><span className="font-semibold text-ink-900">{project.title}</span></div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <div><p className="text-[10.5px] text-ink-400 uppercase tracking-wide">Project status</p><p className="mt-0.5"><StatusBadge status={project.status} /></p></div>
+                        <div><p className="text-[10.5px] text-ink-400 uppercase tracking-wide">Progress</p><p className="mt-0.5 font-semibold text-leaf-700">{project.progress}%</p></div>
+                        <div><p className="text-[10.5px] text-ink-400 uppercase tracking-wide">Sanction order</p><p className="mt-0.5 font-medium text-ink-900">{project.sanctionOrder || '—'}</p></div>
+                        <div><p className="text-[10.5px] text-ink-400 uppercase tracking-wide">Sanctioned budget</p><p className="mt-0.5 font-medium text-ink-900">{formatCurrencyINR(project.budgetSanctioned)}</p></div>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="mt-2 rounded-lg bg-ink-50 border border-ink-100 p-3 text-[12.5px] text-ink-600">No execution project is linked to this DPR on the backend yet.</p>
+                  )}
+                </div>
+              )
+            })()}
           </div>
         )}
       </Modal>
