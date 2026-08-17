@@ -368,9 +368,9 @@ export default function RegisterComplaintWizard() {
       {!createdTicket && currentStep === 1 && (
         <div className="card p-6 space-y-5 animate-fade-in">
           <div className="border-b border-ink-100 pb-3"><h3 className="text-[15px] font-semibold text-ink-950">Step 1: Tell us what service needs help</h3><p className="text-[12px] text-ink-500">Select the public-service area and the issue you want to report.</p></div>
-          <div className="space-y-2"><span className="text-[12px] font-semibold text-ink-800">Select service area</span><div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">{deptCards.map((d) => { const selected = selectedDepartmentId === d.slug; return <button key={d.slug} onClick={() => { const first = (ISSUE_CATEGORIES[d.slug] || ['Other'])[0]; const rule = routeFor(d.slug, first); setSelectedDepartmentId(d.slug); setCategoryId(rule.categoryId); setSelectedCategoryKey(`${rule.categoryId}::${first}`); setPriority(rule.defaultPriority) }} className={`p-3.5 rounded-xl border text-left transition-all ${selected ? 'border-saffron-500 bg-saffron-50 ring-2 ring-saffron-100' : 'border-ink-200 hover:border-ink-400 hover:-translate-y-0.5'}`}><div className="flex gap-2.5"><div className="grid h-9 w-9 place-items-center rounded-lg text-white" style={{ background: DEPARTMENT_MAP[d.slug]?.color || '#546882' }}><Building2 size={16}/></div><div><b className="block text-[13px]">{d.name}</b><span className="text-[11px] text-ink-500 leading-snug block mt-1">{d.summary}</span></div></div></button> })}</div></div>
+          <div className="space-y-2" data-tour="citizen-complaint-category"><span className="text-[12px] font-semibold text-ink-800">Select service area</span><div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">{deptCards.map((d) => { const selected = selectedDepartmentId === d.slug; return <button key={d.slug} onClick={() => { const first = (ISSUE_CATEGORIES[d.slug] || ['Other'])[0]; const rule = routeFor(d.slug, first); setSelectedDepartmentId(d.slug); setCategoryId(rule.categoryId); setSelectedCategoryKey(`${rule.categoryId}::${first}`); setPriority(rule.defaultPriority) }} className={`p-3.5 rounded-xl border text-left transition-all ${selected ? 'border-saffron-500 bg-saffron-50 ring-2 ring-saffron-100' : 'border-ink-200 hover:border-ink-400 hover:-translate-y-0.5'}`}><div className="flex gap-2.5"><div className="grid h-9 w-9 place-items-center rounded-lg text-white" style={{ background: DEPARTMENT_MAP[d.slug]?.color || '#546882' }}><Building2 size={16}/></div><div><b className="block text-[13px]">{d.name}</b><span className="text-[11px] text-ink-500 leading-snug block mt-1">{d.summary}</span></div></div></button> })}</div></div>
           <div className="space-y-2"><span className="text-[12px] font-semibold text-ink-800">Select issue category</span><div className="flex flex-wrap gap-2">{(ISSUE_CATEGORIES[selectedDepartmentId] || ['Other']).map((category) => { const rule = routeFor(selectedDepartmentId, category); const key = `${rule.categoryId}::${category}`; const selected = selectedCategoryKey === key; return <button key={category} onClick={() => { setCategoryId(rule.categoryId); setPriority(rule.defaultPriority); setSelectedCategoryKey(key) }} className={`px-3 py-2 rounded-lg text-[12px] font-semibold border ${selected ? 'bg-ink-900 border-ink-900 text-white' : 'border-ink-200 text-ink-700 hover:bg-ink-50'}`}>{category}</button> })}</div></div>
-          <div className="space-y-3 pt-2"><div><label className="block text-[12px] font-semibold text-ink-700 mb-1">Complaint title</label><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={`e.g. ${selectedRule.categoryName} at ${villageName}`} className="w-full rounded-lg border border-ink-200 px-3 py-2 text-[13px]"/></div><div><label className="block text-[12px] font-semibold text-ink-700 mb-1">Describe the problem</label><textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Tell us what happened and when it started." className="w-full rounded-lg border border-ink-200 px-3 py-2 text-[13px]"/></div></div>
+          <div className="space-y-3 pt-2"><div><label className="block text-[12px] font-semibold text-ink-700 mb-1">Complaint title</label><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={`e.g. ${selectedRule.categoryName} at ${villageName}`} className="w-full rounded-lg border border-ink-200 px-3 py-2 text-[13px]"/></div><div><label className="block text-[12px] font-semibold text-ink-700 mb-1">Describe the problem</label><textarea data-tour="citizen-complaint-description" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Tell us what happened and when it started." className="w-full rounded-lg border border-ink-200 px-3 py-2 text-[13px]"/></div></div>
 
           <div className="space-y-2 pt-1 border-t border-ink-100">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -417,7 +417,7 @@ export default function RegisterComplaintWizard() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2 h-72 rounded-xl overflow-hidden card relative">
+            <div className="lg:col-span-2 h-72 rounded-xl overflow-hidden card relative" data-tour="citizen-complaint-location">
               <MapView
                 ref={mapRef}
                 center={selectedPos}
@@ -515,7 +515,7 @@ export default function RegisterComplaintWizard() {
               <h3 className="text-[15px] font-semibold text-ink-950">Step 3: Attach Geo-Tagged Evidence</h3>
               <p className="text-[12px] text-ink-500">Upload site photos or video. Distance to dropped GIS pin is validated automatically.</p>
             </div>
-            <Button size="sm" variant="saffron" icon={Camera} onClick={handleAttachPhoto}>
+            <Button size="sm" variant="saffron" icon={Camera} data-tour="citizen-complaint-evidence" onClick={handleAttachPhoto}>
               Capture / Attach Photo
             </Button>
             <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileSelected} />
@@ -669,11 +669,11 @@ export default function RegisterComplaintWizard() {
           )}
 
           {currentStep < 5 ? (
-            <Button icon={ArrowRight} onClick={() => setCurrentStep((s) => s + 1)}>
+            <Button icon={ArrowRight} data-tour="citizen-complaint-next" onClick={() => setCurrentStep((s) => s + 1)}>
               Next Step
             </Button>
           ) : (
-            <Button variant="positive" loading={isSubmitting} icon={Check} onClick={handleFinalSubmit}>
+            <Button variant="positive" loading={isSubmitting} icon={Check} data-tour="citizen-complaint-submit" onClick={handleFinalSubmit}>
               Submit Complaint
             </Button>
           )}

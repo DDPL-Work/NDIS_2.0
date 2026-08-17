@@ -5,7 +5,7 @@ const titleCase = (value) => String(value || '').replace(/[_-]+/g, ' ').replace(
 
 const CATEGORY_COLORS = ['#c0392b', '#1d7ab5', '#1f7a54', '#8a4fc0', '#e07a2c', '#546882', '#0e7490', '#b45309', '#be185d', '#4d7c0f']
 
-export default function GISLayerPanel({ catalog, visible = {}, loading = {}, onToggle }) {
+export default function GISLayerPanel({ catalog, visible = {}, loading = {}, onToggle, embedded = false }) {
   const [query, setQuery] = useState('')
   const [expanded, setExpanded] = useState(() => new Set(Object.keys(catalog?.categories || {})))
 
@@ -34,10 +34,12 @@ export default function GISLayerPanel({ catalog, visible = {}, loading = {}, onT
   return (
     <div className="flex h-full flex-col">
       <div className="shrink-0 border-b border-ink-100 px-3 py-2.5">
-        <div className="flex items-center justify-between">
-          <span className="flex items-center gap-1.5 text-[13px] font-semibold text-ink-900"><Layers size={15} className="text-saffron-600" /> Layers</span>
-          <span className="text-[11px] text-ink-400">{visibleLayers.filter((layer) => visible[layer.name]).length}/{visibleLayers.length} on</span>
-        </div>
+        {!embedded && (
+          <div className="flex items-center justify-between">
+            <span className="flex items-center gap-1.5 text-[13px] font-semibold text-ink-900"><Layers size={15} className="text-saffron-600" /> Layers</span>
+            <span className="text-[11px] text-ink-400">{visibleLayers.filter((layer) => visible[layer.name]).length}/{visibleLayers.length} on</span>
+          </div>
+        )}
         <div className="relative mt-2"><Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-400" /><input value={query} onChange={(e) => setQuery(e.target.value)} className="input-field !py-1.5 !pl-8 text-xs" placeholder="Search layers…" /></div>
         <div className="mt-2 flex items-center gap-3">
           <button className={headerButton} onClick={() => setExpanded(new Set(groups.map((group) => group.name)))} disabled={allExpanded}>Expand all</button>

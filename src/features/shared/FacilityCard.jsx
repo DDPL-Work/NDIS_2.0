@@ -20,7 +20,7 @@ export default function FacilityCard({ facility, onClick, active, deptMap = DEPA
             <span className="h-2 w-2 rounded-full shrink-0" style={{ background: dept?.color }} />
             <span className="text-[11px] font-medium text-ink-500 truncate">{dept?.label} · {facility.categoryLabel}</span>
           </div>
-          <p className="text-[13.5px] font-semibold text-ink-950 truncate">{facility.name}</p>
+          <p className="text-[13.5px] font-semibold text-ink-950 leading-snug line-clamp-2" title={facility.name}>{facility.name}</p>
           <p className="text-[11.5px] text-ink-500 flex items-center gap-1 mt-0.5"><MapPin size={11} />{facility.village}</p>
         </div>
         <GapScoreRing score={facility.gapScore} size={38} strokeWidth={4} />

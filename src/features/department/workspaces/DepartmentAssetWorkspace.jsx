@@ -8,6 +8,7 @@ import Modal from '../../../components/ui/Modal'
 import Select from '../../../components/ui/Select'
 import { useDepartment } from '../framework/DepartmentContext'
 import { useCurrentUser, useCan } from '../identity/hooks/useAuthorization'
+import { useAuthStore } from '../../../app/store/authStore'
 import { useUiStore } from '../../../app/store/uiStore'
 import { useAsync } from '../../../hooks/useAsync'
 import { backendFacilityApi } from '../../../api/facilityApi'
@@ -32,6 +33,10 @@ export default function DepartmentAssetWorkspace() {
   const user = useCurrentUser()
   const canWrite = useCan('assets.maintenance') || useCan('assets.inspection')
   const pushToast = useUiStore((s) => s.pushToast)
+  const authStatus = useAuthStore((s) => s.status)
+  // While /api/auth/me/ is still being restored/loaded the profile has not
+  // yet resolved — that is not the same as "profile has no department".
+  const profileLoading = authStatus === 'restoring' || authStatus === 'loading'
   const deptPk = useMemo(() => departmentPk(user), [user])
 
   const [query, setQuery] = useState('')
@@ -73,7 +78,8 @@ export default function DepartmentAssetWorkspace() {
 
   async function submitAsset(e) {
     e.preventDefault()
-    if (!deptPk) { pushToast('Your profile has no department — asset registration is unavailable.', 'error'); return }
+    if (profileLoading) { pushToast('Loading department profile…', 'info'); return }
+    if (!deptPk) { pushToast('Your profile has no department assigned — asset registration is unavailable.', 'error'); return }
     const category = categories.find((c) => c.id === assetForm.category)
     if (!category) { pushToast('Select an asset category published on the backend.', 'error'); return }
     if (!assetForm.district) { pushToast('Select the district for this asset.', 'error'); return }
@@ -235,7 +241,9 @@ export default function DepartmentAssetWorkspace() {
       <Modal open={registering} onClose={() => setRegistering(false)} width="max-w-lg">
         <form className="space-y-4" onSubmit={submitAsset}>
           <h3 className="text-base font-bold">Register Department Asset</h3>
-          {!deptPk && <div className="rounded-lg border border-saffron-200 bg-saffron-50 px-3 py-2.5 text-[12.5px] text-saffron-800">Your profile has no department id — registration is unavailable.</div>}
+          {profileLoading
+            ? <div className="rounded-lg border border-ink-200 bg-ink-50 px-3 py-2.5 text-[12.5px] text-ink-600">Loading department profile…</div>
+            : !deptPk && <div className="rounded-lg border border-saffron-200 bg-saffron-50 px-3 py-2.5 text-[12.5px] text-saffron-800">Your profile has no department assigned — registration is unavailable.</div>}
           {actionError && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-[12.5px] text-red-700">{actionError.message}</div>}
           <input className="input-field" required placeholder="Asset name" value={assetForm.name} onChange={(e) => setAssetForm({ ...assetForm, name: e.target.value })} />
           {categories.length ? (
@@ -248,7 +256,7 @@ export default function DepartmentAssetWorkspace() {
           <div className="grid grid-cols-2 gap-3"><input className="input-field" required type="number" step="any" placeholder="Latitude" value={assetForm.latitude} onChange={(e) => setAssetForm({ ...assetForm, latitude: e.target.value })} /><input className="input-field" required type="number" step="any" placeholder="Longitude" value={assetForm.longitude} onChange={(e) => setAssetForm({ ...assetForm, longitude: e.target.value })} /></div>
           <label className="flex items-center gap-2 text-[12.5px] text-ink-700"><input type="checkbox" checked={assetForm.hazardSafe} onChange={(e) => setAssetForm({ ...assetForm, hazardSafe: e.target.checked })} /> Hazard-safe (earthquake / flood compliant)</label>
           <p className="text-[11.5px] text-ink-400">Creates a facility record on the backend registry (POST /api/facilities/) with a planned lifecycle attribute.</p>
-          <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setRegistering(false)}>Cancel</Button><Button type="submit" disabled={saving || !deptPk}>{saving ? 'Registering…' : 'Register Asset'}</Button></div>
+          <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setRegistering(false)}>Cancel</Button><Button type="submit" disabled={saving || profileLoading || !deptPk}>{saving ? 'Registering…' : 'Register Asset'}</Button></div>
         </form>
       </Modal>
     </div>

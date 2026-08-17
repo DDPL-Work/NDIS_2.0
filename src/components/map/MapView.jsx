@@ -40,7 +40,9 @@ const MapView = forwardRef(function MapView({
   basemapUrl,
   departmentColors = {},
   vectorLayers = [],
-  route = null,          // { coordinates: [[lat,lng],...], origin: {lat,lng}, destination: {lat,lng} } | null
+  route = null,          // { coordinates, origin, destination, mode } | null — exactly two endpoints
+  onFacilityRouteTo,     // "Route to here" from a facility marker popup
+  routeOriginKey = null, // route key of the current origin (popup "Start point" chip)
 }, ref) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)              // Leaflet map instance
@@ -55,6 +57,12 @@ const MapView = forwardRef(function MapView({
   const searchLayerRef = useRef(null)
   const routeLayerRef = useRef(null)
   const [ready, setReady] = useState(false)
+  // Live values for the catalog/facility layer closures — reading through refs
+  // keeps "Start point"/"Route to here" fresh without recreating any Leaflet
+  // layer when the route state changes (routing must never rebuild the map
+  // layers).
+  const routeOriginKeyRef = useRef(routeOriginKey)
+  routeOriginKeyRef.current = routeOriginKey
   // leaflet.heat / leaflet.markercluster attach to a global `L`; loaded async
   // once window.L is available (see services/leafletPlugins.js).
   const [pluginsReady, setPluginsReady] = useState(false)
@@ -224,6 +232,8 @@ const MapView = forwardRef(function MapView({
       departmentColors,
       activeTool,
       onFacilityClick,
+      onFacilityRouteTo,
+      getRouteOriginKey: () => routeOriginKeyRef.current,
       map,
     }).getLayers()
 
@@ -237,7 +247,7 @@ const MapView = forwardRef(function MapView({
     if (facilitiesLayerRef.current) map.removeLayer(facilitiesLayerRef.current)
     facilitiesLayerRef.current = nextLayer
     map.addLayer(nextLayer)
-  }, [facilities, departmentColors, ready, colorBy, onFacilityClick, activeTool, clusterEnabled, pluginsReady])
+  }, [facilities, departmentColors, ready, colorBy, onFacilityClick, activeTool, clusterEnabled, pluginsReady, onFacilityRouteTo])
 
   // Spatial-query result layer: cleared on every new search batch, markers are
   // drawn on top of the facility layer and the map fits the result bounds.
@@ -271,8 +281,11 @@ const MapView = forwardRef(function MapView({
 
   // Road route overlay — the ONLY layer this effect manages.  Facility
   // markers, search-result pins, catalog layers and boundaries are untouched.
-  // A new route replaces the previous one; null clears it.  The map fits
-  // origin + geometry + destination without zooming past maxZoom 16.
+  // A new route replaces the previous one; null clears it.  The map view is
+  // never auto-fitted to the route (manual panning only) — an auto fit over a
+  // bad/wide bounds set is what previously threw the map to world zoom.
+  // STRICT TWO-POINT: origin circle, destination circle, road polyline — no
+  // intermediate waypoint markers exist (multi-stop routing is not supported).
   useEffect(() => {
     const map = mapRef.current
     if (!map || !ready) return
@@ -280,13 +293,18 @@ const MapView = forwardRef(function MapView({
     if (group) { map.removeLayer(group); routeLayerRef.current = null }
     const coordinates = route?.coordinates
     if (!Array.isArray(coordinates) || coordinates.length < 2) return
+    // OSRM returns GeoJSON [lng, lat] pairs; Leaflet paths and bounds require
+    // [lat, lng].  Converting exactly once keeps the polyline inside the local
+    // area — a raw pass-through would render the route at swapped coordinates
+    // far from Nalanda and drag the map view away from the route.
+    const path = coordinates.map(toLatLng)
 
     const upper = L.layerGroup()
-    const casing = L.polyline(coordinates, { color: '#ffffff', weight: 8, opacity: 0.95 })
-    const line = L.polyline(coordinates, { color: '#0b3558', weight: 4.5, opacity: 0.9 })
+    const casing = L.polyline(path, { color: '#ffffff', weight: 8, opacity: 0.95 })
+    const line = L.polyline(path, { color: '#0b3558', weight: 4.5, opacity: 0.9 })
     upper.addLayer(casing).addLayer(line)
 
-    const ff = route.mode === 'facility_to_facility'
+    const ff = route.origin?.type === 'facility'
     if (route.origin?.lat != null && route.origin?.lng != null) {
       upper.addLayer(L.circleMarker([route.origin.lat, route.origin.lng], {
         radius: 7, color: '#ffffff', weight: 2, fillColor: ff ? '#1f7a54' : '#1d7ab5', fillOpacity: 1,
@@ -300,18 +318,22 @@ const MapView = forwardRef(function MapView({
 
     routeLayerRef.current = upper
     map.addLayer(upper)
-    map.fitBounds(L.latLngBounds(coordinates), { padding: [40, 40], maxZoom: 16 })
   }, [route, ready])
 
   // Backend GIS catalog layers (Point / LineString / Polygon / MultiPolygon
   // GeoJSON from the server, rendered untouched — no geometry transforms).
+  // Display-only: boundaries and other GIS features support hover/identify
+  // but never routing — only facilities are routable points.
   useEffect(() => {
     const map = mapRef.current
     if (!map || !ready) return
     const group = L.layerGroup()
     ;(vectorLayers || []).forEach((entry) => {
       if (!entry?.features?.length) return
-      const layer = createCatalogLayer(entry, { layerName: entry.layerName, category: entry.category })
+      const layer = createCatalogLayer(entry, {
+        layerName: entry.layerName,
+        category: entry.category,
+      })
       group.addLayer(layer)
     })
     if (vectorLayerRef.current) map.removeLayer(vectorLayerRef.current)

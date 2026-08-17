@@ -5,6 +5,9 @@ import { createCatalogLayer } from '../services/LeafletLayerService'
 // REF.html toggleLayer() + loadedGeoJSONLayers cache, expressed as React state.
 // A layer is fetched from GET /api/gis/layers/{layer_name}/ exactly once and
 // cached as a Leaflet layer; toggling only adds/removes it from the map.
+// Catalog layers are display-only: boundaries and other GIS features support
+// hover/identify but NEVER become routing destinations (routing targets must
+// be explicitly selected facilities with point coordinates).
 export const DEFAULT_LAYERS = ['District_boundary', 'Block_boundary']
 
 export function useLeafletLayers(map, { defaults = DEFAULT_LAYERS } = {}) {
@@ -41,7 +44,10 @@ export function useLeafletLayers(map, { defaults = DEFAULT_LAYERS } = {}) {
     setError(null)
     try {
       const geojson = await GISRepository.layer(name)
-      const leafletLayer = createCatalogLayer(geojson, { layerName: geojson.layerName || name, category: geojson.category })
+      const leafletLayer = createCatalogLayer(geojson, {
+        layerName: geojson.layerName || name,
+        category: geojson.category,
+      })
       cache.current.set(name, leafletLayer)
       map.addLayer(leafletLayer)
       setVisible((current) => ({ ...current, [name]: true }))

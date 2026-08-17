@@ -3,15 +3,15 @@ import { ROLES } from './constants'
 // Navigation strictly tailored to RBAC permissions per persona (Part 2 Requirements)
 
 export const CITIZEN_NAV = [
-  { to: '/citizen', label: 'Dashboard', icon: 'LayoutDashboard', end: true },
-  { to: '/citizen/map', label: 'Explore Map', icon: 'Map' },
-  { to: '/citizen/register', label: 'Register Complaint', icon: 'PlusCircle' },
-  { to: '/citizen/complaints', label: 'My Complaints', icon: 'FileText' },
-  { to: '/citizen/track', label: 'Track Complaint', icon: 'Search' },
-  { to: '/citizen/schemes', label: 'Schemes', icon: 'Sparkles' },
-  { to: '/citizen/facilities', label: 'Facilities', icon: 'Building2' },
-  { to: '/citizen/notifications', label: 'Notifications', icon: 'Bell' },
-  { to: '/citizen/profile', label: 'Profile', icon: 'User' },
+  { to: '/citizen', label: 'Dashboard', icon: 'LayoutDashboard', end: true, tour: 'citizen-dashboard' },
+  { to: '/citizen/map', label: 'Explore Map', icon: 'Map', tour: 'citizen-explore-map' },
+  { to: '/citizen/register', label: 'Register Complaint', icon: 'PlusCircle', tour: 'citizen-register-complaint' },
+  { to: '/citizen/complaints', label: 'My Complaints', icon: 'FileText', tour: 'citizen-my-complaints' },
+  { to: '/citizen/track', label: 'Track Complaint', icon: 'Search', tour: 'citizen-track-complaint' },
+  { to: '/citizen/schemes', label: 'Schemes', icon: 'Sparkles', tour: 'citizen-schemes' },
+  { to: '/citizen/facilities', label: 'Facilities', icon: 'Building2', tour: 'citizen-facilities' },
+  { to: '/citizen/notifications', label: 'Notifications', icon: 'Bell', tour: 'citizen-notifications' },
+  { to: '/citizen/profile', label: 'Profile', icon: 'User', tour: 'citizen-profile' },
 ]
 
 export const ADMIN_NAV = [

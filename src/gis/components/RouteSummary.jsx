@@ -1,37 +1,60 @@
-import { ArrowLeftRight, Flag, Loader2, X } from 'lucide-react'
+import { Loader2, Navigation, X } from 'lucide-react'
 import Button from '../../components/ui/Button'
-import { ROUTE_MODES } from '../../hooks/useRoute'
 
-// Floating route card shown over the map.  Handles three states for both
-// routing modes: facility-to-facility selection (start/destination picked but
-// not yet routed), in-flight, error, and the active route summary.
-//
-// Distances are always labeled: search cards show the spatial-query distance;
-// this card shows ROAD distance from the routing engine — the two values are
-// different concepts and are never merged.
-export default function RouteSummary({ status, mode, route, startFacility, destinationFacility, errorMessage, onShowShortest, onSwap, onClear }) {
-  const ff = mode === ROUTE_MODES.FACILITY_TO_FACILITY
-  const pickActive = ff && status === 'idle' && (startFacility || destinationFacility)
+function TargetRow({ label, target }) {
+  return (
+    <div className="flex items-start gap-2">
+      <span className="w-14 shrink-0 pt-px text-[10px] font-semibold uppercase tracking-wide text-ink-400">{label}</span>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-[12px] font-medium text-ink-800">{target?.name || '—'}</div>
+        {target?.sub ? <div className="truncate text-[10px] text-ink-400">{target.sub}</div> : null}
+      </div>
+    </div>
+  )
+}
 
-  if (status === 'idle' && !pickActive) return null
+// Floating route card shown over the map.  Represents exactly TWO endpoints —
+// origin + destination — in four states: picked-but-not-calculated (idle),
+// in-flight, error, and the active route summary with totals from the routing
+// response.  Road distance comes from the routing engine; spatial-query cards
+// show the search distance — two different concepts, never merged.
+export default function RouteSummary({ status, route, origin = null, destination = null, errorMessage, onCalculate, onClear }) {
+  const hasOrigin = origin != null
+  const hasDestination = destination != null
+  const routeLocked = status === 'loading'
+  const canCalculate = hasOrigin && hasDestination && !routeLocked
+  const idle = status === 'idle'
 
-  if (pickActive) {
+  if (idle && !hasOrigin && !hasDestination) return null
+
+  if (idle) {
     return (
-      <div className="pointer-events-auto w-[260px] overflow-hidden rounded-xl border border-ink-200 bg-white shadow-lg">
+      <div className="pointer-events-auto w-[280px] overflow-hidden rounded-xl border border-ink-200 bg-white shadow-lg">
         <div className="flex items-start justify-between gap-2 border-b border-ink-100 bg-ink-900 px-3.5 py-2">
           <div className="min-w-0">
-            <div className="text-[9.5px] font-semibold uppercase tracking-wide text-ink-400">Route between facilities</div>
-            <div className="mt-0.5 truncate text-[12.5px] font-semibold text-white">{startFacility?.name || '—'}</div>
+            <div className="text-[9.5px] font-semibold uppercase tracking-wide text-ink-400">Route</div>
+            <div className="mt-0.5 truncate text-[12.5px] font-semibold text-white">
+              {hasOrigin && hasDestination ? `${origin.name} → ${destination.name}` : (hasOrigin ? origin.name : '—')}
+            </div>
           </div>
-          <button onClick={onClear} aria-label="Cancel facility selection" className="shrink-0 rounded-md p-1 text-ink-400 hover:bg-white/10 hover:text-white"><X size={14} /></button>
+          <button onClick={onClear} aria-label="Cancel route" className="shrink-0 rounded-md p-1 text-ink-400 hover:bg-white/10 hover:text-white"><X size={14} /></button>
         </div>
-        <div className="space-y-1 px-3.5 py-2.5 text-[12px]">
-          <div className="flex items-center gap-2"><Flag size={12} className="shrink-0 text-leaf-600" /><span className="w-10 text-[10px] font-semibold uppercase tracking-wide text-ink-400">To</span><span className="truncate font-medium text-ink-800">{destinationFacility?.name || 'Choose a destination facility'}</span></div>
-          {!destinationFacility && <p className="pt-1 text-[11px] text-ink-500">Tap &quot;Route To Here&quot; on another facility result to set the destination.</p>}
+        <div className="space-y-2 px-3.5 py-2.5 text-[12px]">
+          <TargetRow label="From" target={origin} />
+          <TargetRow label="To" target={destination} />
+          {(!hasOrigin || !hasDestination) && (
+            <p className="pt-0.5 text-[11px] text-ink-500">
+              {!hasOrigin && !hasDestination ? 'Pick a start point to build the route.' : hasOrigin ? 'Route to a destination to build the route.' : 'Set a start point to build the route.'}
+            </p>
+          )}
+          <div className="flex items-center justify-between border-t border-ink-100 pt-1.5 text-[11px] text-ink-500">
+            <span>Origin → destination</span>
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-400">Tap start to route on roads</span>
+          </div>
         </div>
         <div className="flex gap-2 border-t border-ink-100 px-2.5 py-2">
-          <Button size="sm" variant="primary" icon={Flag} disabled={!destinationFacility} onClick={onShowShortest} className="flex-1">Show Shortest Route</Button>
-          {startFacility && destinationFacility && <Button size="sm" variant="ghost" icon={ArrowLeftRight} onClick={onSwap} title="Swap start and destination">Swap</Button>}
+          <Button size="sm" variant="primary" icon={Navigation} disabled={!canCalculate} onClick={onCalculate} className="flex-1">Start Route</Button>
+          <Button size="sm" variant="outline" icon={X} onClick={onClear} className="flex-1">Clear</Button>
         </div>
       </div>
     )
@@ -41,7 +64,7 @@ export default function RouteSummary({ status, mode, route, startFacility, desti
     return (
       <div className="pointer-events-auto flex items-center gap-2 rounded-xl border border-ink-200 bg-white px-3.5 py-2.5 text-[12px] font-medium text-ink-700 shadow-lg">
         <Loader2 size={14} className="animate-spin text-saffron-600" />
-        {ff ? 'Calculating shortest route…' : 'Calculating route…'}
+        Calculating route…
       </div>
     )
   }
@@ -56,26 +79,29 @@ export default function RouteSummary({ status, mode, route, startFacility, desti
   }
 
   return (
-    <div className="pointer-events-auto w-[260px] overflow-hidden rounded-xl border border-ink-200 bg-white shadow-lg">
+    <div className="pointer-events-auto w-[280px] overflow-hidden rounded-xl border border-ink-200 bg-white shadow-lg">
       <div className="flex items-start justify-between gap-2 border-b border-ink-100 bg-ink-900 px-3.5 py-2">
         <div className="min-w-0">
-          <div className="text-[9.5px] font-semibold uppercase tracking-wide text-ink-400">{ff ? 'Route between facilities' : 'Route to'}</div>
-          <div className="truncate text-[12.5px] font-semibold text-white">{ff && startFacility ? `${startFacility.name} → ${route?.destination?.name || 'Facility'}` : (route?.destination?.name || 'Facility')}</div>
+          <div className="text-[9.5px] font-semibold uppercase tracking-wide text-ink-400">Route</div>
+          <div className="truncate text-[12.5px] font-semibold text-white">{origin?.name || '—'} → {destination?.name || '—'}</div>
         </div>
         <button onClick={onClear} aria-label="Clear route" className="shrink-0 rounded-md p-1 text-ink-400 hover:bg-white/10 hover:text-white"><X size={14} /></button>
       </div>
-      <div className="space-y-1 px-3.5 py-2.5 text-[12px]">
-        {ff && (
-          <div className="flex items-center gap-2 pb-1 text-[11px] text-ink-500">
-            <span className="font-medium text-ink-800 truncate">From: {route?.origin?.name || startFacility?.name}</span>
-          </div>
-        )}
-        <div className="flex items-center justify-between gap-3"><span className="text-[10px] font-semibold uppercase tracking-wide text-ink-400">Road distance</span><span className="font-semibold text-ink-900">{route.distanceKm} km</span></div>
-        <div className="flex items-center justify-between gap-3"><span className="text-[10px] font-semibold uppercase tracking-wide text-ink-400">Estimated time</span><span className="text-ink-700">{route.durationMinutes} min</span></div>
+      <div className="space-y-2 px-3.5 py-2.5 text-[12px]">
+        <TargetRow label="From" target={origin} />
+        <TargetRow label="To" target={destination} />
+        <div className="flex items-center justify-between gap-3 border-t border-ink-100 pt-1.5">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-400">Road distance</span>
+          <span className="text-ink-700">{route.distanceKm != null ? `${route.distanceKm} km` : '—'}</span>
+        </div>
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-400">Estimated time</span>
+          <span className="text-ink-700">{route.durationMinutes != null ? `${route.durationMinutes} min` : '—'}</span>
+        </div>
       </div>
       <div className="flex gap-2 border-t border-ink-100 px-2.5 py-2">
+        <Button size="sm" variant="primary" icon={Navigation} onClick={onCalculate} className="flex-1">Recalculate</Button>
         <Button size="sm" variant="outline" icon={X} onClick={onClear} className="flex-1">Clear Route</Button>
-        {ff && <Button size="sm" variant="ghost" icon={ArrowLeftRight} onClick={onSwap} title="Swap start and destination">Swap</Button>}
       </div>
     </div>
   )

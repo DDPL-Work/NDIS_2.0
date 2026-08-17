@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { I18nProvider } from './i18n/i18n'
 import { useAuthStore } from './app/store/authStore'
@@ -7,8 +8,11 @@ import LoginPage from './features/auth/LoginPage'
 import SimulationControlPanel from './components/ui/SimulationControlPanel'
 import AuthBootstrap from './app/AuthBootstrap'
 
+const PublicLandingPage = lazy(() => import('./features/landing/PublicLandingPage'))
+
 import { CITIZEN_NAV, ADMIN_NAV, ENGINEER_NAV } from './config/navigation'
 import { ROLES } from './config/constants'
+import CitizenTourHost from './components/tour/CitizenTourHost'
 
 // Citizen Views
 import CitizenDashboard from './features/citizen/CitizenDashboard'
@@ -82,7 +86,12 @@ function useFilteredNav(items) {
 
 function CitizenShell() {
   const nav = useFilteredNav(CITIZEN_NAV)
-  return <AppShell navItems={nav} portalLabel="Citizen Portal" portalIcon="User" accentClassName="bg-leaf-600" title="Citizen Portal" subtitle="NDISP Public Services & Complaint Tracking" showDistrict showDepartment={false} />
+  return (
+    <>
+      <AppShell navItems={nav} portalLabel="Citizen Portal" portalIcon="User" accentClassName="bg-leaf-600" title="Citizen Portal" subtitle="NDISP Public Services & Complaint Tracking" showDistrict showDepartment={false} />
+      <CitizenTourHost />
+    </>
+  )
 }
 
 function AdminShell() {
@@ -107,7 +116,10 @@ export default function App() {
       <BrowserRouter>
         <AuthBootstrap>
         <Routes>
-          <Route path="/" element={<LoginPage />} />
+          {/* Public landing page — no authentication required. */}
+          <Route path="/" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><PublicLandingPage /></Suspense>} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<LoginPage initialMode="signup" />} />
 
           {/* Citizen Routes */}
           <Route element={<RequireRole roles={[ROLES.CITIZEN]} />}>

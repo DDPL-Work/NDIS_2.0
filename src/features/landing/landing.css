@@ -1,0 +1,82 @@
+/* Public landing page — lightweight CSS animation system.
+   No animation framework is installed, so motion is expressed as small,
+   GPU-friendly keyframes. Every decorative animation is disabled under
+   prefers-reduced-motion (the global index.css override plus targeted
+   motion-reduce variants here). */
+
+@keyframes ndisp-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes ndisp-drift {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(12px, -8px); }
+}
+
+@keyframes ndisp-pulse-ring {
+  0% { transform: scale(0.6); opacity: 0.9; }
+  80%, 100% { transform: scale(2.4); opacity: 0; }
+}
+
+@keyframes ndisp-dash-flow {
+  to { stroke-dashoffset: -240; }
+}
+
+@keyframes ndisp-reveal {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ndisp-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes ndisp-gradient-pan {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.ndisp-float { animation: ndisp-float 7s ease-in-out infinite; }
+.ndisp-float-slow { animation: ndisp-float 11s ease-in-out infinite; }
+.ndisp-drift { animation: ndisp-drift 16s ease-in-out infinite; }
+.ndisp-dash { stroke-dasharray: 6 14; animation: ndisp-dash-flow 22s linear infinite; }
+.ndisp-reveal { animation: ndisp-reveal 0.6s ease-out both; }
+.ndisp-fade-in { animation: ndisp-fade-in 0.4s ease-out both; }
+.ndisp-pulse-ring { animation: ndisp-pulse-ring 2.8s ease-out infinite; transform-origin: center; transform-box: fill-box; }
+.ndisp-gradient-pan { background-size: 220% 220%; animation: ndisp-gradient-pan 18s ease-in-out infinite; }
+
+/* Scroll-reveal helper (IntersectionObserver adds .in-view) */
+.ndisp-scroll-reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.55s ease-out, transform 0.55s ease-out;
+}
+.ndisp-scroll-reveal.in-view {
+  opacity: 1;
+  transform: translateY(0);
+}
+.ndisp-scroll-reveal.stagger-1 { transition-delay: 0.08s; }
+.ndisp-scroll-reveal.stagger-2 { transition-delay: 0.16s; }
+.ndisp-scroll-reveal.stagger-3 { transition-delay: 0.24s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ndisp-float,
+  .ndisp-float-slow,
+  .ndisp-drift,
+  .ndisp-pulse-ring,
+  .ndisp-dash,
+  .ndisp-gradient-pan {
+    animation: none !important;
+  }
+  .ndisp-reveal,
+  .ndisp-fade-in {
+    animation-duration: 0.001ms !important;
+  }
+  .ndisp-scroll-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}

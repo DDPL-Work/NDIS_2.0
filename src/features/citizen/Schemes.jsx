@@ -60,7 +60,7 @@ export default function Schemes() {
   }
 
   return (
-    <div>
+    <div data-tour="citizen-schemes-page">
       <PageHeader
         eyebrow="Citizen Portal · Vol 3 §19"
         title="Government schemes"
@@ -154,7 +154,7 @@ export default function Schemes() {
         )}
 
         {/* Scheme List */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4" data-tour="citizen-schemes-list">
           {loading && Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}
           {!loading &&
             (eligibleResults || schemes || []).map((s) => {

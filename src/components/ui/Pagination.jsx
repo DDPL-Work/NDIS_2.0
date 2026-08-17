@@ -26,7 +26,9 @@ function paginate(rows, page, pageSize) {
   return rows.slice((page - 1) * pageSize, page * pageSize)
 }
 
-export default function Pagination({ total, page, onPage, pageSize = 25, onPageSize, className = '' }) {
+export default function Pagination({ total, page, onPage, onChange, pageSize = 25, onPageSize, className = '' }) {
+  // Accept both call conventions used across the app (onPage and onChange).
+  const handlePage = onPage || onChange || (() => {})
   const pages = Math.max(1, Math.ceil(total / pageSize))
   const safePage = Math.min(page, pages)
   const from = total === 0 ? 0 : (safePage - 1) * pageSize + 1
@@ -54,7 +56,7 @@ export default function Pagination({ total, page, onPage, pageSize = 25, onPageS
         <button
           type="button"
           disabled={safePage <= 1}
-          onClick={() => onPage(safePage - 1)}
+          onClick={() => handlePage(safePage - 1)}
           className="grid h-7 w-7 place-items-center rounded-lg border border-ink-200 bg-white text-ink-600 hover:bg-ink-50 disabled:opacity-40 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink-900/20"
           aria-label="Previous page"
         >
@@ -64,7 +66,7 @@ export default function Pagination({ total, page, onPage, pageSize = 25, onPageS
           <button
             key={n}
             type="button"
-            onClick={() => onPage(n)}
+            onClick={() => handlePage(n)}
             className={clsx(
               'h-7 min-w-7 px-1.5 rounded-lg text-[12px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink-900/20',
               n === safePage ? 'bg-ink-900 text-white' : 'border border-ink-200 bg-white text-ink-600 hover:bg-ink-50'
@@ -76,7 +78,7 @@ export default function Pagination({ total, page, onPage, pageSize = 25, onPageS
         <button
           type="button"
           disabled={safePage >= pages}
-          onClick={() => onPage(safePage + 1)}
+          onClick={() => handlePage(safePage + 1)}
           className="grid h-7 w-7 place-items-center rounded-lg border border-ink-200 bg-white text-ink-600 hover:bg-ink-50 disabled:opacity-40 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink-900/20"
           aria-label="Next page"
         >

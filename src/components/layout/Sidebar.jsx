@@ -12,6 +12,7 @@ function SidebarLink({ item, collapsed }) {
       key={item.to}
       to={item.to}
       end={item.end}
+      data-tour={item.tour}
       title={collapsed ? item.label : undefined}
       className={({ isActive }) =>
         clsx(

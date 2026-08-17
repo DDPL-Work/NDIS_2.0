@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { FlaskConical, LockKeyhole, MapPinned, UserPlus } from 'lucide-react'
 import { useAuthStore } from '../../app/store/authStore'
 import { getDefaultRoute } from '../../app/authRoutes'
 import { DEMO_PERSONAS } from './demoPersonas'
 import Icon from '../../components/ui/Icon'
 
-export default function LoginPage() {
+export default function LoginPage({ initialMode = 'login' }) {
   const navigate = useNavigate(); const signIn = useAuthStore((s) => s.signIn); const signUp = useAuthStore((s) => s.signUp); const demoSignIn = useAuthStore((s) => s.demoSignIn); const status = useAuthStore((s) => s.status); const storeError = useAuthStore((s) => s.error); const user = useAuthStore((s) => s.user)
-  const [signup, setSignup] = useState(false); const [form, setForm] = useState({ username: '', password: '', email: '', full_name: '' }); const [notice, setNotice] = useState('')
+  const [signup, setSignup] = useState(initialMode === 'signup'); const [form, setForm] = useState({ username: '', password: '', email: '', full_name: '' }); const [notice, setNotice] = useState('')
   const busy = status === 'loading'
+  useEffect(() => { setSignup(initialMode === 'signup'); setNotice('') }, [initialMode])
   useEffect(() => { if (user?.role && status === 'authenticated') navigate(getDefaultRoute(user.role), { replace: true }) }, [navigate, status, user])
   function change(event) { setForm((current) => ({ ...current, [event.target.name]: event.target.value })) }
   async function submit(event) { event.preventDefault(); setNotice(''); try { if (signup) { await signUp(form); setNotice('Account created. You can now sign in.'); setSignup(false) } else { await signIn({ username: form.username, password: form.password }) } } catch { /* Store exposes a safe message. */ } }
@@ -17,6 +18,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-ink-950 flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-lg">
+        <Link to="/" className="mb-4 inline-flex items-center gap-1.5 text-xs font-medium text-ink-400 transition-colors hover:text-saffron-300"><span aria-hidden="true">←</span> Back to NDISP home</Link>
         <div className="rounded-2xl border border-white/10 bg-white/[.06] p-7 shadow-2xl backdrop-blur">
           <div className="mb-7 text-center">
             <div className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-saffron-500 text-white"><MapPinned size={23} /></div>

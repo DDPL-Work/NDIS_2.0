@@ -55,12 +55,36 @@ export function catalogPopupHtml(properties = {}) {
     </div>`
 }
 
+// Two-point route state of a routable point.  Exactly ONE origin and ONE
+// destination exist at any time.  A point that already IS the origin shows a
+// static "Start point" chip; every other routable point offers "Route to
+// here", which sets OR REPLACES the destination — it never appends a third
+// stop (multi-stop routing does not exist).
+function routeActionHtml({ isOrigin, includeDetails = false }) {
+  const chip = '<span data-action="origin-chip" style="flex:1;text-align:center;background:#eef1f5;color:#7488a0;border-radius:6px;padding:4px 0;font-size:11px;font-weight:600;cursor:default;">Start point</span>'
+  const button = '<button data-action="route-to" style="flex:1;background:#1d7ab5;color:#fff;border:none;border-radius:6px;padding:4px 0;font-size:11px;font-weight:600;cursor:pointer;">Route to here</button>'
+  const details = includeDetails
+    ? '<button data-action="view-details" style="flex:1;background:#0b3558;color:#fff;border:none;border-radius:6px;padding:4px 0;font-size:11px;font-weight:600;cursor:pointer;">View Details</button>'
+    : ''
+  return `
+    <div style="display:flex;gap:6px;margin-top:8px;padding-top:6px;border-top:1px solid #e4e8ed;">
+      ${details}${isOrigin ? chip : button}
+    </div>`
+}
+
 // L.geoJSON for a backend layer response (Point / LineString / Polygon /
 // MultiPolygon) exactly like REF.html — no manual geometry transforms.
-export function createCatalogLayer(geojson, { layerName = '', category = '' } = {}) {
+// Catalog layers are DISPLAY-ONLY: features support hover/identify (metadata
+// tooltip) but never route.  Routing destinations must be explicitly selected
+// facilities with real point coordinates — administrative boundaries,
+// polygons, lines and derived geometry points are never routable here.
+export function createCatalogLayer(geojson, {
+  layerName = '',
+  category = '',
+} = {}) {
   const collection = geojson?.features ? geojson : { type: 'FeatureCollection', features: geojson?.features || [] }
   const style = styleForCategory(category, layerName)
-  return L.geoJSON(collection, {
+  const layer = L.geoJSON(collection, {
     style() { return style },
     pointToLayer(_feature, latlng) {
       return L.circleMarker(latlng, {
@@ -73,15 +97,14 @@ export function createCatalogLayer(geojson, { layerName = '', category = '' } = 
       })
     },
     onEachFeature(feature, leafletLayer) {
-      // Hover tooltip only — clicking a catalog feature never opens a popup
-      // (click must stay free for the role-based facility action).
-      leafletLayer.bindTooltip(catalogPopupHtml(feature.properties), {
+      leafletLayer.bindTooltip(catalogPopupHtml(feature?.properties || {}), {
         sticky: true,
         direction: 'top',
         offset: [0, -6],
       })
     },
   })
+  return layer
 }
 
 // Deterministic hash colour used when a department has no assigned colour —
@@ -104,14 +127,21 @@ export function facilityColor(facility, { colorBy = 'department', departmentColo
 }
 
 // Lightweight hover popup (production NDISP behaviour).  Name, department,
-// category, status and gap score only — never buttons, links or scrolling.
-// Popup content is derived from the mapped facility (backend fields only).
-export function facilityPopupHtml(facility) {
+// category, status and gap score only.  When route actions are enabled
+// (getRouteOriginKey provided) the popup extends the same layout with the
+// facility route actions — View Details + Route to here — so map facilities
+// are first-class routable points without a separate design.
+// STRICT TWO-POINT semantics: "Route to here" sets or replaces the single
+// destination (never appends a stop); a facility that already IS the origin
+// shows a static "Start point" chip instead.
+export function facilityPopupHtml(facility, { routeOriginKey = null, enabled = false } = {}) {
   const gap = Number.isFinite(facility.gapScore) ? facility.gapScore : null
   const gapLabel = gap !== null ? ` · Gap ${Math.round(gap * 100)}%` : ''
   const gapColor = gap > 0.66 ? '#c0392b' : gap > 0.33 ? '#e07a2c' : '#1f7a54'
+  const isOrigin = routeOriginKey != null && String(routeOriginKey) === `facility:${String(facility.id)}`
+  const actionRow = enabled ? routeActionHtml({ isOrigin, includeDetails: true }) : ''
   return `
-    <div style="font-family:Inter,sans-serif;min-width:150px;max-width:220px;padding:2px 0;">
+    <div style="font-family:Inter,sans-serif;min-width:220px;max-width:240px;padding:2px 0;">
       <div style="font-weight:600;font-size:12.5px;color:#0b3558;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(facility.name || '')}</div>
       <div style="font-size:11.5px;color:#546882;margin-top:3px;">
         ${escapeHtml(facility.departmentName || '—')} · ${escapeHtml(facility.categoryLabel || '')}
@@ -119,6 +149,7 @@ export function facilityPopupHtml(facility) {
       <div style="font-size:11px;color:${gapLabel ? gapColor : '#7488a0'};margin-top:3px;text-transform:capitalize;">
         ${escapeHtml(facility.status || 'active')}${gapLabel}
       </div>
+      ${actionRow}
     </div>`
 }
 
@@ -132,19 +163,238 @@ function facilityIcon(color, { inactive = false } = {}) {
   })
 }
 
+// Per-map hover guard for the interactive facility popup.  One mousemove
+// listener per map (never one per marker/layer rebuild), dropped on unload.
+// Closing is decided by geometry, not by mouseout alone: the popup closes only
+// once the cursor is clearly outside the popup and its anchor.  For facility
+// markers the anchor region is ONE continuous hover region spanning the
+// marker, the popup AND Leaflet's ~20px pointer-events:none tip corridor
+// between them (see guard.closeIfLeft) — closing mid-transit would make the
+// popup unreachable, the exact interaction bug this guard fixes.  For path
+// layers (GIS lines/polygons) the anchor is a single point projected to screen
+// space — the raw SVG element rect of a long line would span most of the map
+// and pin the popup open.
+// Map movement: exploring the map is drag-only.  The instant the map starts
+// moving (drag, zoom, programmatic pan/fitBounds) any open hover popup is
+// closed and hover interactions are suspended until the movement ends — a
+// drag must never fight an open popup or pop one open mid-pan.
+const FACILITY_HOVER_GUARDS = new WeakMap()
+function ensureFacilityHoverGuard(map) {
+  let guard = FACILITY_HOVER_GUARDS.get(map)
+  if (guard) return guard
+  guard = {
+    active: false,
+    popup: null,
+    openMarker: null,
+    anchorLatLng: null,
+    dragging: false,
+  }
+  guard.closeIfLeft = (x, y) => {
+    if (!guard.active || !guard.popup?.isOpen() || guard.dragging) return false
+    const pad = 10
+    const within = (rect, extraPad = pad) => rect && x >= rect.left - extraPad && x <= rect.right + extraPad && y >= rect.top - extraPad && y <= rect.bottom + extraPad
+    const popupRect = guard.popup.getElement()?.getBoundingClientRect()
+    if (within(popupRect)) return false
+    if (guard.anchorLatLng) {
+      // Path-layer anchor: small screen-space grace zone around the exact
+      // destination point (popup anchor), so the corridor between the popup
+      // and the line/polygon point stays traversable.
+      const point = map.latLngToContainerPoint(guard.anchorLatLng)
+      if (within({ left: point.x, right: point.x, top: point.y, bottom: point.y }, 14)) return false
+      map.closePopup(guard.popup)
+      guard.openMarker = null
+      guard.anchorLatLng = null
+      return true
+    }
+    // Facility marker: ONE continuous hover region — the union of the marker
+    // rect and the popup rect, expanded by a 12px travel margin.  Leaflet
+    // leaves a pointer-events:none corridor between the marker element and the
+    // popup (tip + margin), so a naive outside-both-rects check closes the
+    // popup while the cursor is simply walking from the marker into it.  The
+    // union region keeps the popup open for that exact flight path and closes
+    // it only once the cursor has genuinely left both.
+    const markerRect = guard.openMarker?.getElement?.()?.getBoundingClientRect()
+    if (markerRect && popupRect) {
+      const margin = 12
+      const left = Math.min(markerRect.left, popupRect.left) - margin
+      const right = Math.max(markerRect.right, popupRect.right) + margin
+      const top = Math.min(markerRect.top, popupRect.top) - margin
+      const bottom = Math.max(markerRect.bottom, popupRect.bottom) + margin
+      if (x >= left && x <= right && y >= top && y <= bottom) return false
+    }
+    map.closePopup(guard.popup)
+    guard.openMarker = null
+    guard.anchorLatLng = null
+    return true
+  }
+  guard.handleMove = (event) => {
+    const x = event.originalEvent?.clientX
+    const y = event.originalEvent?.clientY
+    if (x == null || y == null) return
+    guard.closeIfLeft(x, y)
+  }
+  guard.onMoveStart = () => {
+    if (guard.popup?.isOpen()) map.closePopup(guard.popup)
+    guard.openMarker = null
+    guard.anchorLatLng = null
+  }
+  guard.onDragStart = () => { guard.dragging = true }
+  guard.onDragEnd = () => { guard.dragging = false }
+  map.on('mousemove', guard.handleMove)
+  map.on('movestart', guard.onMoveStart)
+  map.on('dragstart', guard.onDragStart)
+  map.on('dragend', guard.onDragEnd)
+  map.on('unload', () => {
+    map.off('mousemove', guard.handleMove)
+    map.off('movestart', guard.onMoveStart)
+    map.off('dragstart', guard.onDragStart)
+    map.off('dragend', guard.onDragEnd)
+  })
+  FACILITY_HOVER_GUARDS.set(map, guard)
+  return guard
+}
+
+// Shared interactive hover-popup lifecycle — used by facility markers AND
+// routable GIS layer features so there is exactly one implementation.  One
+// L.popup instance per caller; the per-map hover guard owns close decisions,
+// so the cursor can travel from the marker into the popup without it closing.
+// Action buttons are handled by ONE delegated click listener per popup element
+// (see ensurePopupActions), so opens and setContent() refreshes never re-bind
+// and never stack listeners.  `anchorLatLng` (a [lng, lat] pair) lets path
+// layers — which have no getLatLng() — anchor the popup at their deterministic
+// destination point.  Returns an object with `open(latlng)` / `refresh(latlng)`
+// used by line/polygon click refinement; `refresh` re-anchors and re-renders
+// content while the delegated action binding survives untouched.
+function bindHoverPopup({ map, guard, popup, marker, anchorLatLng = null, content, actions = null, activeTool = 'none', getActiveTool = null }) {
+  const toolActive = () => (getActiveTool ? getActiveTool() : activeTool) !== 'none'
+  const anchorRef = { latlng: anchorLatLng ? L.latLng(anchorLatLng[1], anchorLatLng[0]) : null }
+  const moveAnchor = (latlng) => {
+    if (!latlng) return
+    anchorRef.latlng = latlng
+    if (guard) guard.anchorLatLng = latlng
+  }
+  const openPopup = () => {
+    if (guard?.dragging) return
+    const latlng = anchorRef.latlng || marker.getLatLng()
+    if (guard) {
+      guard.openMarker = marker
+      guard.popup = popup
+      guard.anchorLatLng = anchorRef.latlng
+    }
+    popup.setLatLng(latlng)
+    popup.setContent(content())
+    popup.openOn(map)
+    ensurePopupActions(map, popup, guard, actions)
+  }
+  marker.on('mouseover', () => {
+    if (toolActive()) return
+    if (guard?.dragging) return // never pop popups while the map is being dragged
+    openPopup()
+  })
+  marker.on('mouseout', (event) => {
+    if (!popup.isOpen()) return
+    if (!actions) {
+      // Non-interactive popup: legacy hover-close, keeping the popup open
+      // while the cursor is still over its content.
+      if (event?.originalEvent?.relatedTarget && popup.getElement()?.contains(event.originalEvent.relatedTarget)) return
+      map.closePopup(popup)
+      return
+    }
+    // Interactive popup: mouseout alone must not close it — the cursor can be
+    // mid-glide through the tip corridor towards the buttons.  Use the same
+    // geometry check as the mousemove guard (also catches the marker moving
+    // away under a stationary cursor during a map drag).
+    const original = event.originalEvent
+    if (guard && original && original.clientX != null && original.clientY != null) {
+      guard.closeIfLeft(original.clientX, original.clientY)
+    }
+  })
+  return {
+    open: (latlng) => {
+      moveAnchor(latlng)
+      openPopup()
+    },
+    refresh: (latlng) => {
+      moveAnchor(latlng)
+      if (!popup.isOpen()) return
+      popup.setLatLng(anchorRef.latlng || marker.getLatLng())
+      popup.setContent(content())
+      ensurePopupActions(map, popup, guard, actions)
+    },
+  }
+}
+
+// Popup action buttons are dispatched by ONE delegated click listener per
+// popup element.  Leaflet reuses the same popup root element across open/close
+// cycles AND a single L.popup instance is shared by every marker in the layer,
+// so per-open binding (button.addEventListener on every openPopup()) would
+// stack duplicate listeners (each click would run the action repeatedly),
+// while a permanently bound listener must NOT capture the first marker's
+// action closures.  The current actions object is therefore stored per popup
+// instance on every open/refresh (POPUP_ACTIONS_CURRENT, a WeakMap) and
+// resolved at CLICK time, so each marker's popup always runs ITS OWN
+// View Details / Route to here handler for the facility being hovered — a
+// popup button can never execute a different facility's handler.
+// Clicks inside the popup are additionally isolated from the rest of the map:
+// click-family events (click / mousedown / mouseup / dblclick / contextmenu /
+// pointerdown / pointerup) are stopPropagation'd at the popup root, so they
+// can never bubble into the map container's click pipeline (Leaflet's
+// close-on-map-click, tool placement, ...) or reach the marker's own click
+// handler — popup/button events therefore cannot trigger the marker's
+// navigation handler, which stays reserved for direct marker presses.
+// The listener and the isolation handlers die with the element (no global
+// document listeners, no memory leak).
+const POPUP_ACTIONS_BOUND = new WeakSet()   // popup element → delegated listener attached
+const POPUP_ACTIONS_CURRENT = new WeakMap() // popup instance → actions for the currently displayed content
+
+function ensurePopupActions(map, popup, guard, actions) {
+  if (!actions || !popup) return
+  POPUP_ACTIONS_CURRENT.set(popup, actions)
+  const element = popup.getElement()
+  if (!element || POPUP_ACTIONS_BOUND.has(element)) return
+  POPUP_ACTIONS_BOUND.add(element)
+  L.DomEvent.on(element, 'click mousedown mouseup dblclick contextmenu pointerdown pointerup', L.DomEvent.stopPropagation)
+  element.addEventListener('click', (event) => {
+    const button = event.target?.closest?.('[data-action]')
+    if (!button) return
+    map.closePopup(popup)
+    if (guard) guard.openMarker = null
+    const handler = POPUP_ACTIONS_CURRENT.get(popup)?.[button.getAttribute('data-action')]
+    if (typeof handler === 'function') handler()
+  })
+}
+
 // Facilities → L.marker([latitude, longitude]) from backend [longitude, latitude].
-// Hover shows a lightweight popup; leaving closes it.  Click never opens the
-// popup — it reports the whole facility object so the parent decides between
-// citizen navigation (/citizen/facility/:slug) and the admin right-side panel.
+// Hover shows a lightweight popup.  Click never opens the popup — it reports
+// the whole facility object so the parent decides between citizen navigation
+// (/citizen/facility/:slug) and the admin right-side panel.  When route actions
+// are enabled (onFacilityRouteTo provided) the popup becomes interactive and
+// adds View Details plus the two-point route action (Route to here / Start
+// point chip — see facilityPopupHtml), never a multi-stop control; the marker
+// click behaviour itself is never changed.
 export function createFacilityMarkers(facilities, {
   colorBy = 'department',
   departmentColors = {},
   activeTool = 'none',
   onFacilityClick,
+  onFacilityRouteTo = null,
+  getRouteOriginKey = null,
   map,
 } = {}) {
   const group = L.layerGroup()
-  const popup = map ? L.popup({ closeButton: false, offset: [0, -6], maxWidth: 240, interactive: false }) : null
+  const withActions = typeof onFacilityRouteTo === 'function'
+  const popup = map ? L.popup({
+    closeButton: false,
+    offset: [0, -6],
+    maxWidth: 260,
+    interactive: withActions,
+    closeOnClick: false,
+  }) : null
+  const guard = map ? ensureFacilityHoverGuard(map) : null
+  if (guard) {
+    guard.active = withActions
+    if (withActions) guard.popup = popup
+  }
   facilities.forEach((facility) => {
     if (!Array.isArray(facility.position) || facility.position.length < 2) return
     const color = facilityColor(facility, { colorBy, departmentColors })
@@ -155,19 +405,26 @@ export function createFacilityMarkers(facilities, {
       bubblingMouseEvents: activeTool !== 'none',
     })
     if (map && popup) {
-      marker.on('mouseover', () => {
-        if (activeTool !== 'none') return
-        popup.setLatLng(marker.getLatLng())
-        popup.setContent(facilityPopupHtml(facility))
-        popup.openOn(map)
-      })
-      marker.on('mouseout', () => {
-        if (popup.isOpen()) map.closePopup(popup)
+      bindHoverPopup({
+        map,
+        guard,
+        popup,
+        marker,
+        content: () => facilityPopupHtml(facility, {
+          enabled: withActions,
+          routeOriginKey: withActions ? (getRouteOriginKey ? getRouteOriginKey() : null) : null,
+        }),
+        actions: withActions ? {
+          'view-details': () => onFacilityClick?.(facility),
+          'route-to': () => onFacilityRouteTo?.(facility),
+        } : null,
+        activeTool,
       })
     }
     marker.on('click', () => {
       if (activeTool !== 'none') return
       if (popup?.isOpen()) map?.closePopup(popup)
+      if (guard) guard.openMarker = null
       onFacilityClick?.(facility)
     })
     group.addLayer(marker)

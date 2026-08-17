@@ -7,7 +7,7 @@ import { DISTRICTS } from '../../../config/constants'
 import GISCommandCenter from '../../../gis/components/GISCommandCenter'
 
 export default function DepartmentGisWorkspace() {
-  const { dept, deptName, assets, complaints, projects, workOrders, inspections, maintenanceTasks } = useDepartment()
+  const { dept, deptName, can, assets, complaints, projects, workOrders, inspections, maintenanceTasks } = useDepartment()
   const user = useAuthStore((s) => s.user)
   // Fully dynamic map surface: view is anchored to the authenticated user's
   // district, never a hardcoded coordinate set.
@@ -58,7 +58,7 @@ export default function DepartmentGisWorkspace() {
       </div>
 
       <div className="min-h-0 flex-1">
-        <GISCommandCenter facilities={mapPoints} complaints={complaints} projects={projects} center={districtCenter} zoom={district?.zoom || 11} user={user} allowedDepartments={[dept.id]} onOpen={setSelectedItem} />
+        <GISCommandCenter facilities={mapPoints} complaints={complaints} projects={projects} center={districtCenter} zoom={district?.zoom || 11} user={user} allowedDepartments={[dept.id]} onOpen={setSelectedItem} deptId={dept.id} deptLabel={deptName || dept.label} can={can} />
       </div>
 
       {/* Selected Item Modal */}

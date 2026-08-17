@@ -205,7 +205,7 @@ export default function SituationMatrix() {
 
           {/* Route summary (floating, above the map but below panels) */}
           <div className="absolute bottom-4 left-4 z-[115]">
-            <RouteSummary status={routing.status} mode={routing.mode} route={routing.route} startFacility={routing.startFacility} destinationFacility={routing.destinationFacility} errorMessage={routing.errorMessage} onShowShortest={routing.showFacilityRoute} onSwap={routing.swapFacilities} onClear={routing.clearRoute} />
+            <RouteSummary status={routing.status} route={routing.route} origin={routing.origin} destination={routing.destination} errorMessage={routing.errorMessage} onCalculate={routing.calculateRoute} onClear={routing.clearRoute} />
           </div>
 
           {/* Top-left: department legend + gap legend + boundary toggle + layers */}

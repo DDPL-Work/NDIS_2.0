@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
-import { Bell, LogOut, ChevronDown, Globe, MapPin, Search } from 'lucide-react'
+import { Bell, LogOut, ChevronDown, Globe, HelpCircle, MapPin, Search } from 'lucide-react'
 import Select from '../ui/Select'
 import Badge from '../ui/Badge'
 import NotificationDrawer from '../ui/NotificationDrawer'
@@ -10,6 +10,7 @@ import { useAsync } from '../../hooks/useAsync'
 import { notificationApi } from '../../services/api'
 import { DISTRICTS, DEPARTMENTS, ROLE_LABELS, ROLES } from '../../config/constants'
 import { useNavigate } from 'react-router-dom'
+import { useTourStore } from '../tour/tourStore'
 
 function useOutsideClick(ref, onOutside) {
   useEffect(() => {
@@ -139,6 +140,18 @@ export default function Topbar({ title, subtitle, showDistrict = true, showDepar
           >
             <Globe size={14} /> {locale === 'en' ? 'EN' : 'हि'}
           </button>
+
+          {/* Citizen-only guided tour replay ("Take a Tour") */}
+          {user?.role === ROLES.CITIZEN && (
+            <button
+              onClick={() => useTourStore.getState().openReplay()}
+              className="grid h-9 w-9 place-items-center rounded-lg text-ink-500 hover:bg-ink-100 transition-colors"
+              title="Take a tour"
+              aria-label="Take a tour"
+            >
+              <HelpCircle size={17} />
+            </button>
+          )}
 
           {/* Notification Bell Button */}
           <button
