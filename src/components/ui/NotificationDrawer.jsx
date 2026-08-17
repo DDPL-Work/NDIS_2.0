@@ -1,6 +1,6 @@
 // Notification Drawer — Vol 4 §API / Vol 3 Ch 18 (Notification Engine).
 // Slide-out panel for portal, SMS, and email alerts.
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Bell, X, Check, Filter, MessageSquare, Mail, Smartphone, AlertTriangle } from 'lucide-react'
 import Badge from './Badge'
 import Button from './Button'
@@ -16,6 +16,18 @@ const CHANNEL_ICONS = {
 export default function NotificationDrawer({ open, onClose, notifications = [], onMarkAllRead }) {
   const [channelFilter, setChannelFilter] = useState('all')
 
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e) => e.key === 'Escape' && onClose()
+    document.addEventListener('keydown', onKey)
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = previous
+    }
+  }, [open, onClose])
+
   if (!open) return null
 
   const filtered = notifications.filter((n) => {
@@ -26,7 +38,7 @@ export default function NotificationDrawer({ open, onClose, notifications = [], 
   const unreadCount = notifications.filter((n) => !n.read).length
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden flex justify-end bg-ink-950/40 backdrop-blur-xs animate-fade-in">
+    <div className="fixed inset-0 z-50 overflow-hidden flex justify-end bg-ink-950/40 backdrop-blur-sm animate-fade-in">
       <div className="w-full max-w-md bg-white h-full shadow-2xl flex flex-col animate-slide-in-right">
         {/* Drawer Header */}
         <div className="p-4 border-b border-ink-100 flex items-center justify-between">
@@ -45,7 +57,7 @@ export default function NotificationDrawer({ open, onClose, notifications = [], 
         </div>
 
         {/* Filter Bar */}
-        <div className="px-4 py-2 border-b border-ink-100 bg-ink-50/50 flex items-center justify-between text-[12px]">
+        <div className="px-4 py-2 border-b border-ink-100 bg-ink-50/50 flex flex-wrap items-center justify-between gap-2 text-[12px]">
           <div className="flex items-center gap-1.5">
             {['all', 'portal', 'sms', 'email'].map((c) => (
               <button

@@ -124,7 +124,7 @@ export default function CollectorExecutiveDashboard() {
       />
 
       {/* KPI Strip */}
-      <div className="px-6 grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+      <div className="px-6 grid grid-cols-2 sm:grid-cols-4 gap-3.5">
         <StatCard label="Total Complaints" value={formatNumber(metrics.total)} icon={Gavel} tone="ink" sub={`${metrics.pending} pending action`} />
         <StatCard label="SLA Compliance Rate" value={`${metrics.slaCompliance}%`} icon={CheckCircle2} tone="leaf" delta={4.2} sub="Target ≥ 85%" />
         <StatCard label="Critical / Escalated" value={metrics.escalated} icon={AlertTriangle} tone="alert" sub="Requires DM Intervention" />

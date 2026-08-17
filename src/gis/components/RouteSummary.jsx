@@ -29,7 +29,7 @@ export default function RouteSummary({ status, route, origin = null, destination
 
   if (idle) {
     return (
-      <div className="pointer-events-auto w-[280px] overflow-hidden rounded-xl border border-ink-200 bg-white shadow-lg">
+      <div className="pointer-events-auto w-[min(280px,calc(100vw-32px))] overflow-hidden rounded-xl border border-ink-200 bg-white shadow-lg">
         <div className="flex items-start justify-between gap-2 border-b border-ink-100 bg-ink-900 px-3.5 py-2">
           <div className="min-w-0">
             <div className="text-[9.5px] font-semibold uppercase tracking-wide text-ink-400">Route</div>
@@ -71,7 +71,7 @@ export default function RouteSummary({ status, route, origin = null, destination
 
   if (status === 'error') {
     return (
-      <div className="pointer-events-auto max-w-[270px] rounded-xl border border-alert-200 bg-white px-3.5 py-2.5 shadow-lg">
+      <div className="pointer-events-auto w-[min(270px,calc(100vw-32px))] rounded-xl border border-alert-200 bg-white px-3.5 py-2.5 shadow-lg">
         <p className="text-[11px] text-alert-700">{errorMessage || 'Unable to calculate a road route.'}</p>
         <Button size="sm" variant="ghost" onClick={onClear} className="mt-1.5 !text-[11px]">Dismiss</Button>
       </div>
@@ -79,7 +79,7 @@ export default function RouteSummary({ status, route, origin = null, destination
   }
 
   return (
-    <div className="pointer-events-auto w-[280px] overflow-hidden rounded-xl border border-ink-200 bg-white shadow-lg">
+    <div className="pointer-events-auto w-[min(280px,calc(100vw-32px))] overflow-hidden rounded-xl border border-ink-200 bg-white shadow-lg">
       <div className="flex items-start justify-between gap-2 border-b border-ink-100 bg-ink-900 px-3.5 py-2">
         <div className="min-w-0">
           <div className="text-[9.5px] font-semibold uppercase tracking-wide text-ink-400">Route</div>

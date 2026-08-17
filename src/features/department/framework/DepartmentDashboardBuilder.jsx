@@ -167,7 +167,7 @@ export default function DepartmentDashboardBuilder() {
                 <Card>
                   <CardHeader title="Sector GIS Map" subtitle="Spatial asset distribution" icon={MapPin} />
                   <CardBody className="!p-2">
-                    <div className="h-56 rounded-xl overflow-hidden relative">
+                    <div className="h-[clamp(160px,24vh,224px)] rounded-xl overflow-hidden relative">
                       <MapView center={[85.4211, 25.0294]} zoom={12} facilities={mapFacilities} className="h-full" />
                     </div>
                   </CardBody>

@@ -96,12 +96,12 @@ function SanctionRegisterView() {
             columns={[
               { key: 'sanctionNo', label: 'Sanction No', render: (r) => <span className="font-mono text-[12px]">{r.sanctionNo}</span> },
               { key: 'departmentId', label: 'Department', render: (r) => master.departments.find((d) => d.id === r.departmentId)?.name || r.departmentId },
-              { key: 'schemeId', label: 'Scheme', render: (r) => r.schemeId ? <span className="text-[12.5px]">{master.schemes.find((s) => s.id === r.schemeId)?.name || r.schemeId}</span> : '—' },
+              { key: 'schemeId', label: 'Scheme', render: (r) => r.schemeId ? <span className="text-[12.5px]">{master.schemes.find((s) => s.id === r.schemeId)?.name || r.schemeId}</span> : '—', hideOn: 'md' },
               { key: 'amount', label: 'Amount', render: (r) => <span className="font-medium text-ink-900">{formatAmount(r.amount)}</span> },
               { key: 'released', label: 'Released', render: (r) => <span className="text-saffron-700">{formatAmount(r.released)}</span> },
-              { key: 'unreleased', label: 'Unreleased', render: (r) => <span className="text-leaf-700">{formatAmount(r.unreleased)}</span> },
+              { key: 'unreleased', label: 'Unreleased', render: (r) => <span className="text-leaf-700">{formatAmount(r.unreleased)}</span>, hideOn: 'md' },
               { key: 'status', label: 'Status', render: (r) => <Badge tone={r.status === 'approved' ? 'positive' : r.status === 'escalated' ? 'warning' : 'neutral'}>{r.status}</Badge> },
-              { key: 'createdBy', label: 'Raised By' },
+              { key: 'createdBy', label: 'Raised By', hideOn: 'sm' },
               { key: '_', label: '', render: (r) => (
                 <span className="flex items-center gap-1.5">
                   {r.status === 'drafted' && canApprove && <Button variant="ghost" size="sm" icon={ShieldCheck} onClick={() => setApproveFor(r)}>Approve</Button>}

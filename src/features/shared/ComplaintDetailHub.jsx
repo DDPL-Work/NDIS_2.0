@@ -163,7 +163,7 @@ export default function ComplaintDetailHub({ complaintId, onClose }) {
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className="font-display font-semibold text-[15px] truncate">{complaint.title}</span>
+              <span className="font-display font-semibold text-[15px] truncate" title={complaint.title}>{complaint.title}</span>
               <StatusBadge status={complaint.state} />
             </div>
             <p className="text-[11.5px] text-ink-300 font-mono mt-0.5 truncate">
@@ -371,7 +371,7 @@ export default function ComplaintDetailHub({ complaintId, onClose }) {
           <div className="space-y-4 animate-fade-in">
             {Array.isArray(complaint.location?.position) && complaint.location.position.length >= 2 ? (
               <>
-                <div className="h-72 rounded-xl overflow-hidden card border border-ink-200 relative">
+                <div className="h-[clamp(200px,28vh,288px)] rounded-xl overflow-hidden card border border-ink-200 relative">
                   <MapView center={complaint.location.position} zoom={15} activeTool="radius" radiusCenter={complaint.location.position} radiusKm={0.5} className="h-full" />
                 </div>
                 <div className="p-3 card border border-ink-100 text-[12px] flex items-center justify-between">

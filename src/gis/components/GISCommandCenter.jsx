@@ -135,7 +135,7 @@ export default function GISCommandCenter({ facilities = [], complaints = [], pro
         </div>
 
         <span className="hidden shrink-0 text-[11px] text-ink-400 lg:inline">{visiblePoints.length} points</span>
-        <button onClick={() => mapRef.current?.snapshot?.()} className="ml-auto flex shrink-0 items-center gap-1.5 rounded-lg border border-ink-200 px-2.5 py-1.5 text-[11.5px] font-medium text-ink-700 hover:bg-ink-50"><Camera size={13} />Export</button>
+        <button onClick={() => mapRef.current?.snapshot?.()} className="ml-auto flex shrink-0 items-center gap-1.5 rounded-lg border border-ink-200 px-2.5 py-1.5 text-[11.5px] font-medium text-ink-700 hover:bg-ink-50"><Camera size={13} /><span className="hidden sm:inline">Export</span></button>
       </div>
 
       {/* Workspace: left / center / right. On wide screens a true 3-column dock;

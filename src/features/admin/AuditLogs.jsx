@@ -33,11 +33,11 @@ export default function AuditLogs() {
   }, [logs, categoryFilter, searchQuery])
 
   const columns = [
-    { key: 'id', label: 'Log ID', render: (r) => <span className="kbd-mono text-[11.5px]">{r.id}</span> },
+    { key: 'id', label: 'Log ID', render: (r) => <span className="kbd-mono text-[11.5px]">{r.id}</span>, hideOn: 'sm' },
     { key: 'action', label: 'Action & Description', render: (r) => <span className="font-semibold text-ink-950">{r.label}</span> },
-    { key: 'actor', label: 'Actor / User', render: (r) => <span className="text-ink-800">{r.actor}</span> },
-    { key: 'entity', label: 'Target Entity', render: (r) => <span className="kbd-mono text-[11.5px] text-ink-600">{r.targetEntityId}</span> },
-    { key: 'ip', label: 'IP Address', render: (r) => <span className="kbd-mono text-[11.5px] text-ink-500">{r.ipAddress}</span> },
+    { key: 'actor', label: 'Actor / User', render: (r) => <span className="text-ink-800">{r.actor}</span>, hideOn: 'md' },
+    { key: 'entity', label: 'Target Entity', render: (r) => <span className="kbd-mono text-[11.5px] text-ink-600">{r.targetEntityId}</span>, hideOn: 'md' },
+    { key: 'ip', label: 'IP Address', render: (r) => <span className="kbd-mono text-[11.5px] text-ink-500">{r.ipAddress}</span>, hideOn: 'md' },
     { key: 'timestamp', label: 'Timestamp', render: (r) => formatDateTime(r.timestamp) },
     {
       key: 'hash',

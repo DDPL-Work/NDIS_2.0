@@ -20,10 +20,20 @@ const NAV = [
 export default function PublicHeader({ onStartTour }) {
   const user = useAuthStore((s) => s.user)
   const [scrolled, setScrolled] = useState(false)
+  const [active, setActive] = useState('')
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 10)
+    const onScroll = () => {
+      setScrolled(window.scrollY > 10)
+      const probe = window.scrollY + 140
+      let current = NAV[0].href.slice(1)
+      for (const item of NAV) {
+        const el = document.getElementById(item.href.slice(1))
+        if (el && el.offsetTop <= probe) current = item.href.slice(1)
+      }
+      setActive(current)
+    }
     onScroll()
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
@@ -44,9 +54,19 @@ export default function PublicHeader({ onStartTour }) {
         </Link>
 
         <nav className="ml-4 hidden items-center gap-1 lg:flex" aria-label="Primary">
-          {NAV.map((item) => (
-            <a key={item.href} href={item.href} className="rounded-lg px-3 py-2 text-[13.5px] font-medium text-ink-700 transition-colors hover:bg-ink-100/70 hover:text-ink-950">{item.label}</a>
-          ))}
+          {NAV.map((item) => {
+            const isActive = active === item.href.slice(1)
+            return (
+              <a
+                key={item.href}
+                href={item.href}
+                aria-current={isActive ? 'location' : undefined}
+                className={`rounded-lg px-3 py-2 text-[13.5px] font-medium transition-colors hover:bg-ink-100/70 hover:text-ink-950 ${isActive ? 'bg-ink-100/80 text-ink-950' : 'text-ink-700'}`}
+              >
+                {item.label}
+              </a>
+            )
+          })}
         </nav>
 
         <div className="ml-auto flex items-center gap-2">

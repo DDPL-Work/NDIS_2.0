@@ -417,7 +417,7 @@ export default function RegisterComplaintWizard() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2 h-72 rounded-xl overflow-hidden card relative" data-tour="citizen-complaint-location">
+            <div className="lg:col-span-2 h-[clamp(200px,28vh,288px)] rounded-xl overflow-hidden card relative" data-tour="citizen-complaint-location">
               <MapView
                 ref={mapRef}
                 center={selectedPos}

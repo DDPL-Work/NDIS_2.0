@@ -74,9 +74,9 @@ export default function StateAuditWorkspace() {
                 { key: 'actor', label: 'User', render: (a) => <span>{a.actor}<span className="block text-[10.5px] text-ink-400">{a.role}</span></span> },
                 { key: 'action', label: 'Action', render: (a) => <code className="rounded bg-ink-100 px-1.5 py-0.5 font-mono text-[11px] text-ink-800">{a.action}</code> },
                 { key: 'entity', label: 'Entity', render: (a) => <span className="text-[12.5px]">{a.entity}</span> },
-                { key: 'entityId', label: 'Entity ID', render: (a) => <span className="font-mono text-[11.5px]">{a.entityId}</span> },
-                { key: 'reason', label: 'Reason', render: (a) => <span className="text-[12.5px] text-ink-600">{a.reason || '—'}</span> },
-                { key: 'hashSignature', label: 'Hash', render: (a) => <span className="font-mono text-[10.5px] text-ink-400">{a.hashSignature}</span> },
+                { key: 'entityId', label: 'Entity ID', render: (a) => <span className="font-mono text-[11.5px]">{a.entityId}</span>, hideOn: 'md' },
+                { key: 'reason', label: 'Reason', render: (a) => <span className="text-[12.5px] text-ink-600">{a.reason || '—'}</span>, hideOn: 'md' },
+                { key: 'hashSignature', label: 'Hash', render: (a) => <span className="font-mono text-[10.5px] text-ink-400">{a.hashSignature}</span>, hideOn: 'lg' },
                 { key: 'status', label: 'Status', render: (a) => <Badge tone="positive">{a.status}</Badge> },
               ]}
               rows={rows}

@@ -7,6 +7,7 @@
 // facilities, complaints), useLeafletLayers, CitizenLayerPanel,
 // FacilityInfoPanel and the shared facility mapper — no duplicate GIS logic.
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
+import clsx from 'clsx'
 import { Flame, Layers, SlidersHorizontal, MapPin } from 'lucide-react'
 import MapView from '../../components/map/MapView'
 import MapToolbar from '../../components/map/MapToolbar'
@@ -42,6 +43,7 @@ export default function SituationMatrix() {
   const [showBoundary, setShowBoundary] = useState(true)
   const [leafletMap, setLeafletMap] = useState(null)
   const [spatialResults, setSpatialResults] = useState(null)
+  const [displayOpen, setDisplayOpen] = useState(false)
 
   const mapRef = useRef(null)
   const tools = useMapTools()
@@ -168,12 +170,12 @@ export default function SituationMatrix() {
         title="Situation Matrix"
         description={`Cross-department deficit view for ${district?.label}. Deficit radius: ${tools.radiusKm}km (configurable via map toolbar).`}
         action={
-          <div className="w-[340px]">
+          <div className="w-full md:w-[340px]">
             <GISSearchPanel user={user} allowedDepartments={activeIds} center={district?.center} onResults={setSpatialResults} onResultClick={(result) => mapRef.current?.showResult(result)} onShowRoute={routing.showRoute} onClearRoute={routing.clearRoute} routeActiveId={routeActiveId} routeLoading={routing.status === 'loading'} onRouteStart={routing.setRouteStart} onRouteDestination={routing.setRouteDestination} routeStartId={routing.routeStartId} routeDestinationId={routing.routeDestinationId} />
           </div>
         }
       />
-      <div className="flex-1 px-6 pb-6 min-h-0 flex gap-3">
+      <div className="flex-1 px-3 sm:px-6 pb-6 min-h-0 flex flex-col lg:flex-row gap-3">
         {/* Map area */}
         <div className="relative flex-1 min-w-0">
           <MapView
@@ -209,7 +211,7 @@ export default function SituationMatrix() {
           </div>
 
           {/* Top-left: department legend + gap legend + boundary toggle + layers */}
-          <div className="absolute top-4 left-4 flex flex-col gap-2 max-w-xs z-10">
+          <div className="absolute top-4 left-4 flex flex-col gap-2 w-[min(320px,calc(100vw-32px))] z-10">
             <DepartmentLegend
               departments={departments.map((d) => ({ id: String(d.id), name: d.name || d.label, color: d.color }))}
               activeIds={activeIds}
@@ -237,47 +239,55 @@ export default function SituationMatrix() {
             </div>
           </div>
 
-          {/* Top-right controls */}
-          <div className="absolute top-4 right-16 flex flex-col gap-2 z-10">
-            <div className="card p-1 flex gap-1">
-              <button
-                onClick={() => setColorBy('department')}
-                className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-medium ${colorBy === 'department' ? 'bg-ink-900 text-white' : 'text-ink-600 hover:bg-ink-100'}`}
-              >
-                <Layers size={13} /> By dept
-              </button>
-              <button
-                onClick={() => setColorBy('gap')}
-                className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-medium ${colorBy === 'gap' ? 'bg-ink-900 text-white' : 'text-ink-600 hover:bg-ink-100'}`}
-              >
-                <Flame size={13} /> By gap
-              </button>
-            </div>
+          {/* Top-right controls — collapsed behind a "Display" toggle on mobile */}
+          <div className="absolute top-4 right-3 md:right-16 flex flex-col items-end gap-2 z-10">
             <button
-              onClick={() => setShowHeat((v) => !v)}
-              className={`card px-2.5 py-1.5 text-[12px] font-medium flex items-center gap-1.5 ${showHeat ? 'ring-2 ring-alert-400' : ''}`}
+              onClick={() => setDisplayOpen((v) => !v)}
+              className="md:hidden card px-2.5 py-1.5 text-[12px] font-medium flex items-center gap-1.5"
             >
-              <Flame size={13} className={showHeat ? 'text-alert-500' : 'text-ink-500'} /> Hotspot overlay
+              <SlidersHorizontal size={12} className="text-ink-500" /> Display
             </button>
-
-            {/* Gap threshold filter */}
-            <div className="card !p-2.5 text-[11.5px]">
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <SlidersHorizontal size={12} className="text-ink-500" />
-                <span className="font-medium text-ink-700">Min gap ≥</span>
-                <span className="kbd-mono ml-auto">{(gapThreshold * 100).toFixed(0)}%</span>
+            <div className={clsx('flex-col gap-2 w-[190px]', displayOpen ? 'flex' : 'hidden md:flex')}>
+              <div className="card p-1 flex gap-1">
+                <button
+                  onClick={() => setColorBy('department')}
+                  className={clsx('flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-medium', colorBy === 'department' ? 'bg-ink-900 text-white' : 'text-ink-600 hover:bg-ink-100')}
+                >
+                  <Layers size={13} /> By dept
+                </button>
+                <button
+                  onClick={() => setColorBy('gap')}
+                  className={clsx('flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-medium', colorBy === 'gap' ? 'bg-ink-900 text-white' : 'text-ink-600 hover:bg-ink-100')}
+                >
+                  <Flame size={13} /> By gap
+                </button>
               </div>
-              <input
-                type="range" min={0} max={0.9} step={0.05}
-                value={gapThreshold}
-                onChange={(e) => setGapThreshold(Number(e.target.value))}
-                className="w-full accent-ink-900"
-              />
+              <button
+                onClick={() => setShowHeat((v) => !v)}
+                className={clsx('card px-2.5 py-1.5 text-[12px] font-medium flex items-center gap-1.5', showHeat && 'ring-2 ring-alert-400')}
+              >
+                <Flame size={13} className={showHeat ? 'text-alert-500' : 'text-ink-500'} /> Hotspot overlay
+              </button>
+
+              {/* Gap threshold filter */}
+              <div className="card !p-2.5 text-[11.5px]">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <SlidersHorizontal size={12} className="text-ink-500" />
+                  <span className="font-medium text-ink-700">Min gap ≥</span>
+                  <span className="kbd-mono ml-auto">{(gapThreshold * 100).toFixed(0)}%</span>
+                </div>
+                <input
+                  type="range" min={0} max={0.9} step={0.05}
+                  value={gapThreshold}
+                  onChange={(e) => setGapThreshold(Number(e.target.value))}
+                  className="w-full accent-ink-900"
+                />
+              </div>
             </div>
           </div>
 
           {/* Map toolbar */}
-          <div className="absolute bottom-4 right-16 z-10">
+          <div className="absolute bottom-4 right-3 md:right-16 z-10">
             <MapToolbar
               activeTool={tools.activeTool}
               onSelectTool={tools.selectTool}
@@ -292,26 +302,33 @@ export default function SituationMatrix() {
               measureDistKm={tools.measureDistKm}
               measurePoints={tools.measurePoints}
               onClearMeasure={tools.clearMeasure}
+              onRemoveMeasurePoint={tools.removeLastMeasurePoint}
+              onFinishMeasure={tools.finishMeasure}
               onFitDistrict={handleFitDistrict}
               onMyLocation={() => mapRef.current?.locateUser()}
               onSnapshot={() => mapRef.current?.snapshot()}
             />
           </div>
 
-          {/* Asset count badge */}
-          <div className="absolute bottom-4 left-4 z-10">
-            <Badge tone="neutral">{loading ? 'Loading…' : `${filtered.length} assets shown`}</Badge>
-          </div>
+          {/* Asset count badge — hidden while a route is being built so it
+              never sits underneath the floating route card */}
+          {!routing.origin && !routing.destination && (
+            <div className="absolute bottom-4 left-4 z-10">
+              <Badge tone="neutral">{loading ? 'Loading…' : `${filtered.length} assets shown`}</Badge>
+            </div>
+          )}
         </div>
 
-        {/* Facility detail slide-out panel — shared admin FacilityInfoPanel */}
+        {/* Facility detail panel — bottom sheet on mobile, slide-out on desktop */}
         {selectedFacility && (
-          <FacilityInfoPanel
-            facility={selectedFacility}
-            grievances={facilityGrievances || []}
-            department={deptMap[selectedFacility.departmentId] ? { ...deptMap[selectedFacility.departmentId], label: deptMap[selectedFacility.departmentId].name } : null}
-            onClose={() => setSelectedFacility(null)}
-          />
+          <div className="fixed inset-x-0 bottom-0 z-[130] lg:static lg:z-auto px-3 pb-3 lg:p-0 max-h-[70vh] overflow-hidden lg:max-h-none">
+            <FacilityInfoPanel
+              facility={selectedFacility}
+              grievances={facilityGrievances || []}
+              department={deptMap[selectedFacility.departmentId] ? { ...deptMap[selectedFacility.departmentId], label: deptMap[selectedFacility.departmentId].name } : null}
+              onClose={() => setSelectedFacility(null)}
+            />
+          </div>
         )}
       </div>
     </div>

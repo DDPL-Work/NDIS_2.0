@@ -407,7 +407,7 @@ export default function EngineerPortal() {
           </div>
           {activeJob && activeJob.location?.position && (
             <div className="card p-3">
-              <MapView center={activeJob.location.position} zoom={15} className="h-72 w-full" />
+              <MapView center={activeJob.location.position} zoom={15} className="h-[clamp(200px,28vh,288px)] w-full" />
             </div>
           )}
         </div>

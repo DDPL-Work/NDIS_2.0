@@ -373,7 +373,7 @@ export default function CitizenHome() {
       </aside>
 
       {/* Right: map */}
-        <div className="flex-1 relative p-3 z-0 min-w-0" data-tour="citizen-map-canvas">
+        <div className="flex-1 relative p-2 sm:p-3 z-0 min-w-0" data-tour="citizen-map-canvas">
         <MapView
           ref={mapRef}
           center={district.center}
@@ -417,7 +417,7 @@ export default function CitizenHome() {
           </div>
         )}
 
-        <div className="absolute top-6 left-6 flex flex-col gap-2 max-w-xs z-[120]">
+        <div className="absolute top-6 left-6 flex flex-col gap-2 w-[min(320px,calc(100vw-24px))] z-[120]">
           {!sidebarOpen && (
             <button
               onClick={handleToggleSidebar}
@@ -446,6 +446,8 @@ export default function CitizenHome() {
             measureDistKm={tools.measureDistKm}
             measurePoints={tools.measurePoints}
             onClearMeasure={tools.clearMeasure}
+            onRemoveMeasurePoint={tools.removeLastMeasurePoint}
+            onFinishMeasure={tools.finishMeasure}
             onFitDistrict={() => mapRef.current?.flyTo(district.center, district.zoom)}
             onMyLocation={handleLocateMe}
             onSnapshot={() => mapRef.current?.snapshot()}

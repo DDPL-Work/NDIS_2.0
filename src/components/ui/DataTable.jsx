@@ -4,6 +4,15 @@ import EmptyState from './EmptyState'
 import Pagination from './Pagination'
 import { Inbox } from 'lucide-react'
 
+// Responsive column strategy: columns may declare `hideOn: 'sm' | 'md' | 'lg'`
+// to drop low-priority columns below that breakpoint (Strategy B). The table
+// itself stays horizontally scrollable inside its wrapper.
+const HIDE_ON = {
+  sm: 'hidden sm:table-cell',
+  md: 'hidden md:table-cell',
+  lg: 'hidden lg:table-cell',
+}
+
 export default function DataTable({ columns, rows, onRowClick, emptyLabel = 'No records found', keyField = 'id', pageSize = 25 }) {
   const [page, setPage] = useState(1)
   const [size, setSize] = useState(pageSize)
@@ -20,7 +29,7 @@ export default function DataTable({ columns, rows, onRowClick, emptyLabel = 'No 
           <thead>
             <tr className="border-b border-ink-100">
               {columns.map((col) => (
-                <th key={col.key} className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-ink-400 whitespace-nowrap">
+                <th key={col.key} className={clsx('px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-ink-400 whitespace-nowrap', col.hideOn && HIDE_ON[col.hideOn])}>
                   {col.label}
                 </th>
               ))}
@@ -34,7 +43,7 @@ export default function DataTable({ columns, rows, onRowClick, emptyLabel = 'No 
                 className={clsx('border-b border-ink-50 last:border-0', onRowClick && 'cursor-pointer hover:bg-ink-50')}
               >
                 {columns.map((col) => (
-                  <td key={col.key} className="px-4 py-3 text-[13px] text-ink-700 align-middle">
+                  <td key={col.key} className={clsx('px-4 py-3 text-[13px] text-ink-700 align-middle', col.hideOn && HIDE_ON[col.hideOn])}>
                     {col.render ? col.render(row) : row[col.key]}
                   </td>
                 ))}

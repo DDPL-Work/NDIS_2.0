@@ -1,14 +1,25 @@
+import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 import Toaster from '../ui/Toaster'
 
 export default function AppShell({ navItems, sections, portalLabel, portalIcon, accentClassName, title, subtitle, showDistrict, showDepartment }) {
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+
   return (
-    <div className="flex h-screen w-full bg-ink-50 overflow-hidden">
-      <Sidebar items={navItems} sections={sections} portalLabel={portalLabel} portalIcon={portalIcon} accentClassName={accentClassName} />
+    <div className="flex h-screen w-full bg-ink-50 overflow-hidden" style={{ height: '100dvh' }}>
+      <Sidebar
+        items={navItems}
+        sections={sections}
+        portalLabel={portalLabel}
+        portalIcon={portalIcon}
+        accentClassName={accentClassName}
+        open={mobileNavOpen}
+        onClose={() => setMobileNavOpen(false)}
+      />
       <div className="flex flex-1 flex-col min-w-0">
-        <Topbar title={title} subtitle={subtitle} showDistrict={showDistrict} showDepartment={showDepartment} />
+        <Topbar title={title} subtitle={subtitle} showDistrict={showDistrict} showDepartment={showDepartment} onMenuClick={() => setMobileNavOpen(true)} />
         <main className="flex-1 overflow-y-auto">
           <Outlet />
         </main>

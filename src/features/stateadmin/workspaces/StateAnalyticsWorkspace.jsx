@@ -176,7 +176,7 @@ function TrendsTab() {
         </CardBody>
       </Card>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { label: 'Total Sanctioned (FY)' , value: totals.sanctioned, tone: 'ink' },
           { label: 'Total Released (FY)', value: totals.released, tone: 'saffron' },
@@ -370,7 +370,7 @@ function PipelineTab() {
           ) : (
             <DataTable
               columns={[
-                { key: 'id', label: 'Project', render: (r) => <span className="font-mono text-[11.5px]">{r.id}</span> },
+                { key: 'id', label: 'Project', render: (r) => <span className="font-mono text-[11.5px]">{r.id}</span>, hideOn: 'sm' },
                 { key: 'name', label: 'Name' },
                 { key: 'status', label: 'Status', render: (r) => <Badge tone={PROJECT_STATUS_TONE[r.status]}>{PROJECT_STATUS_LABELS[r.status] || r.status}</Badge> },
                 { key: 'completionPct', label: 'Completion', render: (r) => (

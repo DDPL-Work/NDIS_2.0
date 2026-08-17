@@ -53,7 +53,7 @@ export default function PersonnelTab({ officers, fieldStaff }) {
           <Card>
             <CardHeader title="Field Staff Live GPS Tracking Map" subtitle="Current positions of survey teams, ASHA & engineers" icon={Navigation} />
             <CardBody className="!p-2">
-              <div className="h-72 rounded-xl overflow-hidden relative">
+              <div className="h-[clamp(200px,28vh,288px)] rounded-xl overflow-hidden relative">
                 <MapView
                   center={[85.4211, 25.0294]}
                   zoom={12}

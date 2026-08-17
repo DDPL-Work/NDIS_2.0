@@ -19,9 +19,12 @@ export default function WorkflowStepper({ currentState = 'draft', history = [] }
 
   return (
     <div className="w-full py-3">
-      <div className="flex items-center justify-between relative">
-        {/* Background Connecting Line */}
-        <div className="absolute left-4 right-4 top-3.5 h-0.5 bg-ink-100 -z-0" />
+      {/* Scrollable track: 8 stages never compress below ~300px; on narrow
+          screens the track scrolls and the current stage shows its label. */}
+      <div className="overflow-x-auto pb-0.5 -mx-1 px-1">
+        <div className="flex items-center justify-between relative min-w-[300px]">
+          {/* Background Connecting Line */}
+          <div className="absolute left-4 right-4 top-3.5 h-0.5 bg-ink-100 -z-0" />
 
         {LIFECYCLE_STAGES.map((stage, idx) => {
           const isDone = idx < currentIndex || currentState === 'closed' || currentState === 'completed'
@@ -50,9 +53,18 @@ export default function WorkflowStepper({ currentState = 'draft', history = [] }
               >
                 {stage.label}
               </span>
+              <span
+                className={clsx(
+                  'text-[10px] font-semibold mt-1 sm:hidden',
+                  isCurrent ? 'text-saffron-600' : isDone ? 'text-leaf-800' : 'text-ink-400'
+                )}
+              >
+                {isCurrent ? `Step ${idx + 1}/${LIFECYCLE_STAGES.length}` : ''}
+              </span>
             </div>
           )
         })}
+        </div>
       </div>
     </div>
   )

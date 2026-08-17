@@ -14,6 +14,13 @@ export default function CommandPalette({ open, onClose }) {
   const navigate = useNavigate()
 
   useEffect(() => {
+    if (!open) return
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = previous }
+  }, [open])
+
+  useEffect(() => {
     function handleKeyDown(e) {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
@@ -98,7 +105,7 @@ export default function CommandPalette({ open, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto p-4 sm:p-6 md:p-20 bg-ink-950/50 backdrop-blur-xs flex items-start justify-center animate-fade-in">
+    <div className="fixed inset-0 z-50 overflow-y-auto p-4 sm:p-6 md:p-20 bg-ink-950/50 backdrop-blur-sm flex items-start justify-center animate-fade-in">
       <div className="w-full max-w-xl bg-white rounded-2xl shadow-2xl overflow-hidden border border-ink-100 animate-slide-in-down">
         {/* Search Header Input */}
         <div className="p-4 border-b border-ink-100 flex items-center gap-3">

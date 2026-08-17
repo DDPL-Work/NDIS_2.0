@@ -93,8 +93,8 @@ function StateBudgetView() {
                   columns={[
                     { key: 'revisionNo', label: 'Revision' },
                     { key: 'delta', label: 'Delta', render: (r) => <span className={r.delta >= 0 ? 'text-leaf-600' : 'text-alert-600'}>{r.delta >= 0 ? '+' : ''}{formatAmount(r.delta)}</span> },
-                    { key: 'reason', label: 'Reason' },
-                    { key: 'goNumber', label: 'Government Order' },
+                    { key: 'reason', label: 'Reason', hideOn: 'sm' },
+                    { key: 'goNumber', label: 'Government Order', hideOn: 'md' },
                     { key: 'date', label: 'Date' },
                   ]}
                   rows={budget.revisions}

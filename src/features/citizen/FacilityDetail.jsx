@@ -179,7 +179,7 @@ function TelemetryCard({ departmentId, attributes }) {
         <Card className="border-ink-200 bg-ink-50/30">
           <CardHeader title="Asset Condition & Structural Rating" icon={Building2} />
           <CardBody>
-            <div className="grid grid-cols-3 gap-3 text-center">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
               <div className="card !p-2 bg-white">
                 <p className="text-[10.5px] uppercase tracking-wide text-ink-400">Condition Rating</p>
                 {attributes.condition_rating ? (
@@ -332,7 +332,7 @@ export default function FacilityDetail() {
             zoom={14}
             facilities={[facility]}
             selectedId={facility.id}
-            className="h-56 rounded-xl2 overflow-hidden card"
+            className="h-[clamp(160px,24vh,224px)] rounded-xl2 overflow-hidden card"
           />
           <Card>
             <CardBody className="flex items-center justify-between">

@@ -6,7 +6,7 @@
 // Rendered on the shared Leaflet MapView surface; layer toggles compose
 // district boundaries (vector), asset/project markers and a density heat map.
 import { useMemo, useState } from 'react'
-import { Boxes, MapPinned, Warehouse, Layers, Plus, Eye, Edit3, MapPin } from 'lucide-react'
+import { Boxes, MapPinned, Warehouse, Layers, Plus, Eye, Edit3, MapPin, ChevronDown } from 'lucide-react'
 import PageHeader from '../../../components/ui/PageHeader'
 import { Card, CardHeader, CardBody } from '../../../components/ui/Card'
 import DataTable from '../../../components/ui/DataTable'
@@ -187,20 +187,26 @@ function LayersView({ gis, center, zoom }) {
 
   return (
     <div className="mt-5 grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-4">
-      <Card>
-        <CardHeader title="Layer Controls" subtitle="Toggle state spatial layers" icon={Layers} />
-        <CardBody className="space-y-1.5">
-          {gis.layers.map((l) => (
-            <label key={l.id} className="flex cursor-pointer items-center justify-between rounded-lg border border-ink-100 px-3 py-2 hover:bg-ink-50">
-              <span className="text-[12.5px] font-medium text-ink-800">{l.label}</span>
-              <input type="checkbox" className="accent-ink-900" checked={l.visible} onChange={(e) => gis.setLayerVisible(l.id, e.target.checked)} />
-            </label>
-          ))}
-          <div className="mt-3 rounded-lg bg-ink-50 px-3 py-2 text-[11px] leading-relaxed text-ink-500">Boundary polygons are illustrative approximations for the layer explorer; authoritative BDMS boundaries load from the GIS server in production.</div>
-        </CardBody>
-      </Card>
+      {/* Mobile: collapsible <details> toggle so the map stays above the fold */}
+      <details className="card lg:hidden group">
+        <summary className="cursor-pointer list-none flex items-center justify-between gap-2 px-5 py-3.5">
+          <span className="flex items-center gap-2 text-[14px] font-semibold text-ink-950"><Layers size={15} className="text-ink-500" />Layer Controls</span>
+          <ChevronDown size={14} className="shrink-0 text-ink-400 transition-transform group-open:rotate-180" />
+        </summary>
+        <div className="px-5 pb-4">
+          <LayerControlList gis={gis} />
+        </div>
+      </details>
+      <div className="hidden lg:block">
+        <Card>
+          <CardHeader title="Layer Controls" subtitle="Toggle state spatial layers" icon={Layers} />
+          <CardBody className="space-y-1.5">
+            <LayerControlList gis={gis} />
+          </CardBody>
+        </Card>
+      </div>
       <div className="space-y-4">
-        <div className="relative h-[520px] overflow-hidden rounded-xl border border-ink-100">
+        <div className="relative h-[clamp(320px,45vh,520px)] overflow-hidden rounded-xl border border-ink-100">
           <MapView
             className="h-full"
             center={center}
@@ -292,7 +298,7 @@ function AssetsView({ gis, master, assets, center, zoom }) {
         <Card className="lg:sticky lg:top-20">
           <CardHeader title="Asset Map" subtitle={`${assets.length} assets in scope`} icon={MapPin} />
           <CardBody>
-            <div className="relative h-[560px] overflow-hidden rounded-lg border border-ink-100">
+            <div className="relative h-[clamp(360px,48vh,560px)] overflow-hidden rounded-lg border border-ink-100">
               <MapView
                 className="h-full"
                 center={center}
@@ -312,10 +318,10 @@ function AssetsView({ gis, master, assets, center, zoom }) {
             ) : (
               <DataTable
                 columns={[
-                  { key: 'id', label: 'Asset ID', render: (r) => <span className="font-mono text-[11px]">{r.id}</span> },
+                  { key: 'id', label: 'Asset ID', render: (r) => <span className="font-mono text-[11px]">{r.id}</span>, hideOn: 'sm' },
                   { key: 'name', label: 'Name', render: (r) => <span className="text-[12.5px] font-medium">{r.name}</span> },
                   { key: 'category', label: 'Category', render: (r) => <Badge tone="neutral">{catLabel(r.category)}</Badge> },
-                  { key: 'districtId', label: 'District', render: (r) => <span className="text-[12px]">{districtName(r.districtId)}</span> },
+                  { key: 'districtId', label: 'District', render: (r) => <span className="text-[12px]">{districtName(r.districtId)}</span>, hideOn: 'md' },
                   { key: 'valueCr', label: 'Value', render: (r) => `₹${r.valueCr || 0} Cr` },
                   { key: 'condition', label: 'Condition', render: (r) => <Badge tone={CONDITION_TONE[r.condition] || 'neutral'}>{r.condition}</Badge> },
                   { key: 'status', label: 'Status', render: (r) => <Badge tone={ASSET_TONE[r.status] || 'neutral'}>{r.status}</Badge> },
@@ -383,6 +389,20 @@ function SelectFieldLite({ label, value, onChange, options }) {
       <select value={value} onChange={(e) => onChange(e.target.value)} className="input-field w-full px-3 py-2 text-[13px]">
         {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
+    </div>
+  )
+}
+
+function LayerControlList({ gis }) {
+  return (
+    <div className="space-y-1.5">
+      {gis.layers.map((l) => (
+        <label key={l.id} className="flex cursor-pointer items-center justify-between rounded-lg border border-ink-100 px-3 py-2 hover:bg-ink-50">
+          <span className="text-[12.5px] font-medium text-ink-800">{l.label}</span>
+          <input type="checkbox" className="accent-ink-900" checked={l.visible} onChange={(e) => gis.setLayerVisible(l.id, e.target.checked)} />
+        </label>
+      ))}
+      <div className="mt-3 rounded-lg bg-ink-50 px-3 py-2 text-[11px] leading-relaxed text-ink-500">Boundary polygons are illustrative approximations for the layer explorer; authoritative BDMS boundaries load from the GIS server in production.</div>
     </div>
   )
 }

@@ -49,8 +49,8 @@ export default function GrievanceOversight() {
     { key: 'id', label: 'Tracking Code', render: (r) => <span className="kbd-mono text-[12px]">{r.trackingCode}</span> },
     { key: 'title', label: 'Issue', render: (r) => <span className="font-medium text-ink-900">{r.title}</span> },
     { key: 'dept', label: 'Department', render: (r) => r.departmentName || DEPARTMENT_MAP[r.departmentId]?.label || '—' },
-    { key: 'village', label: 'Location' },
-    { key: 'submittedAt', label: 'Submitted', render: (r) => formatDate(r.submittedAt) },
+    { key: 'village', label: 'Location', hideOn: 'md' },
+    { key: 'submittedAt', label: 'Submitted', render: (r) => formatDate(r.submittedAt), hideOn: 'sm' },
     { key: 'sla', label: 'SLA', render: (r) => {
       const d = daysUntil(r.slaDueAt)
       return <span className={d < 0 ? 'text-alert-600 font-semibold' : 'text-ink-600'}>{d < 0 ? `${Math.abs(d)}d overdue` : `${d}d left`}</span>

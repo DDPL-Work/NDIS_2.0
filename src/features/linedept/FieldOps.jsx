@@ -96,8 +96,8 @@ export default function FieldOps() {
   const columns = [
     { key: 'trackingCode', label: 'Tracking Code', render: (r) => <span className="kbd-mono text-[12px]">{r.trackingCode}</span> },
     { key: 'title', label: 'Issue', render: (r) => <span className="font-medium text-ink-900">{r.title}</span> },
-    { key: 'village', label: 'Location' },
-    { key: 'submittedAt', label: 'Submitted', render: (r) => formatDate(r.submittedAt) },
+    { key: 'village', label: 'Location', hideOn: 'md' },
+    { key: 'submittedAt', label: 'Submitted', render: (r) => formatDate(r.submittedAt), hideOn: 'sm' },
     {
       key: 'sla',
       label: 'SLA',

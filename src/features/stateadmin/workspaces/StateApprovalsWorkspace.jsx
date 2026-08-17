@@ -163,12 +163,12 @@ function PendingView() {
             <DataTable
               columns={[
                 { key: 'kind', label: 'Type', render: (r) => <Badge tone={r.kind === 'proposal' ? 'positive' : r.kind === 'release' ? 'saffron' : r.kind === 'reappropriation' ? 'warning' : 'info'}>{KIND_LABEL[r.kind]}</Badge> },
-                { key: 'ref', label: 'Reference', render: (r) => <span className="font-mono text-[12px]">{r.ref}</span> },
+                { key: 'ref', label: 'Reference', render: (r) => <span className="font-mono text-[12px]">{r.ref}</span>, hideOn: 'md' },
                 { key: 'departmentId', label: 'Department', render: (r) => deptName(r.departmentId) },
-                { key: 'schemeId', label: 'Scheme', render: (r) => <span className="text-[12.5px]">{schemeName(r.schemeId)}</span> },
+                { key: 'schemeId', label: 'Scheme', render: (r) => <span className="text-[12.5px]">{schemeName(r.schemeId)}</span>, hideOn: 'md' },
                 { key: 'amount', label: 'Amount', render: (r) => <span className="font-medium text-ink-900">{formatAmount(r.amount)}</span> },
                 { key: 'status', label: 'Stage', render: (r) => <Badge tone="neutral">{r.status === 'drafted' ? 'drafted' : r.status}</Badge> },
-                { key: 'createdAt', label: 'Raised', render: (r) => formatDateOnly(r.createdAt) },
+                { key: 'createdAt', label: 'Raised', render: (r) => formatDateOnly(r.createdAt), hideOn: 'sm' },
                 { key: '_', label: '', render: (r) => <Button size="sm" icon={ShieldCheck} onClick={() => setActFor(r)}>Act</Button> },
               ]}
               rows={rows}

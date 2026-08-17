@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
-import { Bell, LogOut, ChevronDown, Globe, HelpCircle, MapPin, Search } from 'lucide-react'
+import { Menu, Bell, LogOut, ChevronDown, Globe, HelpCircle, MapPin, Search } from 'lucide-react'
 import Select from '../ui/Select'
 import Badge from '../ui/Badge'
 import NotificationDrawer from '../ui/NotificationDrawer'
@@ -40,7 +40,7 @@ function UserMenu() {
         <ChevronDown size={13} className="text-ink-400" />
       </button>
       {open && (
-        <div className="absolute right-0 mt-2 w-56 card p-1.5 z-30 animate-fade-in">
+        <div className="absolute right-0 mt-2 w-56 max-h-[80vh] overflow-y-auto card p-1.5 z-30 animate-fade-in">
           <div className="px-2.5 py-2">
             <p className="text-[13px] font-semibold text-ink-900">{user?.name}</p>
             <p className="text-[11.5px] text-ink-500">{user?.designation || ROLE_LABELS[user?.role]}</p>
@@ -62,7 +62,7 @@ function UserMenu() {
   )
 }
 
-export default function Topbar({ title, subtitle, showDistrict = true, showDepartment = false }) {
+export default function Topbar({ title, subtitle, showDistrict = true, showDepartment = false, onMenuClick }) {
   const user = useAuthStore((s) => s.user)
   const setDistrict = useAuthStore((s) => s.setDistrict)
   const setDepartment = useAuthStore((s) => s.setDepartment)
@@ -96,15 +96,22 @@ export default function Topbar({ title, subtitle, showDistrict = true, showDepar
 
   return (
     <>
-      <header className="h-14 border-b border-ink-100 bg-white/90 backdrop-blur flex items-center justify-between px-5 shrink-0 z-20">
-        <div className="min-w-0 flex items-center gap-3">
-          <div>
+      <header className="h-14 border-b border-ink-100 bg-white/90 backdrop-blur flex items-center justify-between px-3 sm:px-5 shrink-0 z-20">
+        <div className="min-w-0 flex items-center gap-2 sm:gap-3">
+          <button
+            onClick={onMenuClick}
+            className="lg:hidden grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink-600 hover:bg-ink-100 transition-colors"
+            aria-label="Open navigation menu"
+          >
+            <Menu size={18} />
+          </button>
+          <div className="min-w-0">
             <h1 className="text-[15px] font-semibold text-ink-950 truncate">{title}</h1>
             {subtitle && <p className="text-[11.5px] text-ink-500 -mt-0.5 truncate">{subtitle}</p>}
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0 min-w-0">
           {/* Cmd+K Quick Search Trigger Button */}
           <button
             onClick={() => setCmdOpen(true)}
@@ -115,11 +122,24 @@ export default function Topbar({ title, subtitle, showDistrict = true, showDepar
             <kbd className="font-mono text-[10px] text-ink-400 bg-white px-1.5 py-0.5 rounded border border-ink-200">⌘K</kbd>
           </button>
 
-          {showDepartment && (canSwitchDepartment ? (
-            <Select small value={user?.departmentId} onChange={setDepartment} options={DEPARTMENTS.map((d) => ({ value: d.id, label: d.label }))} />
-          ) : (
-            <Badge tone="info">{currentDepartment?.label || 'Department workspace'}</Badge>
-          ))}
+          {/* Mobile-only search trigger so the palette stays reachable on phones */}
+          <button
+            onClick={() => setCmdOpen(true)}
+            className="sm:hidden grid h-9 w-9 place-items-center rounded-lg text-ink-500 hover:bg-ink-100 transition-colors"
+            aria-label="Search NDISP"
+          >
+            <Search size={17} />
+          </button>
+
+          {showDepartment && (
+            <div className="hidden sm:flex items-center max-w-[180px] min-w-0">
+              {canSwitchDepartment ? (
+                <Select small value={user?.departmentId} onChange={setDepartment} options={DEPARTMENTS.map((d) => ({ value: d.id, label: d.label }))} />
+              ) : (
+                <Badge tone="info">{currentDepartment?.label || 'Department workspace'}</Badge>
+              )}
+            </div>
+          )}
 
           {showDistrict && (
             <div className="hidden md:flex items-center gap-1.5 pl-1">
@@ -135,10 +155,11 @@ export default function Topbar({ title, subtitle, showDistrict = true, showDepar
 
           <button
             onClick={() => setLocale(locale === 'en' ? 'hi' : 'en')}
-            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-medium text-ink-600 hover:bg-ink-100"
+            className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[12px] font-medium text-ink-600 hover:bg-ink-100"
             title="Toggle language"
           >
-            <Globe size={14} /> {locale === 'en' ? 'EN' : 'हि'}
+            <Globe size={14} />
+            <span className="hidden sm:inline">{locale === 'en' ? 'EN' : 'हि'}</span>
           </button>
 
           {/* Citizen-only guided tour replay ("Take a Tour") */}

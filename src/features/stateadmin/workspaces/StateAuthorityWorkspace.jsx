@@ -123,11 +123,11 @@ function AuthorityMatrix() {
                 { key: 'authorityId', label: 'Authority', render: (r) => <span className="font-mono text-[11.5px]">{r.authorityId}</span> },
                 { key: 'title', label: 'Title / Role', render: (r) => <span className="text-[12.5px] font-medium">{r.title}</span> },
                 { key: 'authorityType', label: 'Type', render: (r) => <Badge tone={r.authorityType === 'finance' ? 'positive' : 'neutral'}>{r.authorityType}</Badge> },
-                { key: 'departmentId', label: 'Scope', render: (r) => <span className="text-[12px]">{deptName(r.departmentId)}</span> },
+                { key: 'departmentId', label: 'Scope', render: (r) => <span className="text-[12px]">{deptName(r.departmentId)}</span>, hideOn: 'md' },
                 { key: 'sanctionLimit', label: 'Sanction', render: (r) => fmtCr(r.sanctionLimit) },
                 { key: 'releaseLimit', label: 'Release', render: (r) => fmtCr(r.releaseLimit) },
                 { key: 'reappropriationLimit', label: 'Re-App', render: (r) => fmtCr(r.reappropriationLimit) },
-                { key: 'escalationAuthority', label: 'Escalates To', render: (r) => <span className="text-[12px]">{r.escalationAuthority || '—'}</span> },
+                { key: 'escalationAuthority', label: 'Escalates To', render: (r) => <span className="text-[12px]">{r.escalationAuthority || '—'}</span>, hideOn: 'md' },
                 { key: 'status', label: 'Status', render: (r) => <Badge tone={r.status === 'active' ? 'positive' : 'warning'}>{r.status}</Badge> },
                 { key: '_', label: '', render: (r) => canManage && (
                   <span className="flex items-center gap-1.5">

@@ -49,7 +49,7 @@ export default function LineDeptOverview() {
         }
       />
 
-      <div className="px-6 grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+      <div className="px-6 grid grid-cols-2 sm:grid-cols-4 gap-3.5">
         {loadingKpi ? (
           Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
         ) : (
@@ -102,6 +102,8 @@ export default function LineDeptOverview() {
                     measureDistKm={tools.measureDistKm}
                     measurePoints={tools.measurePoints}
                     onClearMeasure={tools.clearMeasure}
+                    onRemoveMeasurePoint={tools.removeLastMeasurePoint}
+                    onFinishMeasure={tools.finishMeasure}
                     onFitDistrict={() => mapRef.current?.flyTo(district.center, district.zoom)}
                     onMyLocation={() => mapRef.current?.locateUser()}
                     onSnapshot={() => mapRef.current?.snapshot()}

@@ -40,7 +40,7 @@ export default function AdminDashboard() {
         description="Cross-department deficit view, approval pipeline health and AI-generated recommendations, in one place."
       />
 
-      <div className="px-6 grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+      <div className="px-6 grid grid-cols-2 sm:grid-cols-4 gap-3.5">
         {(loadingSummary || loadingCoverage)
           ? Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
           : (

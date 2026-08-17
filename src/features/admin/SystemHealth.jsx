@@ -26,7 +26,7 @@ export default function SystemHealth() {
         }
       />
 
-      <div className="px-6 grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+      <div className="px-6 grid grid-cols-2 sm:grid-cols-4 gap-3.5">
         <StatCard
           label="Overall Platform Uptime"
           value={`${health?.overallUptime ?? 99.9}%`}

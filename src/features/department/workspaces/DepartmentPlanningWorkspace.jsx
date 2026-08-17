@@ -262,11 +262,11 @@ function DprWizard({ proposalId: initialId, prefill = {}, onCreated, onDone }) {
       <div className="flex flex-wrap gap-1">{STEPS.map((name, index) => <span key={name} className={`rounded-full px-2 py-1 text-[10px] ${index === step ? 'bg-sky-600 text-white' : completedSteps[index] ? 'bg-leaf-100 text-leaf-800' : 'bg-ink-100 text-ink-400'}`}>{index + 1}. {name}</span>)}</div>
       {actionError && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{actionError.message}</div>}
       {page}
-      <div className="flex justify-between border-t border-ink-100 pt-4">
+      <div className="flex flex-wrap justify-between gap-2 border-t border-ink-100 pt-4">
         <Button variant="ghost" icon={ArrowLeft} disabled={!step || saving || submitting} onClick={() => setStep(step - 1)}>Back</Button>
         {isLast
           ? <Button variant="positive" icon={Send} disabled={saving || submitting} onClick={submit}>{submitting ? 'Submitting…' : 'Submit for review'}</Button>
-          : <span className="flex gap-2">
+          : <span className="flex flex-wrap gap-2">
               <Button variant="outline" disabled={saving || submitting} onClick={() => saveStep(false)}>{saving ? 'Saving…' : (step === 0 && !proposalId ? 'Create draft' : 'Save step')}</Button>
               <Button icon={ArrowRight} disabled={saving || submitting} onClick={() => { if (step === 0 && !form.title.trim()) { pushToast('Proposal title is required.', 'error'); return } saveStep(true) }}>{saving ? 'Saving…' : primaryLabel}</Button>
             </span>}

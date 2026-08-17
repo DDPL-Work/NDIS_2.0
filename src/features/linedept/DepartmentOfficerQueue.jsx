@@ -81,9 +81,9 @@ export default function DepartmentOfficerQueue() {
   }, [deptComplaints])
 
   const columns = [
-    { key: 'id', label: 'Ticket ID', render: (r) => <span className="kbd-mono text-[12px] font-bold text-ink-900">{r.id}</span> },
+    { key: 'id', label: 'Ticket ID', render: (r) => <span className="kbd-mono text-[12px] font-bold text-ink-900">{r.id}</span>, hideOn: 'sm' },
     { key: 'title', label: 'Complaint Title', render: (r) => <span className="font-semibold text-ink-900">{r.title}</span> },
-    { key: 'village', label: 'Location', render: (r) => `${r.location.village}, ${r.location.ward}` },
+    { key: 'village', label: 'Location', render: (r) => `${r.location.village}, ${r.location.ward}`, hideOn: 'md' },
     { key: 'priority', label: 'Priority', render: (r) => <Badge tone={r.priority === 'urgent' || r.priority === 'high' ? 'warning' : 'info'}>{r.priority.toUpperCase()}</Badge> },
     { key: 'sla', label: 'SLA Due', render: (r) => <span className="font-mono text-[11.5px]">{r.slaDueAt ? formatDateTime(r.slaDueAt) : '—'}</span> },
     { key: 'state', label: 'Status', render: (r) => <StatusBadge status={r.state} /> },
@@ -241,7 +241,7 @@ export default function DepartmentOfficerQueue() {
 
         {/* View Mode 2: GIS Map */}
         {viewMode === 'gis' && (
-          <div className="h-[480px] rounded-2xl overflow-hidden card relative">
+          <div className="h-[clamp(300px,42vh,480px)] rounded-2xl overflow-hidden card relative">
             <MapView
               center={[85.4434, 25.1372]}
               zoom={11}

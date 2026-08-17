@@ -8,12 +8,29 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
-import { MAP_TOOLS, attributionFor } from '../../hooks/useMapTools'
+import { MAP_TOOLS, attributionFor, measurePathKm } from '../../hooks/useMapTools'
 import { createFacilityMarkers, createCatalogLayer, createSearchResultMarkers } from '../../services/LeafletLayerService'
 import { ensureLeafletPlugins } from '../../services/leafletPlugins'
+import { distanceMeters } from '../../utils/geo'
 
 const DEFAULT_TILES = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
 const toLatLng = (position) => [position[1], position[0]]
+
+const MEASURE_COLOR = '#8a4fc0'
+
+// Google-Maps-style distance pill label.
+function measureLabelHtml(text) {
+  return `<span style="background:#ffffff;border:1px solid ${MEASURE_COLOR};color:${MEASURE_COLOR};border-radius:999px;padding:1px 6px;font-size:11px;font-weight:600;font-family:Inter,sans-serif;white-space:nowrap;box-shadow:0 1px 2px rgba(16,24,40,0.15);">${text}</span>`
+}
+
+// Meters for sub-kilometre paths, one decimal km below 10, whole km above —
+// the same formatting Google Maps uses for the measure label.
+function formatMeasure(km) {
+  if (km == null || !Number.isFinite(km)) return null
+  if (km < 1) return `${Math.max(1, Math.round(km * 1000))} m`
+  if (km < 10) return `${km.toFixed(1)} km`
+  return `${Math.round(km)} km`
+}
 
 const MapView = forwardRef(function MapView({
   center = [85.4434, 25.1372],
@@ -50,7 +67,7 @@ const MapView = forwardRef(function MapView({
   const facilitiesLayerRef = useRef(null)  // layerGroup | markerClusterGroup
   const selectedRingRef = useRef(null)
   const radiusRef = useRef(null)
-  const measureRef = useRef({ line: null, dots: null, label: null })
+  const measureRef = useRef({ line: null, dots: null, label: null, hoverLine: null, hoverLabel: null })
   const heatRef = useRef(null)
   const vectorLayerRef = useRef(null)
   const locMarkerRef = useRef(null)
@@ -188,11 +205,17 @@ const MapView = forwardRef(function MapView({
     tileLayerRef.current = L.tileLayer(next, { maxZoom: 19, attribution: attributionFor(next) }).addTo(map)
   }, [basemapUrl])
 
-  // Cursor changes by tool
+  // Cursor changes by tool; double-click zoom is disabled while measuring so
+  // a double-click finishes the measurement (Google Maps behaviour) instead of
+  // zooming the map.
   useEffect(() => {
     const container = mapRef.current?.getContainer()
     if (!container) return
     container.style.cursor = activeTool !== MAP_TOOLS.NONE ? 'crosshair' : ''
+    const map = mapRef.current
+    if (!map) return
+    if (activeTool === MAP_TOOLS.MEASURE) map.doubleClickZoom.disable()
+    else map.doubleClickZoom.enable()
   }, [activeTool])
 
   // Tool clicks must work over GeoJSON boundaries as well as bare tiles.
@@ -377,7 +400,9 @@ const MapView = forwardRef(function MapView({
     }
   }, [radiusCenter, radiusKm, ready])
 
-  // Measure overlay
+  // Measure overlay — multi-point Google-Maps-style path: dashed polyline
+  // through every vertex, a dot per vertex, and a distance pill above the last
+  // vertex once the path is complete.
   useEffect(() => {
     const map = mapRef.current
     if (!map || !ready) return
@@ -385,24 +410,80 @@ const MapView = forwardRef(function MapView({
     if (line) map.removeLayer(line)
     if (dots) map.removeLayer(dots)
     if (label) map.removeLayer(label)
-    measureRef.current = { line: null, dots: null, label: null }
+    measureRef.current.line = null
+    measureRef.current.dots = null
+    measureRef.current.label = null
+
+    if (measurePoints.length >= 1) {
+      const dotsLayer = L.layerGroup(measurePoints.map((point) => L.circleMarker(toLatLng(point), {
+        radius: 5, color: MEASURE_COLOR, weight: 2, fillColor: MEASURE_COLOR, fillOpacity: 1,
+      })))
+      map.addLayer(dotsLayer)
+      measureRef.current.dots = dotsLayer
+    }
     if (measurePoints.length >= 2) {
-      measureRef.current.line = L.polyline(measurePoints.map(toLatLng), { color: '#8a4fc0', weight: 2, dashArray: '4 2' }).addTo(map)
-      measureRef.current.dots = L.layerGroup(measurePoints.map((point) => L.circleMarker(toLatLng(point), {
-        radius: 5, color: '#8a4fc0', weight: 2, fillColor: '#8a4fc0', fillOpacity: 1,
-      }))).addTo(map)
+      measureRef.current.line = L.polyline(measurePoints.map(toLatLng), {
+        color: MEASURE_COLOR, weight: 2, dashArray: '4 2',
+      }).addTo(map)
       if (measureDistKm !== null) {
-        const mid = [(measurePoints[0][0] + measurePoints[1][0]) / 2, (measurePoints[0][1] + measurePoints[1][1]) / 2]
-        measureRef.current.label = L.marker(toLatLng(mid), {
+        const last = toLatLng(measurePoints[measurePoints.length - 1])
+        const iconSize = [58, 20]
+        measureRef.current.label = L.marker(last, {
           icon: L.divIcon({
             className: '',
-            html: `<span style="background:#ffffff;border:1px solid #8a4fc0;color:#8a4fc0;border-radius:999px;padding:1px 6px;font-size:11px;font-weight:600;font-family:Inter,sans-serif;">${measureDistKm} km</span>`,
-            iconSize: [46, 20], iconAnchor: [23, 26],
+            html: measureLabelHtml(formatMeasure(measureDistKm)),
+            iconSize,
+            // pill sits just above the last vertex
+            iconAnchor: [iconSize[0] / 2, iconSize[1] + 6],
           }),
+          interactive: false,
+          keyboard: false,
         }).addTo(map)
       }
     }
   }, [measurePoints, measureDistKm, ready])
+
+  // Rubber-band preview: while the measure tool is active with at least one
+  // vertex, a dashed segment follows the cursor from the last vertex and the
+  // running total distance rides along in a pill — exactly like Google Maps.
+  // Layers are mutated in place (no React state) so mousemove stays cheap.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !ready || activeTool !== MAP_TOOLS.MEASURE) return
+
+    const onMove = (event) => {
+      const points = measurePoints
+      if (!points.length) return
+      const last = toLatLng(points[points.length - 1])
+      const latlng = event.latlng
+      const doneKm = measureDistKm ?? 0
+      const runningKm = doneKm + distanceMeters(points[points.length - 1], [latlng.lng, latlng.lat]) / 1000
+      const { hoverLine, hoverLabel } = measureRef.current
+      if (!hoverLine) {
+        measureRef.current.hoverLine = L.polyline([last, [latlng.lat, latlng.lng]], {
+          color: MEASURE_COLOR, weight: 2, dashArray: '4 2', opacity: 0.85, interactive: false,
+        }).addTo(map)
+        measureRef.current.hoverLabel = L.marker([latlng.lat, latlng.lng], {
+          icon: L.divIcon({ className: '', html: measureLabelHtml(formatMeasure(runningKm)) }),
+          interactive: false,
+          keyboard: false,
+        }).addTo(map)
+      } else {
+        hoverLine.setLatLngs([last, [latlng.lat, latlng.lng]])
+        hoverLabel.setLatLng([latlng.lat, latlng.lng])
+        hoverLabel.setIcon(L.divIcon({ className: '', html: measureLabelHtml(formatMeasure(runningKm)) }))
+      }
+    }
+
+    map.on('mousemove', onMove)
+    return () => {
+      map.off('mousemove', onMove)
+      // A finished/deactivated measurement must not leave the preview behind.
+      const { hoverLine, hoverLabel } = measureRef.current
+      if (hoverLine) { map.removeLayer(hoverLine); measureRef.current.hoverLine = null }
+      if (hoverLabel) { map.removeLayer(hoverLabel); measureRef.current.hoverLabel = null }
+    }
+  }, [activeTool, measurePoints, measureDistKm, ready])
 
   // Heat/hotspot overlay
   useEffect(() => {

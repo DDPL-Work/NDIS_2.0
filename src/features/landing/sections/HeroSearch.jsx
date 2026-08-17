@@ -1,11 +1,12 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Loader2, MapPin, Navigation, Search } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { ArrowRight, Loader2, MapPin, Navigation, Search, TrendingUp } from 'lucide-react'
 import { spatialQueryService } from '../../../services/spatialQueryService'
+import LandingCta from '../LandingCta'
 
 // QUERY_CHIPS run the same public backend spatial-query the Explore Map uses
-// (authenticated: false, 5-minute client cache). Navigation chips link to the
-// existing citizen routes — no second search engine, no invented data.
+// (authenticated: false, 5-minute client cache). Navigation items link through
+// LandingCta, which serves signed-in users the real citizen route and
+// anonymous visitors an in-page section or the login page.
 const QUERY_CHIPS = [
   { label: 'Nearest Hospital', query: 'Nearest hospital' },
   { label: 'Nearest School', query: 'Nearest school' },
@@ -20,13 +21,31 @@ const NAV_CHIPS = [
   { label: 'Government Schemes', to: '/citizen/schemes' },
 ]
 
-export default function HeroSearch() {
+const POPULAR = [
+  { label: 'Nearest Hospital', hint: 'Search health facilities', query: 'Nearest hospital' },
+  { label: 'Nearest School', hint: 'Search education facilities', query: 'Nearest school' },
+  { label: 'Register Complaint', hint: 'Create your account to report', to: '/citizen/register' },
+  { label: 'Track Complaint', hint: 'Follow your request', to: '/citizen/track' },
+  { label: 'Explore Facilities', hint: 'Open the district map', to: '/citizen/map' },
+]
+
+const PLACEHOLDERS = [
+  'Find the nearest hospital',
+  'Report a road problem',
+  'Find a school near you',
+  'Track my complaint',
+  'Find government services',
+]
+
+export default function HeroSearch({ externalQuery = null }) {
   const [query, setQuery] = useState('')
+  const [focused, setFocused] = useState(false)
+  const [phIndex, setPhIndex] = useState(0)
   const [busy, setBusy] = useState(false)
   const [results, setResults] = useState(null)
   const [error, setError] = useState(null)
 
-  async function runSearch(term) {
+  const runSearch = useCallback(async (term) => {
     const q = String(term || '').trim()
     if (!q) return
     setQuery(q)
@@ -41,10 +60,25 @@ export default function HeroSearch() {
     } finally {
       setBusy(false)
     }
-  }
+  }, [])
+
+  // Requests from elsewhere on the page (quick actions, scenarios, markers)
+  // funnel into the same public search — one engine, one cache.
+  useEffect(() => {
+    if (externalQuery) runSearch(externalQuery)
+  }, [externalQuery, runSearch])
+
+  // Slow placeholder rotation; pauses while the input is focused.
+  useEffect(() => {
+    if (focused) return
+    const timer = setInterval(() => setPhIndex((index) => (index + 1) % PLACEHOLDERS.length), 3800)
+    return () => clearInterval(timer)
+  }, [focused])
+
+  const placeholder = focused ? 'What can we help you find?' : PLACEHOLDERS[phIndex]
 
   return (
-    <div className="w-full">
+    <div className="relative w-full" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false) }}>
       <form
         className="relative"
         onSubmit={(event) => { event.preventDefault(); runSearch(query) }}
@@ -55,8 +89,9 @@ export default function HeroSearch() {
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="What do you need help with?"
-          aria-label="What do you need help with?"
+          onFocus={() => setFocused(true)}
+          placeholder={placeholder}
+          aria-label="What can we help you find?"
           className="w-full rounded-2xl border border-ink-200 bg-white py-4 pl-11 pr-28 text-[15px] text-ink-900 shadow-card outline-none placeholder:text-ink-400 focus:border-saffron-400 focus-visible:ring-2 focus-visible:ring-saffron-500/30"
         />
         <button
@@ -68,7 +103,44 @@ export default function HeroSearch() {
         </button>
       </form>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2" aria-label="Popular searches">
+      {focused && !query.trim() && (
+        <div className="absolute inset-x-0 top-full z-20 mt-2" aria-label="Popular searches">
+          <div className="rounded-2xl border border-ink-100 bg-white p-2 shadow-popover">
+            <p className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-400">
+              <TrendingUp size={12} />Popular searches
+            </p>
+            {POPULAR.map((item) => (
+              item.query ? (
+                <button
+                  key={item.label}
+                  onClick={() => { setFocused(false); runSearch(item.query) }}
+                  className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-saffron-50"
+                >
+                  <span>
+                    <span className="block text-[13px] font-semibold text-ink-900">{item.label}</span>
+                    <span className="block text-[11.5px] text-ink-400">{item.hint}</span>
+                  </span>
+                  <ArrowRight size={14} className="shrink-0 text-saffron-600" />
+                </button>
+              ) : (
+                <LandingCta
+                  key={item.label}
+                  to={item.to}
+                  className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-saffron-50"
+                >
+                  <span>
+                    <span className="block text-[13px] font-semibold text-ink-900">{item.label}</span>
+                    <span className="block text-[11.5px] text-ink-400">{item.hint}</span>
+                  </span>
+                  <ArrowRight size={14} className="shrink-0 text-saffron-600" />
+                </LandingCta>
+              )
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="mt-3 flex flex-wrap items-center gap-2" aria-label="Try these searches">
         <span className="text-[12px] font-medium text-ink-500">Try:</span>
         {QUERY_CHIPS.map((chip) => (
           <button
@@ -82,9 +154,9 @@ export default function HeroSearch() {
         ))}
         <span className="mx-1 hidden h-4 w-px bg-ink-200 sm:block" />
         {NAV_CHIPS.map((chip) => (
-          <Link key={chip.label} to={chip.to} className="rounded-full border border-ink-200 bg-white px-3 py-1.5 text-[12px] font-medium text-ink-700 transition-colors hover:border-leaf-400 hover:bg-leaf-50 hover:text-leaf-700">
+          <LandingCta key={chip.label} to={chip.to} className="rounded-full border border-ink-200 bg-white px-3 py-1.5 text-[12px] font-medium text-ink-700 transition-colors hover:border-leaf-400 hover:bg-leaf-50 hover:text-leaf-700">
             {chip.label}
-          </Link>
+          </LandingCta>
         ))}
       </div>
 
@@ -95,7 +167,7 @@ export default function HeroSearch() {
         <div className="mt-3 overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-popover">
           <div className="flex items-center justify-between border-b border-ink-100 px-4 py-2.5">
             <p className="text-[12.5px] font-semibold text-ink-800">Nearby results for “{results.queryInfo?.query || query}”</p>
-            <Link to="/citizen/map" className="flex items-center gap-1 rounded-lg px-2 py-1 text-[12px] font-semibold text-ink-600 transition-colors hover:bg-ink-50 hover:text-ink-900"><Navigation size={12} />Open Map</Link>
+            <LandingCta to="/citizen/map" className="flex items-center gap-1 rounded-lg px-2 py-1 text-[12px] font-semibold text-ink-600 transition-colors hover:bg-ink-50 hover:text-ink-900"><Navigation size={12} />Open Map</LandingCta>
           </div>
           {(results.results || []).length === 0 ? (
             <p className="px-4 py-4 text-[12.5px] text-ink-500">No matching places found nearby right now.</p>

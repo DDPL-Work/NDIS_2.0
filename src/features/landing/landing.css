@@ -60,6 +60,50 @@
 .ndisp-scroll-reveal.stagger-1 { transition-delay: 0.08s; }
 .ndisp-scroll-reveal.stagger-2 { transition-delay: 0.16s; }
 .ndisp-scroll-reveal.stagger-3 { transition-delay: 0.24s; }
+.ndisp-scroll-reveal.stagger-4 { transition-delay: 0.32s; }
+
+/* Interactive district visual */
+.ndisp-marker {
+  cursor: pointer;
+  transition: transform 0.25s ease-out;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+.ndisp-marker:hover,
+.ndisp-marker:focus-visible {
+  transform: scale(1.18);
+}
+.ndisp-marker:focus-visible {
+  outline: none;
+}
+.ndisp-marker:focus-visible .ndisp-marker-ring {
+  stroke: #e07a2c;
+  stroke-width: 2.4;
+}
+
+@keyframes ndisp-pop {
+  from { opacity: 0; transform: translate(-50%, calc(-100% - 10px)) scale(0.95); }
+  to { opacity: 1; transform: translate(-50%, calc(-100% - 14px)) scale(1); }
+}
+.ndisp-pop { animation: ndisp-pop 0.18s ease-out both; }
+
+/* Dashed vertical connector (HTML element) with flowing dash */
+@keyframes ndisp-line-flow {
+  to { background-position: 0 240px; }
+}
+.ndisp-line-dash {
+  background: repeating-linear-gradient(to bottom, rgba(100, 116, 139, 0.75) 0 5px, transparent 5px 9px);
+  animation: ndisp-line-flow 18s linear infinite;
+}
+
+/* Connected-node section: slow node pulses */
+@keyframes ndisp-node-pulse {
+  0% { transform: scale(0.85); opacity: 0.8; }
+  70%, 100% { transform: scale(1.9); opacity: 0; }
+}
+.ndisp-node-pulse {
+  animation: ndisp-node-pulse 4.2s ease-out infinite;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .ndisp-float,
@@ -67,11 +111,17 @@
   .ndisp-drift,
   .ndisp-pulse-ring,
   .ndisp-dash,
+  .ndisp-line-dash,
+  .ndisp-node-pulse,
   .ndisp-gradient-pan {
     animation: none !important;
   }
+  .ndisp-marker {
+    transition: none;
+  }
   .ndisp-reveal,
-  .ndisp-fade-in {
+  .ndisp-fade-in,
+  .ndisp-pop {
     animation-duration: 0.001ms !important;
   }
   .ndisp-scroll-reveal {

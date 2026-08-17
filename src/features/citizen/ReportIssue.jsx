@@ -464,7 +464,7 @@ export default function ReportIssue() {
                   Use GPS Location
                 </Button>
               </div>
-              <div className="h-64 rounded-xl overflow-hidden border border-ink-200 relative">
+              <div className="h-[clamp(192px,26vh,256px)] rounded-xl overflow-hidden border border-ink-200 relative">
                 <MapView
                   ref={mapRef}
                   center={selectedPos}

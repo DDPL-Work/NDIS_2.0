@@ -13,10 +13,10 @@ const SPOTLIGHT_PAD = 8
 
 const STEPS = [
   { id: 'welcome', title: 'Welcome to NDISP', text: 'The National District Information & Service Platform connects you with your district. Let us show you around.' },
-  { id: 'search', title: 'Search for Services', target: '[data-tour-target="hero-search"]', text: 'Try "Nearest hospital" or "Report a road problem" — results come from live district data.' },
-  { id: 'map', title: 'Explore Your District', target: '[data-tour-target="hero-map"]', text: 'Hospitals, schools, water points and more — everything in your district, mapped in one place.' },
+  { id: 'search', title: 'Find Services', target: '[data-tour-target="hero-search"]', text: 'Search for hospitals, schools and other services — results come from live district data.' },
+  { id: 'map', title: 'Search Facilities', target: '[data-tour-target="hero-map"]', text: 'Hospitals, schools, water points and more — everything in your district, mapped in one place.' },
   { id: 'complaint', title: 'Register a Complaint', target: '[data-tour-target="service-complaint"]', text: 'See something that needs attention? Tell the right department about it.' },
-  { id: 'track', title: 'Track Every Step', target: '[data-tour-target="complaint-section"]', text: 'From Submitted to Resolved, follow your request through every stage.' },
+  { id: 'track', title: 'Track Your Request', target: '[data-tour-target="complaint-section"]', text: 'From Submitted to Resolved, follow your request through every stage.' },
   { id: 'account', title: 'Create an Account', target: '[data-tour-target="create-account"]', text: 'Sign up to register complaints, track requests and stay informed. Public information stays open to everyone.' },
 ]
 
@@ -94,11 +94,12 @@ export default function PublicLandingTour({ open, onClose }) {
   const position = useMemo(() => {
     if (!targetRect) return null
     const width = Math.min(360, window.innerWidth - 24)
-    const height = 190
+    const height = 240
     const margin = 8
     const left = Math.max(margin, Math.min(window.innerWidth - width - margin, targetRect.left + targetRect.width / 2 - width / 2))
     const below = targetRect.bottom + 12 + height <= window.innerHeight - margin
-    return { left, top: below ? targetRect.bottom + 12 : Math.max(margin, targetRect.top - height - 12) }
+    const top = below ? targetRect.bottom + 12 : Math.max(margin, targetRect.top - height - 12)
+    return { left, top: Math.min(top, window.innerHeight - height - margin) }
   }, [targetRect])
 
   if (!open || !step) return null
@@ -114,7 +115,7 @@ export default function PublicLandingTour({ open, onClose }) {
       )}
 
       <div
-        className="ndisp-fade-in fixed rounded-xl2 border border-ink-200 bg-white p-5 shadow-popover"
+        className="ndisp-fade-in fixed rounded-xl border border-ink-200 bg-white p-5 shadow-popover"
         style={{ left: position?.left ?? 12, top: position?.top ?? Math.max(12, window.innerHeight / 2 - 95), width: Math.min(360, window.innerWidth - 24) }}
       >
         <div className="flex items-start justify-between gap-3">

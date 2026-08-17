@@ -19,7 +19,7 @@ function Row({ label, children }) {
 export default function FacilityInfoPanel({ facility, grievances = [], onClose, onOpenGrievance, department }) {
   if (!facility) return null
   return (
-    <div className="w-[360px] shrink-0 card overflow-y-auto animate-slide-in-right shadow-xl">
+    <div className="w-full max-w-[360px] shrink-0 card overflow-y-auto animate-slide-in-right shadow-xl">
       <div className="flex items-start justify-between p-4 border-b border-ink-100">
         <div className="min-w-0">
           <h3 className="text-[14px] font-semibold text-ink-950 leading-snug truncate">{facility.name}</h3>

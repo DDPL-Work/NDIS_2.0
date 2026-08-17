@@ -1,16 +1,17 @@
-import { Link } from 'react-router-dom'
-import { CheckCircle2, Circle, FileText, Search } from 'lucide-react'
+import { CheckCircle2, ClipboardCheck, FileText, Wrench } from 'lucide-react'
 import Button from '../../../components/ui/Button'
+import LandingCta from '../LandingCta'
+import { GRIEVANCE_STATE_LABELS } from '../../../config/constants'
 
-// Lifecycle uses the citizen-facing vocabulary of the real complaint state
-// machine (COMPLAINT_STATE_LABELS): Submitted → Assigned → In Progress →
-// Resolved. States shown here are the main path citizens see on their
-// complaint; the full workflow has more intermediate stages.
+// The journey uses the citizen-facing vocabulary of the real complaint state
+// machine (GRIEVANCE_STATE_LABELS): Submitted → Assigned to Department →
+// In Progress → Resolved. The four numbered steps are the simplified public
+// narrative; the "Status" chips carry the exact app vocabulary.
 const STAGES = [
-  { label: 'Submitted', text: 'Your report reaches the district.' },
-  { label: 'Assigned', text: 'The right department takes it up.' },
-  { label: 'In Progress', text: 'Work begins at the location.' },
-  { label: 'Resolved', text: 'Outcome is shared with you.' },
+  { n: '01', icon: FileText, state: 'submitted', title: 'Report', text: 'Tell us what’s wrong.' },
+  { n: '02', icon: ClipboardCheck, state: 'assigned', title: 'Review', text: 'The concerned team reviews your issue.' },
+  { n: '03', icon: Wrench, state: 'in_progress', title: 'Action', text: 'Your complaint reaches the responsible department.' },
+  { n: '04', icon: CheckCircle2, state: 'resolved', title: 'Resolution', text: 'Track the progress until resolution.' },
 ]
 
 export default function ComplaintSection() {
@@ -20,28 +21,34 @@ export default function ComplaintSection() {
         <div className="grid items-center gap-10 lg:grid-cols-2" data-tour-target="complaint-section">
           <div className="ndisp-scroll-reveal">
             <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-saffron-400">Citizen engagement</p>
-            <h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">See Something That Needs Attention?</h2>
+            <h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">Your Voice, Tracked Every Step</h2>
             <p className="mt-4 max-w-lg text-[14.5px] leading-relaxed text-ink-300">
-              Report civic issues to the concerned department and follow the progress from submission to resolution.
+              Report civic issues to the concerned department and follow every stage — from submission to resolution.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
-              <Link to="/citizen/register"><Button size="lg" variant="saffron" icon={FileText}>Register a Complaint</Button></Link>
-              <Link to="/citizen/track" className="inline-flex items-center gap-2 rounded-lg border border-ink-600 bg-transparent px-5 py-2.5 text-[15px] font-medium text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron-500/40"><Search size={16} />Track Complaint</Link>
+              <LandingCta to="/citizen/register"><Button size="lg" variant="saffron" icon={FileText}>Register a Complaint</Button></LandingCta>
+              <LandingCta to="/citizen/track"><Button size="lg" variant="outline">Track Complaint</Button></LandingCta>
             </div>
           </div>
 
           <ol className="ndisp-scroll-reveal stagger-1 relative space-y-0" aria-label="How a complaint is handled">
             {STAGES.map((stage, index) => {
-              const Icon = index === STAGES.length - 1 ? CheckCircle2 : Circle
+              const Icon = stage.icon
               return (
-                <li key={stage.label} className="relative flex items-center gap-4 pb-8 last:pb-0">
-                  {index < STAGES.length - 1 && <span className="absolute left-[15px] top-9 h-[calc(100%-28px)] w-px bg-ink-700" aria-hidden="true" />}
-                  <span className="relative z-10 grid h-8 w-8 shrink-0 place-items-center rounded-full border-2 border-ink-600 bg-ink-900 text-ink-300">
+                <li key={stage.n} className={`ndisp-scroll-reveal stagger-${index} relative flex items-center gap-4 pb-8 last:pb-0`}>
+                  {index < STAGES.length - 1 && <span className="ndisp-line-dash absolute left-[15px] top-9 h-[calc(100%-28px)] w-px" aria-hidden="true" />}
+                  <span className="relative z-10 grid h-8 w-8 shrink-0 place-items-center rounded-full border-2 border-ink-600 bg-ink-900">
                     <Icon size={14} className={index === STAGES.length - 1 ? 'text-leaf-400' : 'text-saffron-400'} />
                   </span>
-                  <span>
-                    <span className="block text-[14.5px] font-semibold text-white">{stage.label}</span>
-                    <span className="block text-[12.5px] text-ink-400">{stage.text}</span>
+                  <span className="min-w-0">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="font-display text-[11px] font-bold tracking-widest text-ink-500">{stage.n}</span>
+                      <span className="text-[14.5px] font-semibold text-white">{stage.title}</span>
+                      <span className="rounded-full border border-ink-600 bg-ink-900 px-2 py-0.5 text-[10.5px] font-medium text-ink-300">
+                        Status · {GRIEVANCE_STATE_LABELS[stage.state]}
+                      </span>
+                    </span>
+                    <span className="mt-0.5 block text-[12.5px] text-ink-400">{stage.text}</span>
                   </span>
                 </li>
               )

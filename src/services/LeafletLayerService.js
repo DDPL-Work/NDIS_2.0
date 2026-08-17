@@ -47,7 +47,7 @@ export function catalogPopupHtml(properties = {}) {
     })
     .join('')
   return `
-    <div style="font-family:Inter,sans-serif;min-width:180px;max-width:280px;">
+    <div style="font-family:Inter,sans-serif;min-width:180px;max-width:min(280px,calc(100vw - 40px));">
       <div style="font-weight:600;font-size:12.5px;color:#0b3558;padding:0 0 4px;border-bottom:1px solid #e4e8ed;margin-bottom:6px;">${escapeHtml(title)}</div>
       <table style="width:100%;border-collapse:collapse;font-size:11.5px;">
         ${rows || '<tr><td style="color:#7488a0;">No attributes</td></tr>'}
@@ -141,7 +141,7 @@ export function facilityPopupHtml(facility, { routeOriginKey = null, enabled = f
   const isOrigin = routeOriginKey != null && String(routeOriginKey) === `facility:${String(facility.id)}`
   const actionRow = enabled ? routeActionHtml({ isOrigin, includeDetails: true }) : ''
   return `
-    <div style="font-family:Inter,sans-serif;min-width:220px;max-width:240px;padding:2px 0;">
+    <div style="font-family:Inter,sans-serif;min-width:220px;max-width:min(240px,calc(100vw - 40px));padding:2px 0;">
       <div style="font-weight:600;font-size:12.5px;color:#0b3558;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(facility.name || '')}</div>
       <div style="font-size:11.5px;color:#546882;margin-top:3px;">
         ${escapeHtml(facility.departmentName || '—')} · ${escapeHtml(facility.categoryLabel || '')}
@@ -446,7 +446,7 @@ export function searchResultPopupHtml(facility) {
     ? '<span style="color:#1f7a54;font-weight:700;">Safe ✓</span>'
     : '<span style="color:#c0392b;font-weight:700;">Hazard ⚠</span>'
   return `
-    <div style="font-family:Inter,sans-serif;min-width:170px;max-width:240px;padding:2px 0;">
+    <div style="font-family:Inter,sans-serif;min-width:170px;max-width:min(240px,calc(100vw - 40px));padding:2px 0;">
       <div style="font-weight:600;font-size:12.5px;color:#0b3558;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(facility.name || 'Spatial result')}</div>
       <table style="width:100%;border-collapse:collapse;font-size:11px;margin-top:5px;">
         <tr><td style="color:#7488a0;padding:1px 0;">Category</td><td style="text-align:right;font-weight:600;color:#27364a;">${escapeHtml(category)}</td></tr>
@@ -481,7 +481,7 @@ export function createSearchResultMarkers(results, {
     marker.bindPopup(searchResultPopupHtml(facility), {
       closeButton: false,
       offset: [0, -8],
-      maxWidth: 300,
+      maxWidth: 260,
     })
     marker.on('popupopen', () => {
       const node = marker.getPopup()?.getElement()

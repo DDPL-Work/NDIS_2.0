@@ -11,7 +11,7 @@ const REASONS = [
 
 export default function WhyNdisSection() {
   return (
-    <section id="about" className="bg-white py-16 sm:py-20">
+    <section id="about" className="bg-ink-50/70 py-16 sm:py-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <div className="ndisp-scroll-reveal text-center">
           <p className="eyebrow">Why NDISP</p>

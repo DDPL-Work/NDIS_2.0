@@ -112,12 +112,12 @@ function ProjectRegistryView() {
           ) : (
             <DataTable
               columns={[
-                { key: 'id', label: 'Project ID', render: (r) => <span className="font-mono text-[12px]">{r.id}</span> },
+                { key: 'id', label: 'Project ID', render: (r) => <span className="font-mono text-[12px]">{r.id}</span>, hideOn: 'sm' },
                 { key: 'name', label: 'Project Name', render: (r) => <span className="font-medium text-ink-900">{r.name}</span> },
                 { key: 'departmentId', label: 'Department', render: (r) => deptName(r.departmentId) },
-                { key: 'districtId', label: 'District', render: (r) => districtName(r.districtId) },
-                { key: 'estimatedCost', label: 'Estimated Cost', render: (r) => formatAmount(r.estimatedCost) },
-                { key: 'sanctionedAmount', label: 'Sanctioned', render: (r) => formatAmount(r.sanctionedAmount) },
+                { key: 'districtId', label: 'District', render: (r) => districtName(r.districtId), hideOn: 'md' },
+                { key: 'estimatedCost', label: 'Estimated Cost', render: (r) => formatAmount(r.estimatedCost), hideOn: 'md' },
+                { key: 'sanctionedAmount', label: 'Sanctioned', render: (r) => formatAmount(r.sanctionedAmount), hideOn: 'lg' },
                 { key: 'releasedAmount', label: 'Released', render: (r) => <span className="text-saffron-700">{formatAmount(r.releasedAmount)}</span> },
                 { key: 'utilizedAmount', label: 'Utilized', render: (r) => <span className="text-leaf-700">{formatAmount(r.utilizedAmount)}</span> },
                 { key: 'completionPct', label: 'Completion', render: (r) => <Badge tone={r.completionPct >= 80 ? 'positive' : r.completionPct >= 40 ? 'warning' : 'negative'}>{r.completionPct}%</Badge> },
