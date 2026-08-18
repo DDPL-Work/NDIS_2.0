@@ -7,6 +7,7 @@ import { SkeletonCard } from '../../components/ui/Skeleton'
 import CitizenComplaintDetail from './CitizenComplaintDetail'
 import ComplaintStatusStepper, { complaintStateLabel } from './ComplaintStatusStepper'
 import { workflowApi } from '../../services/api'
+import { useMediaQuery } from '../../hooks/useMediaQuery'
 import { formatDateTime } from '../../utils/format'
 
 export default function TrackGrievance() {
@@ -16,6 +17,32 @@ export default function TrackGrievance() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [detailOpen, setDetailOpen] = useState(false)
+  const isMobile = useMediaQuery('(max-width: 767px)')
+
+  // Full-screen complaint sheet on mobile: lock page scroll, hide the bottom
+  // navigation, close on Escape, and let the Android back button close the
+  // sheet without breaking browser history (pushState marker + popstate).
+  useEffect(() => {
+    if (!detailOpen || !isMobile) return
+    document.body.classList.add('citizen-modal-open')
+    document.body.style.overflow = 'hidden'
+    const frame = requestAnimationFrame(() => {
+      document.getElementById('citizen-complaint-sheet')?.querySelector('button')?.focus()
+    })
+    const onKey = (e) => { if (e.key === 'Escape') setDetailOpen(false) }
+    document.addEventListener('keydown', onKey)
+    window.history.pushState({ citizenSheet: true }, '')
+    const onPop = () => setDetailOpen(false)
+    window.addEventListener('popstate', onPop)
+    return () => {
+      cancelAnimationFrame(frame)
+      document.body.classList.remove('citizen-modal-open')
+      document.body.style.overflow = ''
+      document.removeEventListener('keydown', onKey)
+      window.removeEventListener('popstate', onPop)
+      if (window.history.state?.citizenSheet) window.history.back()
+    }
+  }, [detailOpen, isMobile])
 
   async function search(term) {
     const trackingCode = String(term || code || '').trim()
@@ -116,9 +143,15 @@ export default function TrackGrievance() {
         </div>
       )}
 
-      <Modal open={detailOpen} onClose={() => setDetailOpen(false)} width="max-w-3xl">
-        {detailOpen && result && <CitizenComplaintDetail complaintId={result.id} onClose={() => setDetailOpen(false)} />}
-      </Modal>
+      {detailOpen && result && (
+        isMobile ? (
+          <CitizenComplaintDetail fullscreen complaintId={result.id} onClose={() => setDetailOpen(false)} />
+        ) : (
+          <Modal open={detailOpen} onClose={() => setDetailOpen(false)} width="max-w-3xl">
+            <CitizenComplaintDetail complaintId={result.id} onClose={() => setDetailOpen(false)} />
+          </Modal>
+        )
+      )}
     </div>
   )
 }

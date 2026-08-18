@@ -10,7 +10,7 @@ import { createPortal } from 'react-dom'
 // while the modal is open (form typing, select changes, validation, data
 // arrivals) must never re-run it — re-running would re-trigger the initial
 // focus write and steal focus from the active form control.
-export default function Modal({ open, onClose, title, children, footer, width = 'max-w-lg' }) {
+export default function Modal({ open, onClose, title, children, footer, width = 'max-w-lg', zIndex = 'z-50' }) {
   const panelRef = useRef(null)
   const closeBtnRef = useRef(null)
   const previouslyFocused = useRef(null)
@@ -53,7 +53,7 @@ export default function Modal({ open, onClose, title, children, footer, width = 
   if (!open) return null
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-3 sm:p-4">
+    <div className={`fixed inset-0 ${zIndex} flex items-end justify-center sm:items-center p-3 sm:p-4`}>
       <div className="absolute inset-0 bg-ink-950/40 animate-fade-in" onClick={onClose} />
       <div
         ref={panelRef}

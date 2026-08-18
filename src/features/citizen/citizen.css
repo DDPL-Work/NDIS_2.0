@@ -2,6 +2,14 @@
    Small, GPU-friendly, and every animation is disabled under
    prefers-reduced-motion (mirrors the landing-page approach). */
 
+/* Layout tokens — single source of truth for mobile chrome heights and
+   safe-area insets. All citizen mobile pages/sheets consume these. */
+:root {
+  --citizen-bottom-nav-height: 64px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
 /* Current-step pulse in the complaint status stepper */
 @keyframes ndisp-step-pulse {
   0% { box-shadow: 0 0 0 0 rgba(224, 122, 44, 0.35); }
@@ -67,7 +75,14 @@
 
 /* Mobile bottom navigation safe area */
 .ndisp-bottom-nav {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: var(--safe-bottom);
+}
+
+/* Full-screen complaint detail sheet owns the whole viewport: the bottom
+   navigation is hidden while it is open (explicit modal-open state set by
+   TrackGrievance on the <body>). */
+body.citizen-modal-open .ndisp-bottom-nav {
+  display: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

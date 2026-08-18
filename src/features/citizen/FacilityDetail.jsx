@@ -250,8 +250,8 @@ export default function FacilityDetail() {
             >
               <Icon name={dept.icon} size={18} />
             </div>
-            <div>
-              <h1 className="text-xl font-display font-semibold text-ink-950">{facility.name}</h1>
+            <div className="min-w-0">
+              <h1 className="break-words text-xl font-display font-semibold text-ink-950">{facility.name}</h1>
               <p className="text-[12.5px] text-ink-500">{facility.categoryLabel} · {dept.label}</p>
             </div>
           </div>

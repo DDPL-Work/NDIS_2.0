@@ -85,6 +85,7 @@ export default function CitizenHome() {
   // Sidebar state — desktop: open / rail / closed; mobile: drawer open/closed.
   const [desktopMode, setDesktopMode] = useState('open')
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [layersOpen, setLayersOpen] = useState(false)
   const isMobile = useMediaQuery('(max-width: 1023px)')
   const routing = useRoute()
   const routeActiveId = routing.routeActiveId
@@ -207,6 +208,14 @@ export default function CitizenHome() {
     window.history.replaceState({}, '', window.location.pathname)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [departmentsData])
+
+  // Escape closes the mobile GIS-layers bottom sheet.
+  useEffect(() => {
+    if (!layersOpen) return
+    const onKey = (e) => { if (e.key === 'Escape') setLayersOpen(false) }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [layersOpen])
 
   const referencePoint = userGps || district.center
 
@@ -527,9 +536,10 @@ export default function CitizenHome() {
           )}
         </div>
 
-        {/* Honest location-permission banner with retry */}
+        {/* Honest location-permission banner with retry. Sits below the
+            Leaflet zoom control (top-right) so the controls never overlap. */}
         {locationStatus === 'denied' && (
-          <div className="absolute top-6 right-6 z-[120] flex items-center gap-3 rounded-xl border border-alert-200 bg-white p-3 shadow-popover" role="alert">
+          <div className="absolute top-24 right-6 z-[120] flex items-center gap-3 rounded-xl border border-alert-200 bg-white p-3 shadow-popover" role="alert">
             <div className="min-w-0">
               <p className="text-[12px] font-semibold text-ink-900">Location access is off</p>
               <p className="text-[11px] text-ink-500">Enable location to sort facilities nearest to you.</p>
@@ -538,7 +548,24 @@ export default function CitizenHome() {
           </div>
         )}
 
-        <div className="absolute bottom-6 right-6 z-[120]" data-tour="citizen-map-tools">
+        <div className="absolute bottom-6 right-6 z-[120] flex flex-col items-end gap-2" data-tour="citizen-map-tools">
+          {/* Mobile: dedicated GIS-layers pill opening the bottom sheet.
+              Map stays the primary surface; the drawer is only for search. */}
+          {isMobile && !mobileOpen && (
+            <button
+              type="button"
+              onClick={() => setLayersOpen(true)}
+              aria-label="Open GIS layers"
+              aria-expanded={layersOpen}
+              className="flex h-11 items-center gap-2 rounded-full border border-ink-200 bg-white px-4 text-[12.5px] font-medium text-ink-800 shadow-lg transition-colors hover:bg-ink-50"
+            >
+              <Layers size={14} className="text-saffron-600" />
+              GIS Layers
+              {layers.activeCount > 0 && (
+                <span className="grid h-5 min-w-5 place-items-center rounded-full bg-ink-900 px-1 text-[10.5px] font-semibold text-white">{layers.activeCount}</span>
+              )}
+            </button>
+          )}
           <MapToolbar
             groupAdvanced={isCitizenRole}
             activeTool={tools.activeTool}
@@ -607,6 +634,50 @@ export default function CitizenHome() {
             ))}
           </div>
         </div>
+      )}
+      {/* Mobile GIS-layers bottom sheet — same pattern as the department
+          sheet (ndisp-sheet-up, above the bottom navigation) so the map
+          stays the primary visual area. */}
+      {layersOpen && (
+        <>
+          <div onClick={() => setLayersOpen(false)} aria-hidden="true" className="fixed inset-0 z-[145] bg-slate-900/25" />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="GIS Layers"
+            className="ndisp-sheet-up fixed inset-x-0 bottom-16 z-[150] flex max-h-[75dvh] flex-col overflow-hidden rounded-t-2xl border-t border-ink-100 bg-white shadow-2xl"
+          >
+            <div className="flex shrink-0 justify-center pt-2.5 pb-1">
+              <span className="h-1 w-10 rounded-full bg-ink-200" />
+            </div>
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-ink-100 px-4 py-2">
+              <h3 className="flex items-center gap-1.5 text-[13px] font-semibold text-ink-900">
+                <Layers size={14} className="text-saffron-600" />
+                GIS Layers
+              </h3>
+              <button
+                type="button"
+                onClick={() => setLayersOpen(false)}
+                className="grid h-11 min-w-11 place-items-center rounded-lg px-3 text-[12.5px] font-semibold text-sky-700 transition-colors hover:bg-sky-50"
+              >
+                Done
+              </button>
+            </div>
+            <div className="min-h-0 overflow-y-auto overscroll-contain pb-[env(safe-area-inset-bottom)]">
+              <CitizenLayerPanel
+                catalog={catalog}
+                visible={layers.visible}
+                loading={layers.loading}
+                toggle={layers.toggle}
+                showDefaults={layers.showDefaults}
+                clearAll={layers.clearAll}
+                activeCount={layers.activeCount}
+                selectedDepartments={departments.filter((department) => activeIds.includes(String(department.id)))}
+                defaultOpen
+              />
+            </div>
+          </div>
+        </>
       )}
     </div>
   )

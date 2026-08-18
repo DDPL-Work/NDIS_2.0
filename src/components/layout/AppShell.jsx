@@ -20,7 +20,7 @@ export default function AppShell({ navItems, sections, portalLabel, portalIcon, 
       />
       <div className="flex flex-1 flex-col min-w-0">
         <Topbar title={title} subtitle={subtitle} showDistrict={showDistrict} showDepartment={showDepartment} onMenuClick={() => setMobileNavOpen(true)} />
-        <main className={bottomNav ? 'flex-1 overflow-y-auto pb-16 lg:pb-0' : 'flex-1 overflow-y-auto'}>
+        <main className={bottomNav ? 'flex-1 overflow-y-auto pb-[calc(var(--citizen-bottom-nav-height,64px)+var(--safe-bottom,0px))] lg:pb-0' : 'flex-1 overflow-y-auto'}>
           <Outlet />
         </main>
       </div>

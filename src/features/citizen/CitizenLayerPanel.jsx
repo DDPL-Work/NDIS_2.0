@@ -19,8 +19,8 @@ const layerBelongsToDepartments = (layer, departments = []) => {
   return departments.some((department) => layerBelongsToDepartment(layer, department))
 }
 
-export default function CitizenLayerPanel({ catalog, visible = {}, loading = {}, toggle, showDefaults, clearAll, activeCount = 0, selectedDepartments = [], closedDivider = true }) {
-  const [open, setOpen] = useState(false)
+export default function CitizenLayerPanel({ catalog, visible = {}, loading = {}, toggle, showDefaults, clearAll, activeCount = 0, selectedDepartments = [], closedDivider = true, defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen)
   const [query, setQuery] = useState('')
   const term = query.trim().toLowerCase()
 
@@ -60,20 +60,20 @@ export default function CitizenLayerPanel({ catalog, visible = {}, loading = {},
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search layers (e.g. Hospital, Block)…"
-              className="w-full rounded-lg border border-ink-200 bg-ink-50 pl-7 pr-3 py-1.5 text-[12px] focus:bg-white focus:border-ink-300 focus:outline-none"
+              className="w-full rounded-lg border border-ink-200 bg-ink-50 pl-7 pr-3 py-2 text-[12px] focus:bg-white focus:border-ink-300 focus:outline-none"
             />
           </div>
 
           <div className="flex gap-1.5">
             <button
               onClick={showDefaults}
-              className="flex items-center gap-1 rounded-lg border border-ink-200 px-2 py-1 text-[11px] font-medium text-ink-700 hover:bg-ink-50"
+              className="flex min-h-11 items-center gap-1 rounded-lg border border-ink-200 px-3 py-1.5 text-[11px] font-medium text-ink-700 hover:bg-ink-50"
             >
               <Eye size={11} /> Default Layers
             </button>
             <button
               onClick={clearAll}
-              className="flex items-center gap-1 rounded-lg border border-ink-200 px-2 py-1 text-[11px] font-medium text-ink-700 hover:bg-ink-50"
+              className="flex min-h-11 items-center gap-1 rounded-lg border border-ink-200 px-3 py-1.5 text-[11px] font-medium text-ink-700 hover:bg-ink-50"
             >
               <EyeOff size={11} /> Clear Map
             </button>
@@ -99,7 +99,7 @@ export default function CitizenLayerPanel({ catalog, visible = {}, loading = {},
                   {layers.map((layer) => (
                     <label
                       key={layer.name}
-                      className="flex cursor-pointer items-center justify-between gap-2 rounded-md px-2 py-1.5 text-[12px] text-ink-700 hover:bg-ink-50"
+                      className="flex min-h-11 cursor-pointer items-center justify-between gap-2 rounded-md px-2 py-1.5 text-[12px] text-ink-700 hover:bg-ink-50"
                       title={layer.displayName}
                     >
                       <span className="truncate flex items-center gap-1.5">
@@ -108,12 +108,14 @@ export default function CitizenLayerPanel({ catalog, visible = {}, loading = {},
                       </span>
                       <span className="flex items-center gap-1.5 shrink-0">
                         <span className="text-[10px] text-ink-400 bg-ink-100 rounded px-1 py-0.5">{layer.featureCount}</span>
-                        <input
-                          type="checkbox"
-                          className="accent-saffron-500"
-                          checked={Boolean(visible[layer.name])}
-                          onChange={() => toggle(layer)}
-                        />
+                        <span className="grid h-11 w-11 -mr-2 place-items-center">
+                          <input
+                            type="checkbox"
+                            className="accent-saffron-500"
+                            checked={Boolean(visible[layer.name])}
+                            onChange={() => toggle(layer)}
+                          />
+                        </span>
                       </span>
                     </label>
                   ))}

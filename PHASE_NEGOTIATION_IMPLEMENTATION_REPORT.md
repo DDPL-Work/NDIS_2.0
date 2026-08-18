@@ -690,3 +690,34 @@ Same `departments`/`activeIds`/`toggleDept` props — no duplicated list, no filte
 
 ## Lint / build
 0 errors; build success (49.9s). Browser verification at 320–430px + 768px is pending (agent has no browser): search prominent, compact pill below it, sheet fits/scrolis, nav/zoom accessible, no overflow, desktop intact.
+
+---
+
+# POST-FIX 10 - CITIZEN PORTAL MOBILE RESPONSIVE UX (FULL PASS)
+
+## ISSUE 1 - Complaint detail: full-screen mobile sheet (was: nested 88vh card in shared Modal)
+- `src/features/citizen/TrackGrievance.jsx` - on `max-width: 767px` the complaint detail now renders as a standalone full-screen sheet (`CitizenComplaintDetail fullscreen`) instead of inside the shared `Modal`; desktop keeps the existing `max-w-3xl` Modal card.
+- Sheet behaviour while open (explicit modal-open state): `body` gets `citizen-modal-open` (hides the z-160 bottom nav via CSS) + `overflow: hidden` scroll lock; Escape closes; Android back closes via pushState-marker + popstate (one history entry, cleaned on close, router-safe); initial focus lands on the sheet's first button.
+- `src/features/citizen/CitizenComplaintDetail.jsx` - new `fullscreen` prop: root becomes `fixed inset-0 z-[180] h-dvh`, header gets safe-area top padding + a 44px Back arrow (close X kept), tabs bar shrinks, `main` becomes the SINGLE scroll region (`flex-1 min-h-0 overflow-y-auto overscroll-contain`) with safe-area bottom padding; loading/error states are folded into the shell (still closable). Derived consts guarded with optional chaining.
+- Nested Reopen/Escalate dialog: `Modal` gains an optional `zIndex` prop (default `z-50` - all existing callers unchanged); the nested dialog uses `z-[200]` in fullscreen so it layers above the sheet.
+
+## ISSUE 2 - Facility detail: one scroll, no clipped title
+- `src/features/citizen/FacilityDetail.jsx` - title block gets `min-w-0` + `break-words` (long facility names wrap instead of overflowing the header row).
+- `src/components/layout/AppShell.jsx` - scroll container padding `pb-16` replaced by `pb-[calc(var(--citizen-bottom-nav-height,64px)+var(--safe-bottom,0px))]` so the last page content clears the nav + home-indicator inset on devices that have one. Desktop `lg:pb-0` unchanged.
+
+## ISSUE 3 - Explore Map mobile: GIS Layers bottom sheet
+- `src/features/citizen/CitizenHome.jsx` - mobile-only 44px "GIS Layers" pill (active-layer count badge) in the bottom-right tool stack; tapping opens a dedicated bottom sheet (drag handle, title, 44px Done, `max-h-[75dvh]`, internal `overflow-y-auto` + `overscroll-contain`, `bottom-16` above the nav, backdrop z-145 / sheet z-150, Escape closes) rendering the SAME `CitizenLayerPanel` (search, categories, active counts preserved). Map stays the primary surface; the drawer remains search-focused.
+- `src/features/citizen/CitizenLayerPanel.jsx` - new `defaultOpen` prop (sheet starts expanded; drawer unchanged) + 44px touch targets: rows `min-h-11`, checkbox wrapped in a 44px hit area, Default/Clear buttons `min-h-11`.
+
+## ISSUE 4 - Zoom/control safe zones + CSS tokens
+- Location-permission banner moved `top-6` -> `top-24` right-6 so it never covers the Leaflet zoom (+/-) control (top-right) on any width.
+- `src/features/citizen/citizen.css` - `:root` tokens `--citizen-bottom-nav-height: 64px`, `--safe-top`, `--safe-bottom` (env() with 0 fallback); `.ndisp-bottom-nav` consumes `--safe-bottom`; new rule `body.citizen-modal-open .ndisp-bottom-nav { display: none }`. Z-index architecture now explicit: map 1 / markers 2 / leaflet 10 / app controls 120 / drawer 130 / info panel 140 / backdrops 145 / sheets 150 / bottom nav 160 / complaint sheet 180 / nested dialogs 200.
+
+## Scope & guarantees
+No mock data, no backend/API changes, no GIS/search/route/marker/business logic changes; desktop >1024px layouts untouched (Modal default z-50, drawer, legend, toolbar, FacilityDetail md+ layout all unchanged).
+
+## Lint / build
+ESLint 0 errors; `npm run build` success (48.5s).
+
+## Browser verification - PENDING (agent has no browser)
+320-430px: complaint sheet is full-viewport, single scroll, nav hidden, Escape/back close, safe areas; facility page bottom content visible above nav; layers pill -> sheet with 44px rows, scroll contained; zoom +/- always tappable (top-right), banner below it; no horizontal overflow (scrollWidth == innerWidth); 768/1024 tablet + desktop (1366-1920) unchanged.

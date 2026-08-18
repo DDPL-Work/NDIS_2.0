@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
-import { CheckCircle2, Star, RefreshCw, RotateCcw, Clock, Download } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Star, RefreshCw, RotateCcw, Clock, Download } from 'lucide-react'
+import clsx from 'clsx'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
@@ -28,7 +29,7 @@ const chatLabel = (state) => ({
 const canFeedback = (state) => ['resolved', 'verification_pending'].includes(state)
 const canReopen = (state) => ['closed', 'resolved', 'verification_pending'].includes(state)
 
-export default function CitizenComplaintDetail({ complaintId, onClose }) {
+export default function CitizenComplaintDetail({ complaintId, onClose, fullscreen = false }) {
   const [tab, setTab] = useState('Overview')
   const [rating, setRating] = useState(5)
   const [comment, setComment] = useState('')
@@ -87,40 +88,67 @@ export default function CitizenComplaintDetail({ complaintId, onClose }) {
     } catch (error) { setActionError(error) } finally { setSaving(false) }
   }
 
-  if (detail.loading) return <div className="card p-6 text-sm text-ink-500">Loading complaint details…</div>
-  if (detail.error || !complaint) return (
-    <div className="card p-6 text-sm text-alert-700 flex justify-between gap-3">
-      <span>{detail.error?.message || 'Complaint not found.'}</span>
-      <Button size="sm" variant="outline" icon={RefreshCw} onClick={detail.refetch}>Retry</Button>
-    </div>
-  )
-
-  const allowFeedback = canFeedback(complaint.state)
-  const feedbackSubmitted = feedbackSent || complaint.rating != null
-  const evidence = Array.isArray(complaint.evidences) ? complaint.evidences : []
-  const showReopenButton = canReopen(complaint.state)
-  const canEscalate = complaint.slaDueAt && new Date(complaint.slaDueAt) < new Date()
+  const allowFeedback = complaint && canFeedback(complaint.state)
+  const feedbackSubmitted = feedbackSent || complaint?.rating != null
+  const evidence = Array.isArray(complaint?.evidences) ? complaint.evidences : []
+  const showReopenButton = complaint && canReopen(complaint.state)
+  const canEscalate = complaint?.slaDueAt && new Date(complaint.slaDueAt) < new Date()
 
   return (
-    <div className="card bg-white rounded-2xl overflow-hidden max-h-[88vh] flex flex-col">
-      <header className="p-4 bg-ink-950 text-white flex justify-between gap-3">
-        <div>
-          <h2 className="font-semibold">{complaint.title}</h2>
-          <p className="font-mono text-xs text-ink-300 mt-1">Tracking number: {complaint.trackingCode || complaint.id}</p>
+    <div
+      id="citizen-complaint-sheet"
+      className={fullscreen ? 'fixed inset-0 z-[180] flex h-dvh flex-col bg-white' : 'card bg-white rounded-2xl overflow-hidden max-h-[88vh] flex flex-col'}
+    >
+      <header className={clsx('flex shrink-0 justify-between gap-3 bg-ink-950 text-white', fullscreen ? 'px-4 pb-4 pt-[calc(14px+var(--safe-top))]' : 'p-4')}>
+        <div className="flex min-w-0 items-center gap-2">
+          {fullscreen && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Back"
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-ink-300 transition-colors hover:bg-white/10 hover:text-white"
+            >
+              <ArrowLeft size={20} />
+            </button>
+          )}
+          <div className="min-w-0">
+            <h2 className="truncate font-semibold">{complaint?.title || 'Complaint details'}</h2>
+            <p className="mt-1 font-mono text-xs text-ink-300">Tracking number: {complaint?.trackingCode || complaint?.id || '—'}</p>
+          </div>
         </div>
-        <div className="flex items-start gap-2">
-          <Badge tone={complaint.state === 'closed' ? 'positive' : complaint.state === 'rejected' || complaint.state === 'escalated' ? 'negative' : 'info'}>{chatLabel(complaint.state)}</Badge>
-          {onClose && <button onClick={onClose} className="text-ink-300 hover:text-white text-lg leading-none">×</button>}
+        <div className="flex shrink-0 items-start gap-2">
+          {complaint && <Badge tone={complaint.state === 'closed' ? 'positive' : complaint.state === 'rejected' || complaint.state === 'escalated' ? 'negative' : 'info'}>{chatLabel(complaint.state)}</Badge>}
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className={fullscreen ? 'grid h-11 w-11 shrink-0 place-items-center rounded-lg text-ink-300 transition-colors hover:bg-white/10 hover:text-white' : 'text-lg leading-none text-ink-300 hover:text-white'}
+            >
+              ×
+            </button>
+          )}
         </div>
       </header>
 
-      <nav className="px-3 bg-ink-50 border-b flex gap-1 overflow-x-auto">
-        {TABS.map((item) => (
-          <button key={item} onClick={() => setTab(item)} className={`px-3 py-2.5 text-xs font-semibold whitespace-nowrap border-b-2 ${tab === item ? 'border-saffron-500 text-saffron-700' : 'border-transparent text-ink-500'}`}>{item}</button>
-        ))}
-      </nav>
+      {complaint && (
+        <nav className="flex shrink-0 gap-1 overflow-x-auto border-b bg-ink-50 px-3">
+          {TABS.map((item) => (
+            <button key={item} onClick={() => setTab(item)} className={`whitespace-nowrap border-b-2 px-3 py-2.5 text-xs font-semibold ${tab === item ? 'border-saffron-500 text-saffron-700' : 'border-transparent text-ink-500'}`}>{item}</button>
+          ))}
+        </nav>
+      )}
 
-      <main className="p-5 overflow-y-auto space-y-4 text-sm">
+      <main className={fullscreen ? 'min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-5 pb-[calc(20px+var(--safe-bottom))] text-sm' : 'space-y-4 overflow-y-auto p-5 text-sm'}>
+        {detail.loading ? (
+          <p className="text-ink-500">Loading complaint details…</p>
+        ) : detail.error || !complaint ? (
+          <div className="flex items-center justify-between gap-3 text-alert-700">
+            <span>{detail.error?.message || 'Complaint not found.'}</span>
+            <Button size="sm" variant="outline" icon={RefreshCw} onClick={detail.refetch}>Retry</Button>
+          </div>
+        ) : (
+          <>
         {actionError && <p className="rounded-lg bg-alert-50 border border-alert-200 p-3 text-alert-700">{actionError.message}</p>}
 
         {/* OVERVIEW */}
@@ -335,6 +363,8 @@ export default function CitizenComplaintDetail({ complaintId, onClose }) {
             )}
           </>
         )}
+          </>
+        )}
       </main>
 
       {/* Reopen / escalate reason modal */}
@@ -342,6 +372,7 @@ export default function CitizenComplaintDetail({ complaintId, onClose }) {
         open={actionModal !== null}
         onClose={() => setActionModal(null)}
         title={actionModal === 'escalate' ? 'Escalate complaint' : 'Reopen complaint'}
+        zIndex={fullscreen ? 'z-[200]' : 'z-50'}
         footer={
         <>
           <Button variant="outline" onClick={() => setActionModal(null)}>Cancel</Button>
