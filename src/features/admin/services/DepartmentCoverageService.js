@@ -115,7 +115,7 @@ export function topCoverageGaps(rows, limit = 5) {
 }
 
 // Facility-weighted mean gap score, sensibly rounded — feeds the KPI strip.
-export function weightedGapScore(rows) {
+export function weightedGapScore(rows) {             
   const weighted = rows.filter((row) => row.gapScore != null)
   if (!weighted.length) return null
   const total = weighted.reduce((sum, row) => sum + row.facilityCount, 0)

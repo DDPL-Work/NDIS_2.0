@@ -1,7 +1,10 @@
 // Proposal DTO normalization — field inventory verified against the live
-// GET /api/proposals/{id}/ response (backend_guide2.1 §6). The backend status
-// value is preserved verbatim in `status`; presentation labels come from the
-// backend's own status_display field. No status is invented on this side.
+// GET /api/proposals/{id}/ response (backend_guide2.1 §6, backend_next_guide
+// §6.3). The backend status value is preserved verbatim in `status`;
+// presentation labels come from the backend's own status_display field.
+// No status is invented on this side.
+import { mapNegotiation } from './negotiationMapper'
+
 const rows = (value) => (Array.isArray(value) ? value : value?.results || value?.data || [])
 
 const amount = (value) => {
@@ -69,6 +72,15 @@ export function mapProposal(dto = {}) {
     approvedBy: dto.approved_by,
     approvedByName: dto.approved_by_name || '',
     approvedAt: dto.approved_at || null,
+    // Negotiation module (backend_next_guide §6.3) — the backend embeds the
+    // full multi-round trajectory plus the agreed terms on the proposal.
+    // estimated_cost is never overwritten; agreed terms and approval_mode are
+    // written by the backend's own state machine.
+    negotiations: Array.isArray(dto.negotiations) ? dto.negotiations.map(mapNegotiation) : [],
+    agreedAmount: amount(dto.agreed_amount),
+    agreedTimelineDays: amount(dto.agreed_timeline_days),
+    agreedScope: dto.agreed_scope || '',
+    approvalMode: dto.approval_mode || '',
     isDeleted: Boolean(dto.is_deleted),
     createdAt: dto.created_at || null,
     updatedAt: dto.updated_at || null,

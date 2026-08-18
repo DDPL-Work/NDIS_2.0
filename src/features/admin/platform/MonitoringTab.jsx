@@ -1,9 +1,11 @@
 // MonitoringTab — District Command Center "Projects" panel.
 // Phase 3: fully backend-driven. The DM/Collector review queue comes from
 // GET /api/proposals/?status=PENDING_REVIEW, decisions run the backend's own
-// approve / reject actions, and the capital pipeline + fiscal KPIs come from
-// GET /api/projects/summary/ and GET /api/projects/. No frontend engine state
-// and no fabricated offsets are used.
+// approve / reject actions, the capital pipeline + fiscal KPIs come from
+// GET /api/projects/summary/ and GET /api/projects/, scheme rollout comes
+// from GET /api/schemes/, and the sanction-vs-utilization chart comes from
+// GET /api/department-budgets/. No frontend engine state and no fabricated
+// offsets are used.
 import { useMemo, useState } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { Card, CardHeader, CardBody } from '../../../components/ui/Card'
@@ -19,10 +21,11 @@ import { useDataVersion, DATA_SCOPES } from '../../../app/store/dataVersionStore
 import { useUiStore } from '../../../app/store/uiStore'
 import { backendProposalApi } from '../../../api/proposalApi'
 import { backendProjectApi } from '../../../api/projectApi'
+import { backendBudgetApi } from '../../../api/budgetApi'
 
 const SEVERITY_TONE = { low: 'positive', medium: 'warning', high: 'negative', critical: 'negative' }
 
-export default function MonitoringTab({ schemes, budgetUtil }) {
+export default function MonitoringTab() {
   const pushToast = useUiStore((s) => s.pushToast)
 
   const [selectedProposal, setSelectedProposal] = useState(null)
@@ -32,12 +35,23 @@ export default function MonitoringTab({ schemes, budgetUtil }) {
 
   const proposalsVersion = useDataVersion((s) => s.versions[DATA_SCOPES.PROPOSALS] || 0)
   const projectsVersion = useDataVersion((s) => s.versions[DATA_SCOPES.PROJECTS] || 0)
+  const budgetVersion = useDataVersion((s) => s.versions[DATA_SCOPES.BUDGET] || 0)
 
   const { data: pendingProposals, loading: proposalsLoading, error: proposalsError, refetch: refetchProposals } = useAsync(() => backendProposalApi.list({ status: 'PENDING_REVIEW' }), [proposalsVersion])
   const { data: summary, loading: summaryLoading, error: summaryError, refetch: refetchSummary } = useAsync(() => backendProjectApi.summary(), [projectsVersion])
   const { data: projects, loading: projectsLoading, error: projectsError, refetch: refetchProjects } = useAsync(() => backendProjectApi.list({}), [projectsVersion])
+  const { data: schemes, loading: schemesLoading, error: schemesError, refetch: refetchSchemes } = useAsync(() => backendBudgetApi.schemes.list(), [budgetVersion])
+  const { data: departmentBudgets, loading: budgetsLoading, error: budgetsError, refetch: refetchBudgets } = useAsync(() => backendBudgetApi.departmentBudgets.list(), [budgetVersion])
 
   const sanctionedFund = useMemo(() => (projects || []).reduce((sum, p) => sum + (p.budgetSanctioned || 0), 0), [projects])
+
+  // Sanction vs utilization chart — backend crore figures converted to INR
+  // for display consistency with the rest of the panel.
+  const budgetUtil = useMemo(() => (departmentBudgets || []).map((b) => ({
+    departmentId: b.departmentName || b.departmentId || '—',
+    sanctioned: Math.round((b.authorizedCr || 0) * 1e7),
+    utilized: Math.round((b.utilizedCr || 0) * 1e7),
+  })), [departmentBudgets])
 
   async function handleApprove(proposalId) {
     try {
@@ -64,7 +78,7 @@ export default function MonitoringTab({ schemes, budgetUtil }) {
     setAiReviewResult({
       id: proposal.proposalId,
       title: proposal.title,
-      summary: `AI feasibility check: OK. ${benefits}. Cost metrics align with standard Bihar BOQ rates. Recommendation: APPROVE.`,
+      summary: `Heuristic feasibility check based on submitted data: OK. ${benefits}. ${budgetRisk}. Final approval remains with the competent authority.`,
       score: 94,
       riskAnalysis: `${budgetRisk}.`,
     })
@@ -107,10 +121,10 @@ export default function MonitoringTab({ schemes, budgetUtil }) {
   ]
 
   const schemeColumns = [
-    { key: 'name', label: 'Scheme Flagship', render: (r) => <span className="font-semibold text-ink-900">{r.name}</span> },
-    { key: 'coverage', label: 'Target Coverage', render: (r) => r.coverage },
-    { key: 'progress', label: 'Implementation Progress', render: (r) => <span className="font-mono">{r.progress}%</span> },
-    { key: 'issues', label: 'Pending Block Issues', render: (r) => <span className="text-alert-600 font-bold">{r.issues}</span> },
+    { key: 'name', label: 'Scheme Name', render: (r) => <span className="font-semibold text-ink-900">{r.name || '—'}</span> },
+    { key: 'category', label: 'Category / Head', render: (r) => <Badge tone="info">{r.category || r.head || '—'}</Badge> },
+    { key: 'authorizedCr', label: 'Authorized (Cr)', render: (r) => <span className="font-mono">{formatCurrencyINR((r.authorizedCr || 0) * 1e7)}</span> },
+    { key: 'statusDisplay', label: 'Status', render: (r) => <span className="text-ink-600">{r.statusDisplay || r.status || '—'}</span> },
   ]
 
   return (
@@ -155,29 +169,37 @@ export default function MonitoringTab({ schemes, budgetUtil }) {
           </CardBody>
         </Card>
 
-        {/* Schemes */}
+        {/* Schemes — backend /schemes/ register */}
         <Card>
-          <CardHeader title="Centrally Sponsored Schemes Rollout" subtitle="Flagship implementation coverage & metrics" icon={Sparkles} />
+          <CardHeader title="State Scheme Register" subtitle="Flagship schemes & budget heads from the backend" icon={Sparkles} />
           <CardBody className="!p-0">
-            <DataTable columns={schemeColumns} rows={schemes} />
+            {schemesError ? errorBox(schemesError.message, refetchSchemes)
+              : schemesLoading && !schemes ? <p className="px-4 py-4 text-sm text-ink-500">Loading schemes…</p>
+              : <DataTable columns={schemeColumns} rows={schemes || []} emptyLabel="No schemes registered on the backend" />}
           </CardBody>
         </Card>
       </div>
 
-      {/* Budget Allocation Chart */}
+      {/* Budget Allocation Chart — backend /department-budgets/ figures */}
       <Card>
-        <CardHeader title="Department Fund Sanction vs Utilization" subtitle="Real-time fiscal monitoring console" icon={PieChart} />
+        <CardHeader title="Department Fund Sanction vs Utilization" subtitle="Backend department budget register" icon={PieChart} />
         <CardBody>
-          <ResponsiveContainer width="100%" height={230}>
-            <BarChart data={budgetUtil}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f2f5" />
-              <XAxis dataKey="departmentId" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip />
-              <Bar dataKey="sanctioned" fill="#1d7ab5" name="Sanctioned (INR)" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="utilized" fill="#1f7a54" name="Utilized (INR)" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          {budgetsError ? errorBox(budgetsError.message, refetchBudgets)
+            : budgetsLoading && !departmentBudgets ? <p className="px-4 py-4 text-sm text-ink-500">Loading department budgets…</p>
+            : budgetUtil.length === 0 ? (
+              <p className="px-4 py-6 text-center text-ink-400 text-[12.5px]">No department budgets returned by the backend for this financial year.</p>
+            ) : (
+            <ResponsiveContainer width="100%" height={230}>
+              <BarChart data={budgetUtil}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f2f5" />
+                <XAxis dataKey="departmentId" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip />
+                <Bar dataKey="sanctioned" fill="#1d7ab5" name="Authorized (INR)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="utilized" fill="#1f7a54" name="Utilized (INR)" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+            )}
         </CardBody>
       </Card>
 

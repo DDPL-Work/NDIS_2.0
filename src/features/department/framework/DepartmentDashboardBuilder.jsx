@@ -1,22 +1,35 @@
 import { useState } from 'react'
 import {
-  HeartPulse, Building2, Truck, Droplet, Clock, CheckCircle2, AlertTriangle,
-  Flame, Sparkles, MapPin, Activity, ArrowRight, Eye, ShieldAlert
+  Clock, CheckCircle2, AlertTriangle, Flame, MapPin, Eye, FileText
 } from 'lucide-react'
 import StatCard from '../../../components/ui/StatCard'
 import { Card, CardHeader, CardBody } from '../../../components/ui/Card'
-import Badge from '../../../components/ui/Badge'
 import StatusBadge from '../../../components/ui/StatusBadge'
 import Button from '../../../components/ui/Button'
 import MapView from '../../../components/map/MapView'
 import Modal from '../../../components/ui/Modal'
 import ComplaintDetailHub from '../../shared/ComplaintDetailHub'
 import { useDepartment } from './DepartmentContext'
-import { formatNumber, formatDateTime } from '../../../utils/format'
+import { useAsync } from '../../../hooks/useAsync'
+import { backendDashboardApi } from '../../../api/dashboardApi'
+import { DATA_SCOPES } from '../../../app/store/dataVersionStore'
+import { formatNumber } from '../../../utils/format'
 
 export default function DepartmentDashboardBuilder() {
   const { dept, complaints, kpis, assets } = useDepartment()
   const [selectedTicketId, setSelectedTicketId] = useState(null)
+
+  // Live backend department dashboard envelope (complaint KPIs, queue,
+  // SLA + activity).  Engine-derived complaint KPIs remain as the local
+  // projection; backend values take precedence when available.
+  const backend = useAsync(
+    () => backendDashboardApi.department({ department: dept.id }),
+    [dept.id],
+    { deps: [DATA_SCOPES.DASHBOARD] },
+  )
+  const dashboard = backend.data || null
+  const summary = dashboard?.complaints || null
+  const backendKpis = dashboard?.kpis || null
 
   const widgets = dept.dashboardWidgets || [
     { id: 'kpis', type: 'kpis', span: 12 },
@@ -28,11 +41,18 @@ export default function DepartmentDashboardBuilder() {
     id: a.id,
     name: a.name,
     departmentId: dept.id,
-    categoryLabel: a.typeLabel,
+    categoryLabel: a.typeLabel || a.categoryLabel,
     status: a.status,
     gapScore: 0.25,
     position: a.position,
   }))
+
+  const totalTickets = summary?.total ?? kpis.total
+  const pending = summary?.open ?? kpis.pending
+  const resolved = summary?.resolved ?? kpis.resolved
+  const escalated = summary?.escalated ?? kpis.escalated
+  const slaBreached = summary?.slaBreached ?? kpis.slaBreached
+  const slaPct = totalTickets ? Math.round(((totalTickets - slaBreached) / totalTickets) * 100) : 100
 
   return (
     <div className="space-y-5">
@@ -44,67 +64,11 @@ export default function DepartmentDashboardBuilder() {
           if (widget.type === 'kpis') {
             return (
               <div key={widget.id} className="col-span-12 grid grid-cols-2 lg:grid-cols-5 gap-3.5">
-                <StatCard label="Total Tickets" value={kpis.total} icon={Activity} tone="ink" />
-                <StatCard label="Pending Queue" value={kpis.pending} icon={Clock} tone="saffron" />
-                <StatCard label="Resolved Work" value={kpis.resolved} icon={CheckCircle2} tone="leaf" />
-                <StatCard label="Escalated Tickets" value={kpis.escalated} icon={AlertTriangle} tone="alert" />
-                <StatCard label="SLA Compliance" value={`${kpis.slaPct}%`} icon={Flame} tone="sky" />
-              </div>
-            )
-          }
-
-          if (widget.type === 'bed_occupancy') {
-            return (
-              <div key={widget.id} className={colClass}>
-                <Card>
-                  <CardHeader title="Hospital Bed & ICU Telemetry" subtitle="District Health Facilities" icon={HeartPulse} />
-                  <CardBody className="space-y-3 text-[12.5px]">
-                    <div className="grid grid-cols-2 gap-3 p-3 bg-ink-50 rounded-xl">
-                      <div>
-                        <span className="text-ink-500 block text-[11px]">General Beds Occupancy</span>
-                        <span className="text-lg font-display font-semibold text-ink-950">114 / 150 (76%)</span>
-                      </div>
-                      <div>
-                        <span className="text-ink-500 block text-[11px]">ICU / Ventilator Beds</span>
-                        <span className="text-lg font-display font-semibold text-alert-600">15 / 18 (83%)</span>
-                      </div>
-                    </div>
-                    <div className="p-2.5 rounded-lg bg-leaf-50 border border-leaf-200 text-leaf-900 text-[11.5px] flex items-center justify-between">
-                      <span>Oxygen Plant Status: 250 kW PSA Active (99.2% Purity)</span>
-                      <Badge tone="positive">Optimal</Badge>
-                    </div>
-                  </CardBody>
-                </Card>
-              </div>
-            )
-          }
-
-          if (widget.type === 'ambulance_telemetry') {
-            return (
-              <div key={widget.id} className={colClass}>
-                <Card>
-                  <CardHeader title="102/108 Ambulance Fleet Telemetry" subtitle="Emergency Medical Dispatch" icon={Truck} />
-                  <CardBody className="space-y-3 text-[12.5px]">
-                    <div className="grid grid-cols-3 gap-2 text-center p-3 bg-ink-50 rounded-xl">
-                      <div>
-                        <span className="block font-semibold text-leaf-700 text-base">14</span>
-                        <span className="text-[10.5px] text-ink-500 uppercase">On Call / Active</span>
-                      </div>
-                      <div>
-                        <span className="block font-semibold text-saffron-700 text-base">4</span>
-                        <span className="text-[10.5px] text-ink-500 uppercase">En Route</span>
-                      </div>
-                      <div>
-                        <span className="block font-semibold text-ink-900 text-base">2</span>
-                        <span className="text-[10.5px] text-ink-500 uppercase">Under Maintenance</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between text-[11.5px] text-ink-600">
-                      <span>Average Response Time: <strong>14.2 Mins</strong></span>
-                      <span className="font-mono text-leaf-700 font-semibold">GPS Active</span>
-                    </div>
-                  </CardBody>
-                </Card>
+                <StatCard label="Total Tickets" value={formatNumber(totalTickets)} icon={FileText} tone="ink" />
+                <StatCard label="Pending Queue" value={formatNumber(pending)} icon={Clock} tone="saffron" />
+                <StatCard label="Resolved Work" value={formatNumber(resolved)} icon={CheckCircle2} tone="leaf" />
+                <StatCard label="Escalated Tickets" value={formatNumber(escalated)} icon={AlertTriangle} tone="alert" />
+                <StatCard label="SLA Compliance" value={`${slaPct}%`} icon={Flame} tone="sky" />
               </div>
             )
           }
@@ -134,26 +98,6 @@ export default function DepartmentDashboardBuilder() {
                           </div>
                         ))
                       )}
-                    </div>
-                  </CardBody>
-                </Card>
-              </div>
-            )
-          }
-
-          if (widget.type === 'recommendations') {
-            return (
-              <div key={widget.id} className={colClass}>
-                <Card>
-                  <CardHeader title="AI Decision Support" subtitle="Automated sector intelligence" icon={Sparkles} />
-                  <CardBody className="space-y-3 text-[12px]">
-                    <div className="p-3 rounded-xl bg-saffron-50 border border-saffron-200 text-saffron-900 space-y-1">
-                      <span className="font-semibold block flex items-center gap-1">
-                        <ShieldAlert size={14} className="text-saffron-600" /> High Footfall Warning
-                      </span>
-                      <p className="text-[11.5px] text-saffron-800 leading-snug">
-                        Rajgir PHC patient queue spiked 40% in last 24h. Deploy 2 additional ASHA workers.
-                      </p>
                     </div>
                   </CardBody>
                 </Card>

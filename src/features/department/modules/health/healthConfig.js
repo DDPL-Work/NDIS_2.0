@@ -65,22 +65,18 @@ export const HEALTH_CONFIG = {
     { id: 'medicine_stockout', name: 'Essential Drug Stockout at PHC', defaultPriority: 'medium', slaHours: 24 },
   ],
 
-  // Default Dashboard Widgets Configuration
+  // Default Dashboard Widgets Configuration — the dashboard is rendered from
+  // live data only (complaint KPIs, queue, GIS layer); telemetry widgets were
+  // removed because no telemetry endpoint exists on the backend.
   dashboardWidgets: [
     { id: 'kpi_strip', type: 'kpis', title: 'Health Sector Operational KPIs', span: 12 },
-    { id: 'hospital_bed_occupancy', type: 'bed_occupancy', title: 'District Hospital Bed & ICU Occupancy', span: 6 },
-    { id: 'emergency_ambulance_telemetry', type: 'ambulance_telemetry', title: '102/108 Ambulance Fleet Telemetry', span: 6 },
     { id: 'critical_complaints_queue', type: 'complaint_queue', title: 'Active Health Grievances & SLA Countdowns', span: 8 },
-    { id: 'ai_health_recommendations', type: 'recommendations', title: 'AI Public Health Epidemiological Alerts', span: 4 },
-    { id: 'health_gis_map', type: 'gis_mini_map', title: 'Nalanda Health Asset Spatial Layer', span: 12 },
+    { id: 'health_gis_map', type: 'gis_mini_map', title: 'Nalanda Health Asset Spatial Layer', span: 4 },
   ],
 
   // Analytics Metrics
   analyticsMetrics: {
     targetSlaPct: 90,
-    targetBedOccupancyPct: 75,
-    avgAmbulanceResponseMins: 14,
-    vaccineColdChainIntegrityPct: 98.4,
   },
 
   // Document Categories
@@ -90,64 +86,5 @@ export const HEALTH_CONFIG = {
     'Drug Audit Reports',
     'Civil Surgeon Directives',
     'Ambulance Logbooks',
-  ],
-
-  // Sample Reference Assets for Health
-  sampleAssets: [
-    {
-      id: 'HLTH-AST-101',
-      name: 'Sadar Hospital Rajgir (District Facility)',
-      type: 'district_hospital',
-      typeLabel: 'District Hospital',
-      village: 'Rajgir',
-      block: 'Silao',
-      position: [85.4211, 25.0294],
-      status: 'active',
-      attributes: {
-        bed_count: 150,
-        icu_beds: 18,
-        ventilator_count: 12,
-        has_emergency: true,
-        has_blood_bank: true,
-        doctor_count: 24,
-        oxygen_plant_kw: 250,
-      },
-      lastInspected: new Date(Date.now() - 48 * 3600 * 1000).toISOString(),
-    },
-    {
-      id: 'HLTH-AST-102',
-      name: 'Community Health Centre Silao',
-      type: 'chc',
-      typeLabel: 'Community Health Centre',
-      village: 'Silao Bazar',
-      block: 'Silao',
-      position: [85.4434, 25.1372],
-      status: 'active',
-      attributes: {
-        bed_count: 30,
-        has_emergency: true,
-        has_maternity: true,
-        doctor_count: 6,
-        ambulance_count: 2,
-      },
-      lastInspected: new Date(Date.now() - 96 * 3600 * 1000).toISOString(),
-    },
-    {
-      id: 'HLTH-AST-103',
-      name: 'Primary Health Centre Surajpur',
-      type: 'phc',
-      typeLabel: 'Primary Health Centre',
-      village: 'Surajpur',
-      block: 'Silao',
-      position: [85.4312, 25.0811],
-      status: 'active',
-      attributes: {
-        bed_count: 6,
-        doctor_count: 2,
-        staff_nurse_count: 4,
-        cold_chain_status: 'Optimal (4°C)',
-      },
-      lastInspected: new Date(Date.now() - 120 * 3600 * 1000).toISOString(),
-    },
   ],
 }

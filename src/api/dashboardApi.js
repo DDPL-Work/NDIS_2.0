@@ -1,26 +1,27 @@
 import { apiRequest } from './apiClient'
 import { mapComplaintList, registerComplaintReference } from './mappers/complaintMapper'
+import { mapDashboard } from './mappers/citizenDashboardMapper'
 
-const mapDashboard = (dto = {}) => {
-  // Dashboard payload fields differ by role, but any embedded complaint DTOs
-  // cross the same mapper boundary as the list endpoint.  Rows also feed the
-  // name -> pk reference catalog used by complaint creation.
+const mapDashboardEnvelope = (dto = {}) => {
+  const mapped = mapDashboard(dto)
   const myComplaints = mapComplaintList(dto.my_complaints || dto.myComplaints || [])
   const complaints = mapComplaintList(dto.complaints || dto.results || [])
   registerComplaintReference([...myComplaints, ...complaints])
-  return {
-    ...dto,
-    myComplaints,
-    complaints,
-    raw: dto,
-  }
+  return { ...mapped, myComplaints, complaints }
 }
+
 export const backendDashboardApi = {
-  citizen: () => apiRequest('/dashboards/citizen/').then(mapDashboard),
-  department: (params = {}) => apiRequest(`/dashboards/department/${toQuery(params)}`).then(mapDashboard),
-  officer: () => apiRequest('/dashboards/officer/').then(mapDashboard),
-  district: (params = {}) => apiRequest(`/dashboards/district/${toQuery(params)}`).then(mapDashboard),
-  state: (params = {}) => apiRequest(`/dashboards/state/${toQuery(params)}`).then(mapDashboard),
+  citizen: () => apiRequest('/dashboards/citizen/').then(mapDashboardEnvelope),
+  // Role-aware generic dashboard — the backend resolves the profile's role.
+  myDashboard: () => apiRequest('/dashboards/my-dashboard/').then(mapDashboardEnvelope),
+  department: (params = {}) => apiRequest(`/dashboards/department/${toQuery(params)}`).then(mapDashboardEnvelope),
+  officer: () => apiRequest('/dashboards/officer/').then(mapDashboardEnvelope),
+  fieldInspector: () => apiRequest('/dashboards/field-inspector/').then(mapDashboardEnvelope),
+  district: (params = {}) => apiRequest(`/dashboards/district/${toQuery(params)}`).then(mapDashboardEnvelope),
+  districtCollector: (params = {}) => apiRequest(`/dashboards/district-collector/${toQuery(params)}`).then(mapDashboardEnvelope),
+  dm: (params = {}) => apiRequest(`/dashboards/dm/${toQuery(params)}`).then(mapDashboardEnvelope),
+  adm: (params = {}) => apiRequest(`/dashboards/adm/${toQuery(params)}`).then(mapDashboardEnvelope),
+  state: (params = {}) => apiRequest(`/dashboards/state/${toQuery(params)}`).then(mapDashboardEnvelope),
 }
 
 function toQuery(params) {

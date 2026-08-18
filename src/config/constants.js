@@ -224,6 +224,7 @@ export const PROPOSAL_STATE_LABELS = {
   // presented through the backend's own lifecycle (backend_guide2.1 §6.2).
   DRAFT_DPR: 'Draft DPR',
   PENDING_REVIEW: 'Pending Review',
+  UNDER_NEGOTIATION: 'Under Negotiation',
   APPROVED: 'Approved',
   REJECTED: 'Rejected',
   SANCTIONED: 'Sanctioned',
@@ -322,6 +323,7 @@ export const STATUS_TONE = {
   // Backend proposal status tones (uppercase choices from the live API)
   DRAFT_DPR: 'neutral',
   PENDING_REVIEW: 'warning',
+  UNDER_NEGOTIATION: 'warning',
   APPROVED: 'positive',
   SANCTIONED: 'info',
   IN_EXECUTION: 'info',

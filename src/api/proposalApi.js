@@ -1,5 +1,6 @@
 import { apiRequest } from './apiClient'
 import { mapProposal, mapProposalList } from './mappers/proposalMapper'
+import { mapNegotiationList, mapReleaseList, NEGOTIATION_MAPPER_BUILD } from './mappers/negotiationMapper'
 import { invalidateData, DATA_SCOPES } from '../app/store/dataVersionStore'
 
 // App filter vocabulary -> backend ProposalStatus.TextChoices values.
@@ -60,4 +61,35 @@ export const backendProposalApi = {
   async approve(id) { const response = await apiRequest(`/proposals/${id}/approve/`, { method: 'POST' }); touched([DATA_SCOPES.PROPOSALS, DATA_SCOPES.PLANNING])(); return response },
   async reject(id, payload = {}) { const response = await apiRequest(`/proposals/${id}/reject/`, { method: 'POST', body: payload }); touched([DATA_SCOPES.PROPOSALS, DATA_SCOPES.PLANNING])(); return response },
   async sanction(id, payload) { const response = await apiRequest(`/proposals/${id}/sanction/`, { method: 'POST', body: payload }); touched([DATA_SCOPES.PROPOSALS, DATA_SCOPES.PLANNING, DATA_SCOPES.PROJECTS, DATA_SCOPES.DASHBOARD])(); return response },
+  // Negotiation — the backend resolves the state machine and writes the
+  // agreed_amount / agreed_timeline_days / agreed_scope / approval_mode;
+  // estimated_cost is never overwritten on this side.
+  async negotiate(id, payload) { const response = await apiRequest(`/proposals/${id}/negotiation/`, { method: 'POST', body: payload }); touched([DATA_SCOPES.PROPOSALS])(); return response },
+  async respondNegotiation(id, payload) { const response = await apiRequest(`/proposals/${id}/negotiation-response/`, { method: 'POST', body: payload }); touched([DATA_SCOPES.PROPOSALS])(); return response },
+  // TEMPORARY RUNTIME DEBUGGING — keep until the browser test for proposal 13
+  // passes, then gate/remove. Logs the exact body apiRequest resolved (the
+  // backend returns the round as a bare object) and the normalized list.
+  // TEMPORARY BROWSER DIAGNOSIS — UNCONDITIONAL LOGS + BUILD MARKER. Remove
+  // once proposal 13 shows the decision panel. The marker proves which mapper
+  // module the browser executed; the logs capture raw -> normalized -> direct
+  // test in one synchronous chain (before the component's SET STATE log).
+  async negotiations(id, params = {}) {
+    console.log('[NEGOTIATION MODULE BUILD]', NEGOTIATION_MAPPER_BUILD)
+    const raw = await apiRequest(`/proposals/${id}/negotiations/${toQuery(params)}`)
+    console.log('[NEGOTIATION RAW RESPONSE]', JSON.stringify(raw, null, 2))
+    console.log('[NEGOTIATION RAW TYPE]', typeof raw, Array.isArray(raw), raw && typeof raw === 'object' ? Object.keys(raw) : null)
+    const normalized = mapNegotiationList(raw)
+    console.log('[NEGOTIATION NORMALIZED]', JSON.stringify(normalized, null, 2))
+    console.log('[NEGOTIATION NORMALIZED LENGTH]', Array.isArray(normalized) ? normalized.length : 'NOT_ARRAY')
+    console.log('[EXECUTED NEGOTIATION MAPPER]', mapNegotiationList.toString())
+    const directTest = Array.isArray(raw) ? raw : (raw && typeof raw === 'object' ? [raw] : [])
+    console.log('[NEGOTIATION DIRECT TEST]', directTest, { length: Array.isArray(directTest) ? directTest.length : null })
+    if (Array.isArray(normalized) && normalized.length === 0 && Array.isArray(directTest) && directTest.length > 0) console.log('[NEGOTIATION STALE MAPPER] direct test wraps the raw body but mapNegotiationList returned [] — the executed mapper module predates the bare-record fix')
+    return normalized
+  },
+  async proposalNegotiations(params = {}) { return mapNegotiationList(await apiRequest(`/proposal-negotiations/${toQuery(toBackendFilters(params))}`)) },
+  // Budget release — FULL | INSTALLMENT modes; balances stay backend-authoritative.
+  async release(id, payload) { const response = await apiRequest(`/proposals/${id}/release/`, { method: 'POST', body: payload }); touched([DATA_SCOPES.PROPOSALS, DATA_SCOPES.DASHBOARD, DATA_SCOPES.PROJECTS])(); return response },
+  async releases(id, params = {}) { return mapReleaseList(await apiRequest(`/proposals/${id}/releases/${toQuery(params)}`)) },
+  async proposalReleases(params = {}) { return mapReleaseList(await apiRequest(`/proposal-releases/${toQuery(toBackendFilters(params))}`)) },
 }

@@ -18,7 +18,7 @@ import MonitoringTab from './MonitoringTab'
 import DisasterTab from './DisasterTab'
 import GovernanceTab from './GovernanceTab'
 
-// Import Mock Repositories
+// Import Repositories (backend-derived)
 import { DistrictStatisticsRepository } from './DistrictStatisticsRepository'
 import { DistrictBriefRepository } from './DistrictBriefRepository'
 
@@ -33,104 +33,37 @@ export default function DistrictCommandPlatform() {
   const [selectedComplaintId, setSelectedComplaintId] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
 
-  // Interactive local list mock states that update on Smart Actions
-  const [inspections, setInspections] = useState([
-    { id: 'AUD-01', title: 'Rajgir Sadar Hospital Oxygen Plant Inspection', dept: 'health', deptLabel: 'Health & Family Welfare', inspector: 'Dr. Rajesh Kumar', score: 92, status: 'Completed' },
-    { id: 'AUD-02', title: 'Silao Primary School Building Roof Safety Audit', dept: 'education', deptLabel: 'School Education', inspector: 'Shri Birendra Prasad', score: null, status: 'Assigned' },
-  ])
+  // Executive registers (inspections, meetings, control rooms) have no
+  // documented backend endpoint — the panels surface the honest gap.
+  const [inspections] = useState([])
+  const [meetings] = useState([])
+  const [controlRooms] = useState([])
 
-  const [meetings, setMeetings] = useState([
-    { time: '11:00 AM', title: 'Monsoon Flood Preparedness Review', dept: 'Disaster Management', status: 'In Progress' },
-    { time: '03:30 PM', title: 'JJM Tap Connections Phase 2 Audit', dept: 'Water & Sanitation', status: 'Scheduled' },
-  ])
-
-  const [controlRooms, setControlRooms] = useState([
-    { id: 'CR-01', name: 'Sadar Block Disaster Control Room', head: 'Rajeshwar Prasad (ADM)', phone: '06112-225224', status: 'Operational' },
-    { id: 'CR-02', name: 'Rajgir Tourist Outpost emergency unit', head: 'Kavita Kumari', phone: '+91 94318 XXXXX', status: 'Standby' },
-  ])
-
-  // Mock datasets for monitoring & governance
-  const stats = useMemo(() => DistrictStatisticsRepository.getProfile(user?.districtId), [user?.districtId])
+  // District profile & daily brief — computed live from backend data only.
+  const stats = useMemo(() => DistrictStatisticsRepository.getProfile(user?.districtId, complaints), [user?.districtId, complaints])
   const brief = useMemo(() => DistrictBriefRepository.getDailyBrief(complaints, simClockTime), [complaints, simClockTime])
 
-  const officers = [
-    { name: 'Dr. Rajesh Kumar', designation: 'Civil Surgeon / Head', dept: 'health', deptLabel: 'Health', avgSla: 4.8, status: 'Active' },
-    { name: 'Smt. Kavita Devi', designation: 'Deputy CMO', dept: 'health', deptLabel: 'Health', avgSla: 6.2, status: 'Active' },
-    { name: 'Anil Mehta', designation: 'Assistant Engineer', dept: 'water', deptLabel: 'Water Dept', avgSla: 8.4, status: 'Active' },
-    { name: 'Praveen Kumar', designation: 'Junior Engineer', dept: 'electricity', deptLabel: 'Electricity', avgSla: 14.5, status: 'On Leave' },
-  ]
+  // Registers without a backend endpoint render as empty (BACKEND GAP).
+  const officers = []
+  const fieldStaff = []
+  const vehicles = []
+  const schemes = []
+  const budgetUtil = []
+  const shelters = []
+  const csat = []
+  const rankings = []
 
-  const fieldStaff = [
-    { id: 'FS-01', name: 'Manoj Singh', designation: 'Junior Engineer', assignedArea: 'Rajgir Ward 02', status: 'Active', coords: [85.4211, 25.0294] },
-    { id: 'FS-02', name: 'Sunita Sharma', designation: 'ASHA Nodal Worker', assignedArea: 'Silao Sector B', status: 'Active', coords: [85.4434, 25.1372] },
-    { id: 'FS-03', name: 'Rajiv Mishra', designation: 'Survey Supervisor', assignedArea: 'Harnaut Road Project', status: 'Inactive', coords: [85.4312, 25.0811] },
-  ]
-
-  const vehicles = [
-    { reg: 'BR-21G-0102', type: '108 Ambulance Unit', driver: 'Raju Paswan', phone: '94302 XXXXX', fuel: 84, status: 'Active' },
-    { reg: 'BR-21G-0440', type: 'Water Tanker (JJM)', driver: 'Sohan Yadav', phone: '91131 XXXXX', fuel: 72, status: 'Active' },
-    { reg: 'BR-21G-0911', type: 'PWD Survey Jeep', driver: 'Madan Singh', phone: '80024 XXXXX', fuel: 45, status: 'Under Repair' },
-  ]
-
-  const schemes = [
-    { name: 'Jal Jeevan Mission (JJM)', coverage: '1.84 Lakh Taps', progress: 82, issues: 4 },
-    { name: 'Pradhan Mantri Gram Sadak Yojana (PMGSY)', coverage: '96 Roads', progress: 94, issues: 1 },
-    { name: 'PM-JAY Ayushman Bharat', coverage: '5.12 Lakh families', progress: 99, issues: 0 },
-  ]
-
-  const budgetUtil = [
-    { departmentId: 'health', sanctioned: 12000000, utilized: 8400000 },
-    { departmentId: 'water', sanctioned: 18000000, utilized: 11200000 },
-    { departmentId: 'electricity', sanctioned: 15000000, utilized: 9200000 },
-  ]
-
-  const shelters = [
-    { name: 'Rajgir Tourist Shelter Center', capacity: 150, occupied: 42, village: 'Rajgir', block: 'Silao', status: 'Operational' },
-    { name: 'Silao High School Relief Camp', capacity: 200, occupied: 0, village: 'Silao Bazar', block: 'Silao', status: 'Operational' },
-  ]
-
-  const csat = [
-    { deptLabel: 'Health & Family Welfare', rating: 4.6, reviews: 1420 },
-    { deptLabel: 'Water & Sanitation', rating: 4.8, reviews: 2110 },
-    { deptLabel: 'Electricity Board', rating: 3.9, reviews: 920 },
-  ]
-
-  const rankings = [
-    { rank: 1, block: 'Rajgir Block', score: 94 },
-    { rank: 2, block: 'Silao Block', score: 91 },
-    { rank: 3, block: 'Harnaut Block', score: 86 },
-  ]
-
-  // Smart Actions Implementation
-  function handleScheduleInspection(payload) {
-    const newIns = {
-      id: `AUD-0${inspections.length + 1}`,
-      title: payload.title,
-      dept: payload.dept,
-      deptLabel: payload.dept === 'health' ? 'Health & Family Welfare' : 'Water & Sanitation',
-      inspector: payload.inspector,
-      score: null,
-      status: 'Assigned',
-    }
-    setInspections([newIns, ...inspections])
-    pushToast(`Executive inspection scheduled: ${payload.title}`, 'success')
+  // Smart Actions — no backend endpoint exists for these executive registers.
+  function handleScheduleInspection() {
+    pushToast('Executive inspection scheduling is not available on the backend yet (BACKEND GAP).', 'error')
   }
 
-  function handleScheduleMeeting(payload) {
-    const newMeet = {
-      time: '10:30 AM (Tomorrow)',
-      title: payload.title,
-      dept: payload.dept,
-      status: 'Scheduled',
-    }
-    setMeetings([newMeet, ...meetings])
-    pushToast(`Administrative meeting scheduled: ${payload.title}`, 'success')
+  function handleScheduleMeeting() {
+    pushToast('Meeting scheduling is not available on the backend yet (BACKEND GAP).', 'error')
   }
 
-  function handleDispatchTeam(controlRoomId) {
-    setControlRooms((prev) =>
-      prev.map((c) => (c.id === controlRoomId ? { ...c, status: 'Response Active' } : c))
-    )
+  function handleDispatchTeam() {
+    pushToast('Emergency team dispatch is not available on the backend yet (BACKEND GAP).', 'error')
   }
 
   // Universal Search Overlay filter (Module 13)

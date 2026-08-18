@@ -1,8 +1,8 @@
-// State Admin notification inbox — reads the notification feed raised by
-// the finance/governance/project stores (approval pending, budget allocated,
-// fund released, escalated, etc.). Uses the existing uiStore toast system
-// for feedback; unread state lives in the finance store.
-import { useMemo, useState } from 'react'
+// State Admin notification inbox — merges the live notification feed
+// (GET /api/notifications/) with local alerts raised by finance/sanction
+// activity (which the backend does not surface). Unread state for local
+// notifications lives in the finance store; backend items track read locally.
+import { useEffect, useMemo, useState } from 'react'
 import { Bell, CheckCheck, Filter } from 'lucide-react'
 import PageHeader from '../../../components/ui/PageHeader'
 import { Card, CardHeader, CardBody } from '../../../components/ui/Card'
@@ -13,6 +13,7 @@ import Pagination, { usePagedRows } from '../../../components/ui/Pagination'
 import { useStateFinanceStore } from '../store/stateFinanceStore'
 import { useStatePermission } from '../hooks/useStatePermissions'
 import { useUiStore } from '../../../app/store/uiStore'
+import { backendNotificationApi } from '../../../api/notificationApi'
 import { SelectField, FilterStrip } from '../components/StateUI'
 import { STATE_NOTIFICATION_TYPES, STATE_NOTIFICATION_TYPE_LABELS } from '../../../config/stateConstants'
 
@@ -31,24 +32,59 @@ const TONE_BY_TYPE = {
   project_delayed: 'negative',
 }
 
+const toViewItem = (n) => ({
+  id: n.id,
+  type: n.type || 'notification',
+  message: n.message || '',
+  createdAt: n.createdAt || n.created_at || null,
+  departmentId: n.departmentId || null,
+  read: !!n.read,
+  local: false,
+})
+
 export default function StateNotificationsWorkspace() {
   const store = useStateFinanceStore()
   const pushToast = useUiStore((s) => s.pushToast)
   const canMark = useStatePermission('notification.view')
   const [type, setType] = useState('all')
   const [showUnread, setShowUnread] = useState(false)
+  const [backendFeed, setBackendFeed] = useState([])
+  const [backendRead, setBackendRead] = useState({})
+
+  useEffect(() => {
+    let alive = true
+    backendNotificationApi.list().catch(() => []).then((items) => {
+      if (alive) setBackendFeed((items || []).map(toViewItem))
+    })
+    return () => { alive = false }
+  }, [])
 
   const rows = useMemo(() => {
-    return store.notifications.filter((n) => {
+    const local = store.notifications.map((n) => ({ ...n, local: true }))
+    const merged = [...backendFeed, ...local].map((n) => (n.local ? n : { ...n, read: n.read || backendRead[n.id] }))
+    return merged.filter((n) => {
       if (type !== 'all' && n.type !== type) return false
       if (showUnread && n.read) return false
       return true
     })
-  }, [store.notifications, type, showUnread])
+  }, [store.notifications, backendFeed, backendRead, type, showUnread])
 
   const { page, setPage, pageSize, setPageSize, pageRows, total } = usePagedRows(rows)
 
-  const unread = store.notifications.filter((n) => !n.read).length
+  const unread = rows.filter((n) => !n.read).length
+
+  const markRead = (n) => {
+    if (n.read) return
+    if (n.local) store.setNotificationRead(n.id)
+    else setBackendRead((s) => ({ ...s, [n.id]: true }))
+    pushToast('Marked as read.', 'success')
+  }
+
+  const markAllRead = () => {
+    store.markNotificationsRead()
+    setBackendRead(Object.fromEntries(rows.filter((n) => !n.local).map((n) => [n.id, true])))
+    pushToast('All notifications marked as read.', 'success')
+  }
 
   return (
     <div className="px-6 pb-10">
@@ -57,7 +93,7 @@ export default function StateNotificationsWorkspace() {
         title="Notifications"
         description={`System-generated alerts from budget, sanction, release and approval activity — ${unread} unread.`}
         action={
-          <Button variant="ghost" icon={CheckCheck} onClick={() => { store.markNotificationsRead(); pushToast('All notifications marked as read.', 'success') }} disabled={!canMark}>
+          <Button variant="ghost" icon={CheckCheck} onClick={markAllRead} disabled={!canMark}>
             Mark All Read
           </Button>
         }
@@ -86,7 +122,7 @@ export default function StateNotificationsWorkspace() {
                 <button
                   key={n.id}
                   type="button"
-                  onClick={() => { if (!n.read) { store.setNotificationRead(n.id); pushToast('Marked as read.', 'success') } }}
+                  onClick={() => markRead(n)}
                   className={`flex w-full items-start gap-3 px-5 py-3 text-left hover:bg-ink-50 transition-colors ${!n.read ? 'bg-ink-50/60' : ''}`}
                 >
                   <span className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${n.read ? 'bg-ink-200' : 'bg-saffron-500'}`} aria-hidden="true" />

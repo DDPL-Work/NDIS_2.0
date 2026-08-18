@@ -19,6 +19,7 @@ import MapView from '../../../components/map/MapView'
 import { useStateGisStore, ASSET_CATEGORIES } from '../store/stateGisStore'
 import { useStateProjectStore } from '../store/stateProjectStore'
 import { useStateMasterStore } from '../store/stateMasterStore'
+import { backendFacilityApi } from '../../../api/facilityApi'
 import { useStatePermission, useStateActor } from '../hooks/useStatePermissions'
 import { useUiStore } from '../../../app/store/uiStore'
 import { Field, FilterStrip, SummaryPill } from '../components/StateUI'
@@ -204,6 +205,7 @@ function LayersView({ gis, center, zoom }) {
             <LayerControlList gis={gis} />
           </CardBody>
         </Card>
+        <BulkSyncCard gis={gis} />
       </div>
       <div className="space-y-4">
         <div className="relative h-[clamp(320px,45vh,520px)] overflow-hidden rounded-xl border border-ink-100">
@@ -258,9 +260,9 @@ function AssetsView({ gis, master, assets, center, zoom }) {
   const catLabel = (c) => ASSET_CATEGORIES.find((x) => x.value === c)?.label || c
   const districtName = (id) => master.districts.find((d) => d.id === id)?.name || id || '—'
 
-  const save = () => {
+  const save = async () => {
     if (!form.name) throw new Error('Asset name is required.')
-    gis.addAsset({
+    await gis.addAsset({
       actor,
       name: form.name.trim(),
       category: form.category || ASSET_CATEGORIES[0].value,
@@ -276,6 +278,11 @@ function AssetsView({ gis, master, assets, center, zoom }) {
     pushToast(`Asset ${form.name} registered.`, 'success')
     setCreateOpen(false)
     setForm({})
+  }
+
+  const toggleStatus = async (r) => {
+    await gis.toggleAssetStatus(r.id)
+    pushToast(`${r.id} ${r.status === 'active' ? 'deactivated' : 'reactivated'}.`, 'success')
   }
 
   return (
@@ -328,7 +335,7 @@ function AssetsView({ gis, master, assets, center, zoom }) {
                   { key: '_', label: '', render: (r) => (
                     <span className="flex items-center gap-1.5">
                       <Button variant="ghost" size="sm" icon={Eye} onClick={() => setViewFor(r)}>View</Button>
-                      {canManage && <Button variant="ghost" size="sm" icon={Edit3} onClick={() => { gis.toggleAssetStatus(r.id); pushToast(`${r.id} ${r.status === 'active' ? 'deactivated' : 'reactivated'}.`, 'success') }}>Toggle</Button>}
+                      {canManage && <Button variant="ghost" size="sm" icon={Edit3} onClick={() => toggleStatus(r).catch((e) => pushToast(e.message, 'error'))}>Toggle</Button>}
                     </span>
                   ) },
                 ]}
@@ -344,7 +351,7 @@ function AssetsView({ gis, master, assets, center, zoom }) {
         <Modal open onClose={() => setCreateOpen(false)} width="max-w-2xl" title="Register Asset" footer={
           <div className="flex items-center justify-end gap-2">
             <Button variant="ghost" onClick={() => setCreateOpen(false)}>Cancel</Button>
-            <Button onClick={() => { try { save() } catch (e) { pushToast(e.message, 'error') } }}>Register Asset</Button>
+            <Button onClick={() => { save().catch((e) => pushToast(e.message, 'error')) }}>Register Asset</Button>
           </div>
         }>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -404,6 +411,53 @@ function LayerControlList({ gis }) {
       ))}
       <div className="mt-3 rounded-lg bg-ink-50 px-3 py-2 text-[11px] leading-relaxed text-ink-500">Boundary polygons are illustrative approximations for the layer explorer; authoritative BDMS boundaries load from the GIS server in production.</div>
     </div>
+  )
+}
+
+// Bulk facility ↔ GIS coordinate sync (POST /api/facilities/bulk-sync-gis/).
+function BulkSyncCard() {
+  const pushToast = useUiStore((s) => s.pushToast)
+  const [file, setFile] = useState(null)
+  const [syncing, setSyncing] = useState(false)
+  const [result, setResult] = useState(null)
+
+  const runSync = async () => {
+    if (!file) { pushToast('Choose a CSV/XLSX file with the facility GIS coordinates first.', 'error'); return }
+    setSyncing(true)
+    setResult(null)
+    try {
+      const body = new FormData()
+      body.append('file', file)
+      const response = await backendFacilityApi.bulkSyncGis(body)
+      setResult(response)
+      pushToast('Bulk GIS sync completed on the backend.', 'success')
+    } catch (e) {
+      pushToast(`Bulk GIS sync failed: ${e.message}`, 'error')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  return (
+    <Card className="mt-4">
+      <CardHeader title="Bulk GIS Sync" subtitle="Upload facility coordinate sheet (CSV/XLSX)" icon={MapPin} />
+      <CardBody className="space-y-2 text-[12px]">
+        <input
+          type="file"
+          accept=".csv,.xlsx,.xls"
+          onChange={(e) => setFile(e.target.files?.[0] || null)}
+          className="w-full text-[11.5px] file:mr-2 file:rounded-lg file:border-0 file:bg-ink-900 file:px-3 file:py-1.5 file:text-[11.5px] file:font-semibold file:text-white"
+        />
+        <Button size="sm" icon={MapPin} loading={syncing} disabled={!file} onClick={runSync}>
+          Run Bulk Sync
+        </Button>
+        {result && (
+          <div className="rounded-lg bg-leaf-50 border border-leaf-200 px-3 py-2 text-[11.5px] text-leaf-900">
+            Backend accepted the sync.{result.updated != null && ` Updated: ${result.updated}.`}{result.created != null && ` Created: ${result.created}.`}{result.failed != null && ` Failed: ${result.failed}.`}
+          </div>
+        )}
+      </CardBody>
+    </Card>
   )
 }
 

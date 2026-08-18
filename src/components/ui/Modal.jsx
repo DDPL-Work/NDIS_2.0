@@ -3,18 +3,26 @@ import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 
 // Responsive dialog: centered card on desktop, full-width bottom sheet on
-// mobile. Focus is trapped inside, initially placed on the first control,
-// restored on close; ESC and backdrop-click close; body scroll is locked.
+// mobile. Focus is trapped inside, initially placed on the first meaningful
+// control, restored on close; ESC and backdrop-click close; body scroll is locked.
+//
+// Focus lifecycle: the effect below depends ONLY on `open`. Parent re-renders
+// while the modal is open (form typing, select changes, validation, data
+// arrivals) must never re-run it — re-running would re-trigger the initial
+// focus write and steal focus from the active form control.
 export default function Modal({ open, onClose, title, children, footer, width = 'max-w-lg' }) {
   const panelRef = useRef(null)
+  const closeBtnRef = useRef(null)
   const previouslyFocused = useRef(null)
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
 
   useEffect(() => {
     if (!open) return
     previouslyFocused.current = document.activeElement
     const panel = panelRef.current
     const onKey = (e) => {
-      if (e.key === 'Escape') { onClose(); return }
+      if (e.key === 'Escape') { onCloseRef.current(); return }
       if (e.key !== 'Tab' || !panel) return
       const focusables = panel.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')
       if (!focusables.length) { e.preventDefault(); return }
@@ -26,16 +34,21 @@ export default function Modal({ open, onClose, title, children, footer, width = 
     document.addEventListener('keydown', onKey)
     document.body.style.overflow = 'hidden'
     const frame = requestAnimationFrame(() => {
-      const first = panel?.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')
-      ;(first || panel)?.focus?.()
+      const all = panel?.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')
+      if (!all || !all.length) { panel?.focus?.(); return }
+      // The header close button precedes the dialog body in the DOM, so the
+      // first focusable is NOT the right initial target — land on the first
+      // meaningful control (the form's first field) instead.
+      const first = [...all].find((el) => el !== closeBtnRef.current) || all[0]
+      first.focus?.()
     })
     return () => {
       cancelAnimationFrame(frame)
       document.removeEventListener('keydown', onKey)
       document.body.style.overflow = ''
-      previouslyFocused.current?.focus?.()
+      previouslyFocused.current?.focus()
     }
-  }, [open, onClose])
+  }, [open])
 
   if (!open) return null
 
@@ -52,7 +65,7 @@ export default function Modal({ open, onClose, title, children, footer, width = 
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-ink-100 shrink-0">
           <h3 className="text-[15px] font-semibold text-ink-950 break-words">{title}</h3>
-          <button onClick={onClose} className="grid h-7 w-7 place-items-center rounded-md text-ink-400 hover:bg-ink-100 hover:text-ink-700">
+          <button ref={closeBtnRef} type="button" aria-label="Close" onClick={onClose} className="grid h-7 w-7 place-items-center rounded-md text-ink-400 hover:bg-ink-100 hover:text-ink-700">
             <X size={16} />
           </button>
         </div>

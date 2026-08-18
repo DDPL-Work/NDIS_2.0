@@ -42,20 +42,6 @@ class DepartmentRegistrySystem {
             { id: 'gis_mini_map', type: 'gis_mini_map', title: 'Department Asset Map', span: 4 },
           ],
           documentCategories: ['Inspection Reports', 'Sanction Directives', 'Maintenance Logs'],
-          sampleAssets: [
-            {
-              id: `${dept.id.toUpperCase()}-AST-001`,
-              name: `Central ${dept.label} Facility Nalanda`,
-              type: `${dept.id}_primary`,
-              typeLabel: `Primary ${dept.label} Facility`,
-              village: 'Rajgir',
-              block: 'Silao',
-              position: [85.4211, 25.0294],
-              status: 'active',
-              attributes: { condition_rating: 'Good', operational_since: '2021' },
-              lastInspected: new Date(Date.now() - 72 * 3600 * 1000).toISOString(),
-            },
-          ],
         })
       }
     })

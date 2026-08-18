@@ -122,23 +122,23 @@ export default function Topbar({ title, subtitle, showDistrict = true, showDepar
 
         <div className="flex items-center gap-1 sm:gap-2 shrink-0 min-w-0">
           {/* Cmd+K Quick Search Trigger Button */}
-          <button
+          {/* <button
             onClick={() => setCmdOpen(true)}
             className="hidden sm:flex items-center gap-2 rounded-lg border border-ink-200 bg-ink-50 px-2.5 py-1.5 text-[12px] text-ink-500 hover:bg-white hover:border-ink-300 transition-colors"
           >
             <Search size={14} />
             <span>Search NDISP…</span>
             <kbd className="font-mono text-[10px] text-ink-400 bg-white px-1.5 py-0.5 rounded border border-ink-200">⌘K</kbd>
-          </button>
+          </button> */}
 
           {/* Mobile-only search trigger so the palette stays reachable on phones */}
-          <button
+          {/* <button
             onClick={() => setCmdOpen(true)}
             className="sm:hidden grid h-9 w-9 place-items-center rounded-lg text-ink-500 hover:bg-ink-100 transition-colors"
             aria-label="Search NDISP"
           >
             <Search size={17} />
-          </button>
+          </button> */}
 
           {showDepartment && (
             <div className="hidden sm:flex items-center max-w-[180px] min-w-0">

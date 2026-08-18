@@ -3,8 +3,7 @@ import StatCard from '../../../components/ui/StatCard'
 import Badge from '../../../components/ui/Badge'
 import Button from '../../../components/ui/Button'
 import {
-  Gavel, Sparkles, AlertTriangle, ShieldAlert, CloudLightning,
-  Clock, ShieldCheck, MapPin, Building2, Eye, Search, AlertCircle
+  Gavel, Sparkles, AlertTriangle, Clock, MapPin, Eye, Search, Building2, CheckCircle2
 } from 'lucide-react'
 
 export default function OverviewTab({ stats, brief, onInspectComplaint, onGlobalSearch }) {
@@ -21,38 +20,44 @@ export default function OverviewTab({ stats, brief, onInspectComplaint, onGlobal
         />
       </div>
 
-      {/* Main Grid: Statistics & Brief */}
+      {/* Main Grid: Live district statistics & brief */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* District Profile stats (Module 1) */}
+        {/* District profile stats — live backend complaint & registry figures */}
         <div className="lg:col-span-2 space-y-5">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3.5">
-            <StatCard label="District Population" value={stats.population.toLocaleString('en-IN')} icon={MapPin} tone="ink" />
-            <StatCard label="Total Blocks" value={stats.blocksCount} icon={Building2} tone="ink" />
-            <StatCard label="Road Length" value={`${stats.roadLengthKm} Km`} icon={Gavel} tone="ink" />
-            <StatCard label="Hospitals & PHCs" value={stats.hospitalsCount} icon={Building2} tone="leaf" />
-            <StatCard label="Schools Count" value={stats.schoolsCount} icon={Building2} tone="sky" />
-            <StatCard label="Active Schemes" value={stats.runningSchemesCount || 7} icon={Sparkles} tone="saffron" />
+            <StatCard label="Complaints Registered" value={stats.complaintsTotal.toLocaleString('en-IN')} icon={Gavel} tone="ink" />
+            <StatCard label="Pending Action" value={stats.complaintsPending} icon={Clock} tone="saffron" />
+            <StatCard label="Resolved" value={stats.complaintsResolved} icon={CheckCircle2} tone="leaf" />
+            <StatCard label="Escalated" value={stats.complaintsEscalated} icon={AlertTriangle} tone="alert" />
+            <StatCard label="SLA Compliance" value={`${stats.slaPct}%`} icon={Sparkles} tone="sky" />
+            <StatCard label="Departments" value={stats.departmentsCount} icon={Building2} tone="ink" />
           </div>
 
-          {/* SLA Breaches / Notifications (Module 12) */}
+          {/* SLA breach focus (live from complaint registry) */}
           <Card>
-            <CardHeader title="Governance SLA & Notifications" subtitle="Recent critical events" icon={AlertCircle} />
+            <CardHeader title="Governance SLA Focus" subtitle="Complaints currently past their SLA window" icon={Clock} />
             <CardBody className="space-y-3">
-              <div className="p-3 rounded-xl bg-orange-50 border border-orange-200 text-orange-950 flex items-start gap-2.5 text-[12px]">
-                <CloudLightning size={18} className="text-orange-600 shrink-0 mt-0.5" />
-                <div>
-                  <span className="font-semibold block">Weather Warning Orange Alert</span>
-                  <p className="mt-0.5 leading-relaxed">{brief.weather.condition}</p>
+              {stats.slaBreached === 0 ? (
+                <div className="p-3 rounded-xl bg-leaf-50 border border-leaf-200 text-leaf-900 text-[12.5px]">
+                  No complaints are currently past their SLA window.
                 </div>
-              </div>
+              ) : (
+                <div className="p-3 rounded-xl bg-orange-50 border border-orange-200 text-orange-950 flex items-start gap-2.5 text-[12px]">
+                  <AlertTriangle size={18} className="text-orange-600 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-semibold block">SLA Breach Alert</span>
+                    <p className="mt-0.5 leading-relaxed">{stats.slaBreached} open complaint(s) have exceeded their resolution SLA and require Collector attention.</p>
+                  </div>
+                </div>
+              )}
             </CardBody>
           </Card>
         </div>
 
-        {/* AI Brief (Module 2) */}
+        {/* Live command brief */}
         <div className="space-y-5">
           <Card>
-            <CardHeader title="AI District Daily Brief" subtitle={brief.date} icon={Sparkles} />
+            <CardHeader title="District Command Brief" subtitle={brief.date} icon={Sparkles} />
             <CardBody className="space-y-3.5 text-[12px]">
               {/* Daily Stats Summary */}
               <div className="grid grid-cols-2 gap-2 bg-ink-50 p-2.5 rounded-xl text-center">
@@ -70,32 +75,28 @@ export default function OverviewTab({ stats, brief, onInspectComplaint, onGlobal
               <div>
                 <span className="font-semibold text-ink-800 block mb-1">Today's Focus:</span>
                 <div className="space-y-1.5">
-                  {brief.criticalTickets.map((t) => (
-                    <div key={t.id} className="flex items-center justify-between p-2 rounded-lg bg-ink-50 hover:bg-ink-100/50 transition-colors">
-                      <span className="truncate font-medium text-ink-900 pr-2">{t.title}</span>
-                      <Button size="xs" variant="outline" icon={Eye} onClick={() => onInspectComplaint(t.id)}>
-                        Inspect
-                      </Button>
-                    </div>
-                  ))}
+                  {brief.criticalTickets.length === 0 ? (
+                    <p className="p-2 rounded-lg bg-ink-50 text-ink-500">No critical tickets in the live queue.</p>
+                  ) : (
+                    brief.criticalTickets.map((t) => (
+                      <div key={t.id} className="flex items-center justify-between p-2 rounded-lg bg-ink-50 hover:bg-ink-100/50 transition-colors">
+                        <span className="truncate font-medium text-ink-900 pr-2">{t.title}</span>
+                        <Button size="xs" variant="outline" icon={Eye} onClick={() => onInspectComplaint(t.id)}>
+                          Inspect
+                        </Button>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
 
-              {/* Absent Staff Warning */}
-              <div className="p-2.5 rounded-lg bg-saffron-50 border border-saffron-200 text-saffron-900 flex items-center justify-between">
-                <span>Field staff absent count: <strong>{brief.absentStaff}</strong></span>
-                <Badge tone="warning">Warning</Badge>
-              </div>
-
-              {/* AI Recommendation execution */}
-              <div className="space-y-2">
-                <span className="font-semibold text-ink-800 block">AI Executive Advisory:</span>
-                {brief.aiRecommendations.map((rec, idx) => (
-                  <div key={idx} className="p-2.5 bg-leaf-50 border border-leaf-200 rounded-xl text-leaf-950 leading-snug">
-                    {rec}
-                  </div>
-                ))}
-              </div>
+              {/* Department load focus (derived from live complaints) */}
+              {brief.topDept && (
+                <div className="p-2.5 rounded-lg bg-saffron-50 border border-saffron-200 text-saffron-900 flex items-center justify-between">
+                  <span>Highest open load: <strong>{brief.topDept.slug}</strong> ({brief.topDept.openCount} open)</span>
+                  <Badge tone="warning">Focus</Badge>
+                </div>
+              )}
             </CardBody>
           </Card>
         </div>

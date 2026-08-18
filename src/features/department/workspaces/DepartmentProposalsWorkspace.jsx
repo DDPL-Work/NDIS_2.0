@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import {
-  FilePlus, ClipboardList, TrendingUp, Sparkles, Eye, Plus, Copy,
+  ClipboardList, TrendingUp, Sparkles, Eye, Plus, Copy,
   CheckCircle, ArrowRight, X, AlertTriangle, HelpCircle, FileText
 } from 'lucide-react'
 import PageHeader from '../../../components/ui/PageHeader'
@@ -10,17 +10,32 @@ import Button from '../../../components/ui/Button'
 import Modal from '../../../components/ui/Modal'
 import { Card, CardHeader, CardBody } from '../../../components/ui/Card'
 import { useDepartment } from '../framework/DepartmentContext'
-import { useProjectEngine } from '../../../app/store/projectEngine'
 import { useUiStore } from '../../../app/store/uiStore'
+import { useAsync } from '../../../hooks/useAsync'
+import { useDataVersion, DATA_SCOPES } from '../../../app/store/dataVersionStore'
+import { backendProposalApi } from '../../../api/proposalApi'
+import { BackendCapabilityError } from '../../../api/apiClient'
 import { formatCurrencyINR, formatDateTime } from '../../../utils/format'
 
+const STATUS_TONE = {
+  DRAFT_DPR: 'neutral',
+  PENDING_REVIEW: 'warning',
+  APPROVED: 'positive',
+  SANCTIONED: 'positive',
+  IN_EXECUTION: 'info',
+  COMPLETED: 'positive',
+  REJECTED: 'negative',
+}
+
 export default function DepartmentProposalsWorkspace() {
-  const { dept, proposals, complaints } = useDepartment()
+  const { dept, complaints } = useDepartment()
   const pushToast = useUiStore((s) => s.pushToast)
 
-  const createProposal = useProjectEngine((s) => s.createProposal)
-  const duplicateProposal = useProjectEngine((s) => s.duplicateProposal)
-  const transitionProposal = useProjectEngine((s) => s.transitionProposal)
+  const proposalsVersion = useDataVersion((s) => s.versions[DATA_SCOPES.PROPOSALS] || 0)
+  const { data: proposals, loading, error, refetch } = useAsync(
+    () => backendProposalApi.list({ department: dept.id }),
+    [dept.id, proposalsVersion],
+  )
 
   const [selectedProposal, setSelectedProposal] = useState(null)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
@@ -41,50 +56,45 @@ export default function DepartmentProposalsWorkspace() {
     address: '',
     latitude: '',
     longitude: '',
-    collaborators: []
   })
 
-  // AI Gap analysis trigger
+  // AI Gap analysis trigger (derived from live complaints)
   const recurringComplaints = useMemo(() => {
     return complaints.filter(c => c.state === 'escalated' || c.priority === 'urgent')
   }, [complaints])
 
   const showAiDraftOption = recurringComplaints.length >= 1
 
-  function handleCreate(e) {
+  async function handleCreate(e) {
     e.preventDefault()
     if (!formData.title || !formData.financialEstimate) {
       pushToast('Please fill all mandatory fields.', 'error')
       return
     }
-
-    const payload = {
-      title: formData.title,
-      departmentId: dept.id,
-      description: formData.description,
-      needAssessment: formData.needAssessment,
-      problemStatement: formData.problemStatement,
-      objectives: formData.objectives,
-      expectedOutcomes: formData.expectedOutcomes,
-      financialEstimate: Number(formData.financialEstimate),
-      timeline: formData.timeline,
-      risk: formData.risk,
-      priority: formData.priority,
-      beneficiary: formData.beneficiary,
-      population: Number(formData.population || 0),
-      schemeMapping: formData.schemeMapping,
-      gisLocation: {
-        position: [Number(formData.longitude || 85.4211), Number(formData.latitude || 25.0294)],
-        address: formData.address || 'District Office Site'
-      },
-      collaborators: formData.collaborators,
-      creatorName: 'Officer ' + dept.code
+    try {
+      await backendProposalApi.create({
+        title: formData.title,
+        department: dept.id,
+        description: formData.description,
+        need_assessment: formData.needAssessment,
+        problem_statement: formData.problemStatement,
+        objectives: formData.objectives,
+        expected_outcomes: formData.expectedOutcomes,
+        estimated_cost: Number(formData.financialEstimate),
+        estimated_timeline: formData.timeline,
+        risk_level: formData.risk,
+        priority: formData.priority,
+        population_impact: Number(formData.population || 0),
+        village: formData.address,
+        latitude: formData.latitude ? Number(formData.latitude) : null,
+        longitude: formData.longitude ? Number(formData.longitude) : null,
+      })
+      pushToast('Proposal draft saved on the backend.', 'success')
+      setIsCreateModalOpen(false)
+      resetForm()
+    } catch (e) {
+      pushToast(`Draft failed: ${e.message}`, 'error')
     }
-
-    const created = createProposal(payload)
-    pushToast(`Proposal ${created.id} drafted successfully!`, 'success')
-    setIsCreateModalOpen(false)
-    resetForm()
   }
 
   function handleAiAutoDraft() {
@@ -107,24 +117,21 @@ export default function DepartmentProposalsWorkspace() {
       address: primaryIssue.location.address,
       latitude: String(primaryIssue.location.position[1]),
       longitude: String(primaryIssue.location.position[0]),
-      collaborators: []
     })
     setIsCreateModalOpen(true)
     pushToast('Auto-drafted proposal form from AI Gap Analysis!', 'success')
   }
 
-  function handleDuplicate(pId) {
-    const dup = duplicateProposal(pId)
-    if (dup) {
-      pushToast(`Proposal duplicated successfully as ${dup.id}!`, 'success')
-    }
+  function handleDuplicate() {
+    pushToast('Duplicating proposals is not supported by the backend (BACKEND GAP).', 'error')
   }
 
-  function handleTransition(pId, nextState) {
-    const user = { name: 'District officer ' + dept.code, role: 'dept_head' }
-    transitionProposal(pId, nextState, user, `Proposal transitioned to ${nextState.replace(/_/g, ' ')}`)
-    pushToast(`Proposal status updated to ${nextState.toUpperCase()}`, 'success')
-    setSelectedProposal(null)
+  async function handleSubmitForReview(pId) {
+    try {
+      await backendProposalApi.submit(pId)
+      pushToast(`Proposal ${pId} submitted for review.`, 'success')
+      setSelectedProposal(null)
+    } catch (e) { pushToast(`Submission failed: ${e.message}`, 'error') }
   }
 
   function resetForm() {
@@ -145,20 +152,19 @@ export default function DepartmentProposalsWorkspace() {
       address: '',
       latitude: '',
       longitude: '',
-      collaborators: []
     })
   }
 
   const columns = [
-    { key: 'id', label: 'ID', render: (r) => <span className="kbd-mono text-[11.5px] font-bold text-ink-900">{r.id}</span> },
+    { key: 'proposalId', label: 'ID', render: (r) => <span className="kbd-mono text-[11.5px] font-bold text-ink-900">{r.proposalId}</span> },
     { key: 'title', label: 'Title', render: (r) => <span className="font-semibold text-ink-950 block truncate max-w-[200px]">{r.title}</span> },
-    { key: 'financialEstimate', label: 'Est. Cost', render: (r) => <span className="font-mono">{formatCurrencyINR(r.financialEstimate)}</span> },
-    { key: 'priority', label: 'Priority', render: (r) => <Badge tone={r.priority === 'urgent' ? 'negative' : r.priority === 'high' ? 'warning' : 'info'}>{r.priority.toUpperCase()}</Badge> },
-    { key: 'state', label: 'State', render: (r) => <Badge tone={r.state === 'approved' ? 'positive' : r.state === 'draft' ? 'neutral' : 'warning'}>{r.state.toUpperCase().replace(/_/g, ' ')}</Badge> },
+    { key: 'estimatedCost', label: 'Est. Cost', render: (r) => <span className="font-mono">{formatCurrencyINR(r.estimatedCost)}</span> },
+    { key: 'priority', label: 'Priority', render: (r) => <Badge tone={r.priority === 'urgent' ? 'negative' : r.priority === 'high' ? 'warning' : 'info'}>{String(r.priority || '—').toUpperCase()}</Badge> },
+    { key: 'status', label: 'State', render: (r) => <Badge tone={STATUS_TONE[r.status] || 'neutral'}>{r.statusDisplay || r.status || '—'}</Badge> },
     { key: 'action', label: 'Actions', render: (r) => (
       <div className="flex gap-1.5" onClick={(e) => e.stopPropagation()}>
         <Button size="xs" variant="outline" icon={Eye} onClick={() => setSelectedProposal(r)}>View</Button>
-        <Button size="xs" variant="outline" icon={Copy} onClick={() => handleDuplicate(r.id)}>Dup</Button>
+        <Button size="xs" variant="outline" icon={Copy} onClick={handleDuplicate}>Dup</Button>
       </div>
     )}
   ]
@@ -168,7 +174,7 @@ export default function DepartmentProposalsWorkspace() {
       <PageHeader
         eyebrow={`Project Planning & Proposals · ${dept.code}`}
         title={`${dept.label} Proposals Engine`}
-        description="Draft, duplicate, import DPR files, run AI reviews, and transition proposals along the district approval pipeline."
+        description="Draft proposals on the backend, submit them for review, and track them along the district approval pipeline."
         action={
           <div className="flex gap-2">
             {showAiDraftOption && (
@@ -186,9 +192,18 @@ export default function DepartmentProposalsWorkspace() {
       <div className="px-6 grid grid-cols-1 lg:grid-cols-4 gap-5">
         <div className="lg:col-span-3 space-y-4">
           <Card>
-            <CardHeader title="Proposals Pipeline Ledger" subtitle="Review active drafts and approval states" icon={ClipboardList} />
+            <CardHeader title="Proposals Pipeline Ledger" subtitle="Live backend proposal register" icon={ClipboardList} />
             <CardBody className="!p-0">
-              <DataTable columns={columns} rows={proposals} onRowClick={(row) => setSelectedProposal(row)} />
+              {error ? (
+                <div className="flex items-center justify-between gap-3 px-4 py-3">
+                  <p className="text-sm text-red-700">{error.status === 401 || error.status === 403 ? 'You are not authorized to access this proposal register.' : `Unable to load proposals: ${error.message}`}</p>
+                  <Button size="sm" variant="outline" onClick={refetch}>Retry</Button>
+                </div>
+              ) : loading && !proposals ? (
+                <p className="px-4 py-4 text-sm text-ink-500">Loading proposals…</p>
+              ) : (
+                <DataTable columns={columns} rows={proposals || []} emptyLabel="No proposals on the backend for this department" onRowClick={(row) => setSelectedProposal(row)} />
+              )}
             </CardBody>
           </Card>
         </div>
@@ -216,13 +231,13 @@ export default function DepartmentProposalsWorkspace() {
             <CardHeader title="Proposal Workflow Stages" icon={FileText} />
             <CardBody className="text-[11.5px] space-y-2 text-ink-600 leading-relaxed">
               <div className="flex items-center gap-1.5 font-semibold text-ink-800">
-                <span>Draft</span> <ArrowRight size={12} />
-                <span>Internal Review</span> <ArrowRight size={12} />
-                <span>DM/Collector</span> <ArrowRight size={12} />
-                <span>State</span> <ArrowRight size={12} />
-                <span>Approved</span>
+                <span>Draft DPR</span> <ArrowRight size={12} />
+                <span>Pending Review</span> <ArrowRight size={12} />
+                <span>Approved</span> <ArrowRight size={12} />
+                <span>Sanctioned</span> <ArrowRight size={12} />
+                <span>Execution</span>
               </div>
-              <p>Approved proposals automatically trigger execution status, creating associated projects, work orders, and initial milestones.</p>
+              <p>Submission moves the draft to the review queue; approval and sanction are decided on the backend by the competent authority.</p>
             </CardBody>
           </Card>
         </div>
@@ -234,68 +249,62 @@ export default function DepartmentProposalsWorkspace() {
           <div className="space-y-4">
             <div className="flex justify-between items-start">
               <div>
-                <span className="kbd-mono text-[11px] font-bold text-ink-400">{selectedProposal.id}</span>
+                <span className="kbd-mono text-[11px] font-bold text-ink-400">{selectedProposal.proposalId}</span>
                 <h3 className="text-lg font-bold text-ink-950 mt-1">{selectedProposal.title}</h3>
               </div>
-              <Badge tone={selectedProposal.state === 'approved' ? 'positive' : 'warning'}>{selectedProposal.state.toUpperCase()}</Badge>
+              <Badge tone={STATUS_TONE[selectedProposal.status] || 'neutral'}>{selectedProposal.statusDisplay || selectedProposal.status}</Badge>
             </div>
 
             <div className="grid grid-cols-2 gap-4 text-[12.5px] bg-ink-50/50 p-3 rounded-xl">
               <div>
                 <span className="text-ink-400 block text-[11px]">FINANCIAL ESTIMATE</span>
-                <span className="font-bold text-ink-900">{formatCurrencyINR(selectedProposal.financialEstimate)}</span>
+                <span className="font-bold text-ink-900">{formatCurrencyINR(selectedProposal.estimatedCost)}</span>
               </div>
               <div>
                 <span className="text-ink-400 block text-[11px]">TIMELINE</span>
-                <span className="font-semibold text-ink-900">{selectedProposal.timeline}</span>
+                <span className="font-semibold text-ink-900">{selectedProposal.estimatedTimeline || '—'}</span>
               </div>
               <div>
                 <span className="text-ink-400 block text-[11px]">TARGET POPULATION</span>
-                <span className="font-semibold text-ink-900">{selectedProposal.population.toLocaleString('en-IN')} beneficiaries</span>
+                <span className="font-semibold text-ink-900">{selectedProposal.populationImpact ? `${selectedProposal.populationImpact.toLocaleString('en-IN')} beneficiaries` : '—'}</span>
               </div>
               <div>
-                <span className="text-ink-400 block text-[11px]">SCHEME MAPPING</span>
-                <span className="font-semibold text-ink-900">{selectedProposal.schemeMapping || 'General Capital fund'}</span>
+                <span className="text-ink-400 block text-[11px]">DEPARTMENT</span>
+                <span className="font-semibold text-ink-900">{selectedProposal.departmentName || selectedProposal.departmentId || '—'}</span>
               </div>
             </div>
 
             <div className="space-y-1.5 text-[12.5px]">
               <span className="font-semibold text-ink-800">Problem Statement & Need</span>
-              <p className="text-ink-600 bg-ink-50/30 p-2.5 rounded-lg border border-ink-100">{selectedProposal.needAssessment || selectedProposal.description}</p>
+              <p className="text-ink-600 bg-ink-50/30 p-2.5 rounded-lg border border-ink-100">{selectedProposal.problemStatement || selectedProposal.engineeringNotes || '—'}</p>
             </div>
 
             <div className="space-y-2">
-              <span className="font-semibold text-ink-800 text-[12.5px]">Proposal Approval Actions</span>
+              <span className="font-semibold text-ink-800 text-[12.5px]">Proposal Actions</span>
               <div className="flex gap-2">
-                {selectedProposal.state === 'draft' && (
-                  <Button size="sm" onClick={() => handleTransition(selectedProposal.id, 'internal_review')}>Submit for Internal Review</Button>
+                {selectedProposal.status === 'DRAFT_DPR' && (
+                  <Button size="sm" icon={CheckCircle} onClick={() => handleSubmitForReview(selectedProposal.id)}>Submit for Review</Button>
                 )}
-                {selectedProposal.state === 'internal_review' && (
-                  <Button size="sm" onClick={() => handleTransition(selectedProposal.id, 'collector')}>Forward to District Collector</Button>
-                )}
-                {selectedProposal.state === 'collector' && (
-                  <>
-                    <Button size="sm" onClick={() => handleTransition(selectedProposal.id, 'approved')}>Collector Approve (Direct)</Button>
-                    <Button size="sm" variant="outline" tone="alert" onClick={() => handleTransition(selectedProposal.id, 'draft')}>Reject/Return Draft</Button>
-                  </>
+                {selectedProposal.status !== 'DRAFT_DPR' && (
+                  <p className="text-[11.5px] text-ink-500">Further stages (review, approval, sanction) are handled in the competent authority queue on the backend.</p>
                 )}
               </div>
             </div>
 
-            <div className="border-t border-ink-100 pt-3">
-              <span className="font-semibold text-ink-800 text-[12.5px] block mb-2">Audit History Trail</span>
-              <div className="space-y-2 max-h-40 overflow-y-auto">
-                {selectedProposal.auditTrail?.map((trail, idx) => (
-                  <div key={idx} className="text-[11.5px] flex justify-between border-b border-ink-50 pb-1.5 last:border-0">
-                    <div>
-                      <span className="font-semibold text-ink-800">{trail.actorName} ({trail.actorRole})</span>
-                      <span className="text-ink-500 ml-2">{trail.action}</span>
-                      {trail.remarks && <p className="text-[11px] text-ink-400 mt-0.5">{trail.remarks}</p>}
-                    </div>
-                    <span className="text-[10px] text-ink-400">{formatDateTime(trail.timestamp)}</span>
-                  </div>
-                ))}
-              </div>
+            <div className="border-t border-ink-100 pt-3 space-y-1.5 text-[12px]">
+              <span className="font-semibold text-ink-800 block">Review Trail</span>
+              {selectedProposal.reviewNotes && (
+                <p className="text-ink-600"><span className="text-ink-400">Review notes:</span> {selectedProposal.reviewNotes}</p>
+              )}
+              {selectedProposal.reviewedByName && (
+                <p className="text-ink-600"><span className="text-ink-400">Reviewed by:</span> {selectedProposal.reviewedByName}{selectedProposal.reviewedAt ? ` · ${formatDateTime(selectedProposal.reviewedAt)}` : ''}</p>
+              )}
+              {selectedProposal.approvedByName && (
+                <p className="text-ink-600"><span className="text-ink-400">Approved by:</span> {selectedProposal.approvedByName}{selectedProposal.approvedAt ? ` · ${formatDateTime(selectedProposal.approvedAt)}` : ''}</p>
+              )}
+              {!selectedProposal.reviewNotes && !selectedProposal.reviewedByName && !selectedProposal.approvedByName && (
+                <p className="text-ink-500">No review activity recorded yet.</p>
+              )}
             </div>
           </div>
         )}

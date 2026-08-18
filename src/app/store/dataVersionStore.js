@@ -17,6 +17,11 @@ export const DATA_SCOPES = {
   DASHBOARD: 'dashboard',
   FACILITIES: 'facilities',
   GIS: 'gis',
+  COMPLAINTS: 'complaints',
+  TIMELINE: 'timeline',
+  NOTIFICATIONS: 'notifications',
+  EMPLOYEES: 'employees',
+  BUDGET: 'budget',
 }
 
 export const useDataVersion = create((set) => ({

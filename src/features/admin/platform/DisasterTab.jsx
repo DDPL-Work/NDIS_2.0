@@ -36,13 +36,13 @@ export default function DisasterTab({ shelters, controlRooms, onDispatchTeam }) 
 
   return (
     <div className="space-y-6">
-      {/* Flood / Heatwave Alerts Banner */}
-      <div className="p-4 rounded-xl bg-orange-50 border border-orange-200 text-orange-950 flex items-start gap-3 text-[12.5px]">
-        <CloudLightning size={20} className="text-orange-600 shrink-0 mt-0.5" />
+      {/* Emergency readiness note — no disaster telemetry endpoint exists */}
+      <div className="p-4 rounded-xl bg-ink-50 border border-ink-200 text-ink-800 flex items-start gap-3 text-[12.5px]">
+        <CloudLightning size={20} className="text-ink-500 shrink-0 mt-0.5" />
         <div className="space-y-1">
-          <strong className="block font-semibold">Active Orange Alert: Monsoon Flood Watch</strong>
+          <strong className="block font-semibold">Disaster Telemetry — Backend Gap</strong>
           <p className="leading-relaxed">
-            Nalanda District administration has initiated flood patrol along low-lying embankments. 8 shelter stations seeded with dry rations and medical kits.
+            Shelter registers, control rooms and emergency dispatch are not exposed by the backend yet. This panel will render live readiness data once the endpoint is available.
           </p>
         </div>
       </div>
@@ -53,7 +53,7 @@ export default function DisasterTab({ shelters, controlRooms, onDispatchTeam }) 
         <Card>
           <CardHeader title="Rapid Response Control Rooms" subtitle="Command centers under active monitor" icon={Flame} />
           <CardBody className="!p-0">
-            <DataTable columns={controlColumns} rows={controlRooms} />
+            <DataTable columns={controlColumns} rows={controlRooms} emptyLabel="No control rooms registered on the backend" />
           </CardBody>
         </Card>
 
@@ -61,26 +61,26 @@ export default function DisasterTab({ shelters, controlRooms, onDispatchTeam }) 
         <Card>
           <CardHeader title="Emergency Shelters Register" subtitle="Temporary medical & relief shelter stations" icon={HelpCircle} />
           <CardBody className="!p-0">
-            <DataTable columns={shelterColumns} rows={shelters} />
+            <DataTable columns={shelterColumns} rows={shelters} emptyLabel="No shelters registered on the backend" />
           </CardBody>
         </Card>
       </div>
 
       {/* Emergency Contacts */}
       <Card>
-        <CardHeader title="District Emergency Response Hotline Directory" subtitle="Standard active call lines" icon={PhoneCall} />
+        <CardHeader title="District Emergency Response Directory" subtitle="Standard state helpline lines" icon={PhoneCall} />
         <CardBody className="grid grid-cols-1 md:grid-cols-3 gap-3 text-[12.5px] font-mono">
           <div className="p-3 bg-ink-50 rounded-xl">
-            <span className="text-ink-400 block text-[10px] uppercase font-semibold">District Control Helpline</span>
-            <span className="text-[14px] font-bold text-ink-950">06112-225224</span>
+            <span className="text-ink-400 block text-[10px] uppercase font-semibold">National Emergency</span>
+            <span className="text-[14px] font-bold text-ink-950">112</span>
           </div>
           <div className="p-3 bg-ink-50 rounded-xl">
-            <span className="text-ink-400 block text-[10px] uppercase font-semibold">Disaster Response Desk</span>
+            <span className="text-ink-400 block text-[10px] uppercase font-semibold">Disaster Response</span>
             <span className="text-[14px] font-bold text-alert-700">1077 (Toll Free)</span>
           </div>
           <div className="p-3 bg-ink-50 rounded-xl">
-            <span className="text-ink-400 block text-[10px] uppercase font-semibold">Chief Medical Nodal Officer</span>
-            <span className="text-[14px] font-bold text-ink-950">+91 94318 22104</span>
+            <span className="text-ink-400 block text-[10px] uppercase font-semibold">Citizen Services</span>
+            <span className="text-[14px] font-bold text-ink-950">1070 (Toll Free)</span>
           </div>
         </CardBody>
       </Card>

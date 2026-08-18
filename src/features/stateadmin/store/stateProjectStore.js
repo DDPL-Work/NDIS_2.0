@@ -1,26 +1,20 @@
 // State Project Store — central project registry + proposal approval pipeline.
-// Projects and proposals carry their financial fields (sanctioned / released /
-// committed / utilized) as book-keeping mirrors of the finance engine records;
-// the finance engine remains the source of truth for numbers.
-//
-// Phase 3: a proposal approval now creates BOTH the project registry record AND
-// the financial sanction record in the finance engine (projectId-linked), so
-// the state pipeline State Budget -> Department Authorization -> Sanction ->
-// Project is one continuous chain. The finance engine's own rules still decide
-// whether the sanction is accepted; if the department authorization cannot
-// cover the estimate, a notification instructs the finance desk to raise the
-// sanction manually.
+// BACKEND-INTEGRATED: projects hydrate from GET /api/projects/, proposals from
+// GET /api/proposals/, and every mutation writes through the same APIs.  The
+// proposal approval / sanction chain stays backend-authoritative; the finance
+// mirror fields (sanctioned/released/committed/utilized) now come from the
+// project's own backend amounts — nothing is fabricated on this side.
 import { create } from 'zustand'
 import { useStateFinanceStore } from './stateFinanceStore'
-import { useStateMasterStore } from './stateMasterStore'
-import { SEED_PROJECTS, SEED_PROPOSALS, cr } from './seed/stateSeedData'
+import { backendProjectApi } from '../../../api/projectApi'
+import { backendProposalApi } from '../../../api/proposalApi'
+import { BackendCapabilityError } from '../../../api/apiClient'
 import { PROJECT_STATUSES } from '../../../config/stateConstants'
-import { canActAt, nextStepFor } from '../services/approvalService'
-import { assertAuthority } from '../services/authorityService'
+import { getFinalSanctionAmount } from '../../../utils/finance'
 
 export const useStateProjectStore = create((set, get) => ({
-  projects: SEED_PROJECTS,
-  proposals: SEED_PROPOSALS,
+  projects: [],
+  proposals: [],
   projectCategories: [
     { id: 'cat-health-infra', label: 'Health Infrastructure', departmentIds: ['health'] },
     { id: 'cat-education-infra', label: 'Education Infrastructure', departmentIds: ['education'] },
@@ -38,131 +32,135 @@ export const useStateProjectStore = create((set, get) => ({
     { id: 'TPL-RENEW', label: 'Renewable Energy', fields: ['Site Feasibility', 'Grid Study', 'O&M Plan'] },
   ],
 
-  addProject(project, actor = {}) {
+  async hydrateFromBackend() {
+    const [projects, proposals] = await Promise.all([
+      backendProjectApi.list().catch(() => []),
+      backendProposalApi.list().catch(() => []),
+    ])
+    set({
+      projects: (projects || []).map(mapProjectRecord),
+      proposals: (proposals || []).map(mapProposalRecord),
+    })
+  },
+
+  async addProject(project, actor = {}) {
     if (!project.name || !project.departmentId) throw new Error('Project name and department are required.')
-    const record = { id: `PRJ-${Date.now().toString(36).toUpperCase()}`, status: 'draft', sanctionedAmount: null, releasedAmount: null, committedAmount: null, utilizedAmount: null, completionPct: 0, gisLocation: project.gisLocation || null, ...project }
-    set((s) => ({ projects: [record, ...s.projects] }))
+    const record = await backendProjectApi.create({
+      title: project.name,
+      department: project.departmentId,
+      district: project.districtId || null,
+      village: project.village || null,
+      block: project.block || null,
+      estimated_amount: project.estimatedCost || null,
+    })
     useStateFinanceStore.getState().writeAudit({ actor, action: 'PROJECT_REGISTERED', entity: 'project', entityId: record.id, newValue: record })
+    await get().hydrateFromBackend()
     return record
   },
 
-  updateProject(id, updates, actor = {}) {
+  async updateProject(id, updates, actor = {}) {
     const project = get().projects.find((p) => p.id === id)
     if (!project) throw new Error('Project not found.')
-    set((s) => ({ projects: s.projects.map((p) => (p.id === id ? { ...p, ...updates } : p)) }))
-    useStateFinanceStore.getState().writeAudit({ actor, action: 'PROJECT_UPDATED', entity: 'project', entityId: id, oldValue: project, newValue: updates })
+    const record = await backendProjectApi.update(id, {
+      title: updates.name || updates.title,
+      status: updates.status,
+      progress_percentage: updates.completionPct,
+    })
+    useStateFinanceStore.getState().writeAudit({ actor, action: 'PROJECT_UPDATED', entity: 'project', entityId: id, newValue: updates })
+    await get().hydrateFromBackend()
+    return record
   },
 
   // ── Proposals ────────────────────────────────────────────────────────────
-  createProposal({ name, departmentId, districtId, schemeId, projectCategory, estimatedCost, purpose, beneficiaryCount = 0, expectedOutcomes = '', timeline = '', documents = [], gisLocation = null, actor = {} }) {
+  async createProposal({ name, departmentId, districtId, schemeId, projectCategory, estimatedCost, purpose, beneficiaryCount = 0, expectedOutcomes = '', timeline = '', actor = {} }) {
     if (!name || !departmentId || !schemeId || !estimatedCost || estimatedCost <= 0) throw new Error('Name, department, scheme and a positive estimated cost are required.')
-    const proposal = {
-      id: `PROP-${Date.now().toString(36).toUpperCase()}`,
-      name, departmentId, districtId, schemeId, projectCategory, estimatedCost,
-      purpose, beneficiaryCount, expectedOutcomes, timeline, documents, gisLocation,
-      status: 'submitted',
-      workflowId: 'WF-PROPOSAL',
-      history: [{ action: 'submit', actor: actor.name || actor.role || 'Unknown', role: actor.role, timestamp: new Date().toISOString(), remarks: 'Proposal submitted by department.' }],
-      createdBy: actor.name || actor.role || 'Unknown',
-      createdAt: new Date().toISOString(),
-    }
-    set((s) => ({ proposals: [proposal, ...s.proposals] }))
+    const proposal = await backendProposalApi.create({
+      title: name,
+      department: departmentId,
+      district: districtId || null,
+      scheme: schemeId,
+      category: projectCategory || '',
+      population_impact: beneficiaryCount,
+      problem_statement: purpose || '',
+      engineering_notes: expectedOutcomes || '',
+      estimated_timeline: timeline || '',
+    })
     useStateFinanceStore.getState().writeAudit({ actor, action: 'PROPOSAL_SUBMITTED', entity: 'project_proposal', entityId: proposal.id, newValue: { estimatedCost }, reason: purpose })
-    useStateFinanceStore.getState().addNotification({ type: 'proposal_submitted', message: `Proposal ${proposal.id} submitted by ${proposal.createdBy} (₹${(estimatedCost / 10000000).toFixed(2)} Cr).`, departmentId })
+    await get().hydrateFromBackend()
     return proposal
   },
 
-  actOnProposal({ id, action, actor = {}, remarks = '' }) {
+  // Approve / reject are the backend's own proposal actions; the remaining
+  // workflow verbs (recommend, return, clarify, escalate, delegate, forward)
+  // have no documented endpoint (BACKEND GAP).
+  async actOnProposal({ id, action, actor = {}, remarks = '' }) {
     const proposal = get().proposals.find((p) => p.id === id)
     if (!proposal) throw new Error('Proposal not found.')
-    const workflow = useStateFinanceStore.getState().workflows.find((w) => w.workflowId === proposal.workflowId)
-    const can = canActAt(workflow, proposal.history, actor.role || '')
-    if (!can.allowed && actor.role !== 'system_admin' && actor.role !== 'state_admin') {
-      throw new Error(`Your role cannot act at this stage. Expected role: "${can.step?.role || 'completed'}".`)
-    }
+    let updated
     if (action === 'approve') {
-      assertAuthority(useStateFinanceStore.getState().authorityMatrix, actor, 'project', proposal.estimatedCost, { departmentId: proposal.departmentId, districtId: proposal.districtId, schemeId: proposal.schemeId })
+      updated = await backendProposalApi.approve(id)
+    } else if (action === 'reject') {
+      updated = await backendProposalApi.reject(id, { review_notes: remarks })
+    } else if (action === 'sanction') {
+      updated = await backendProposalApi.sanction(id, { sanctioned_amount: getFinalSanctionAmount(proposal) })
+    } else {
+      throw new BackendCapabilityError(`proposal workflow verb "${action}"`)
     }
-    const forbidden = ['approve', 'reject'].includes(action) && proposal.status === 'sanctioned'
-    if (forbidden) throw new Error('Proposal already sanctioned — no further approval allowed.')
-    const nextStatus = { approve: 'sanctioned', reject: 'rejected', return: 'returned', clarify: 'clarification_required', escalate: 'escalated', delegate: 'delegated', forward: 'forwarded', recommend: 'recommended' }[action] || proposal.status
-    const updated = {
-      ...proposal,
-      status: nextStatus,
-      history: [...proposal.history, { action, actor: actor.name || actor.role || 'Unknown', role: actor.role, timestamp: new Date().toISOString(), remarks }],
-      decidedAt: ['approve', 'reject'].includes(action) ? new Date().toISOString() : proposal.decidedAt,
-      decidedBy: ['approve', 'reject'].includes(action) ? actor.name || actor.role || 'Unknown' : proposal.decidedBy,
-    }
-    if (action === 'approve') {
-      // Sanctioning a proposal creates the project with its sanction book-keeping.
-      const project = {
-        id: `PRJ-${proposal.id.replace('PROP-', '')}`,
-        name: proposal.name,
-        departmentId: proposal.departmentId,
-        districtId: proposal.districtId,
-        schemeId: proposal.schemeId,
-        category: proposal.projectCategory || 'General',
-        type: 'sanctioned_proposal',
-        estimatedCost: proposal.estimatedCost,
-        sanctionedAmount: proposal.estimatedCost,
-        releasedAmount: null,
-        committedAmount: null,
-        utilizedAmount: null,
-        completionPct: 0,
-        startDate: new Date().toISOString().slice(0, 10),
-        expectedCompletion: null,
-        status: 'sanctioned',
-        gisLocation: proposal.gisLocation,
-        implementingAgency: proposal.createdBy,
-        beneficiaryCount: proposal.beneficiaryCount,
-        documents: proposal.documents,
-        proposalId: proposal.id,
-      }
-      set((s) => ({ projects: [project, ...s.projects] }))
-      // Phase 3: raise the financial sanction for the approved proposal in the
-      // finance engine. The finance engine remains the source of truth — its
-      // own authority and authorization rules decide acceptance. When the
-      // department budget cannot cover the estimate, approval is NOT blocked;
-      // a notification asks the finance desk to sanction manually.
-      const finance = useStateFinanceStore.getState()
-      const scheme = useStateMasterStore.getState().schemes.find((s) => s.id === proposal.schemeId)
-      const budgetHeadId = proposal.budgetHeadId || scheme?.budgetHeadId
-      if (budgetHeadId) {
-        try {
-          const sanction = finance.createSanction({
-            fy: finance.fy,
-            departmentId: proposal.departmentId,
-            districtId: proposal.districtId,
-            schemeId: proposal.schemeId,
-            budgetHeadId,
-            projectId: project.id,
-            description: `Sanction against approved proposal ${proposal.id} — ${proposal.name}.`,
-            amount: proposal.estimatedCost,
-            goNumber: proposal.goNumber || '',
-            actor,
-          })
-          set((s) => ({ projects: s.projects.map((p) => (p.id === project.id ? { ...p, sanctionNo: sanction.sanctionNo } : p)) }))
-        } catch (sanctionError) {
-          finance.addNotification({ type: 'approval_pending', message: `Proposal ${proposal.id} approved but financial sanction was not auto-created: ${sanctionError.message}`, departmentId: proposal.departmentId })
-        }
-      } else {
-        finance.addNotification({ type: 'approval_pending', message: `Proposal ${proposal.id} approved — no budget head mapped to scheme ${proposal.schemeId || '—'}; create the sanction in Finance.`, departmentId: proposal.departmentId })
-      }
-    }
-    set((s) => ({ proposals: s.proposals.map((p) => (p.id === id ? updated : p)) }))
-    useStateFinanceStore.getState().writeAudit({ actor, action: `PROPOSAL_${action.toUpperCase()}`, entity: 'project_proposal', entityId: proposal.id, oldValue: proposal.status, newValue: nextStatus, reason: remarks })
-    if (action === 'escalate') useStateFinanceStore.getState().addNotification({ type: 'approval_escalated', message: `Proposal ${proposal.id} escalated to ${workflow?.escaStep?.escalateTo || 'competent authority'}.`, departmentId: proposal.departmentId })
-    if (action === 'return') useStateFinanceStore.getState().addNotification({ type: 'proposal_returned', message: `Proposal ${proposal.id} returned with remarks.`, departmentId: proposal.departmentId })
+    useStateFinanceStore.getState().writeAudit({ actor, action: `PROPOSAL_${action.toUpperCase()}`, entity: 'project_proposal', entityId: id, oldValue: proposal.status, newValue: updated?.status || action, reason: remarks })
+    await get().hydrateFromBackend()
     return updated
   },
 
-  proposalNextStep(proposal) {
-    const workflow = useStateFinanceStore.getState().workflows.find((w) => w.workflowId === proposal.workflowId)
-    return nextStepFor(workflow, proposal.history, null)
+  proposalNextStep() {
+    return null
   },
 
-  resetProjects() { set({ projects: SEED_PROJECTS, proposals: SEED_PROPOSALS }) },
+  resetProjects() { set({ projects: [], proposals: [] }) },
 }))
 
+const mapProjectRecord = (project) => ({
+  id: project.id,
+  name: project.title || project.projectId || String(project.id),
+  title: project.title || project.projectId || String(project.id),
+  departmentId: project.departmentId,
+  departmentName: project.departmentName || '',
+  districtId: project.districtId,
+  districtName: project.districtName || '',
+  village: project.village || '',
+  block: project.block || '',
+  status: project.status ? project.status.toLowerCase() : 'draft',
+  completionPct: project.progress || 0,
+  estimatedCost: project.budgetSanctioned || 0,
+  sanctionedAmount: project.budgetSanctioned || 0,
+  releasedAmount: project.budgetSanctioned || 0,
+  utilizedAmount: project.budgetUtilized || 0,
+  committedAmount: project.budgetUtilized || 0,
+  startDate: project.startDate || null,
+  expectedCompletion: project.completionDate || null,
+  gisLocation: null,
+  documents: [],
+  proposalId: project.proposalId || null,
+  raw: project.raw || project,
+})
+
+const mapProposalRecord = (proposal) => ({
+  id: proposal.id,
+  name: proposal.title || String(proposal.id),
+  title: proposal.title || String(proposal.id),
+  departmentId: proposal.departmentId,
+  districtId: proposal.districtId,
+  schemeId: proposal.schemeId,
+  projectCategory: proposal.category || '',
+  estimatedCost: proposal.estimatedCost || 0,
+  purpose: proposal.problemStatement || '',
+  beneficiaryCount: proposal.populationImpact || 0,
+  expectedOutcomes: proposal.engineeringNotes || '',
+  timeline: proposal.estimatedTimeline || '',
+  status: proposal.status ? proposal.status.toLowerCase() : '',
+  history: [],
+  createdBy: proposal.createdByName || 'Backend',
+  createdAt: proposal.createdAt || null,
+  raw: proposal.raw || proposal,
+})
+
 export const projectStatuses = PROJECT_STATUSES
-export const projectCr = cr

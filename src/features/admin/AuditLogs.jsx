@@ -1,22 +1,48 @@
-// Audit Logs Compliance Page — Vol 2 & Vol 4 Compliance Audit Trail (log_audit_event).
+// Audit Logs Compliance Page — Vol 2 & Vol 4 Compliance Audit Trail.
+// Honest data sources only: complaint state transitions (rebuilt from the
+// backend complaint timeline) and workforce/identity actions recorded by the
+// identity store. No fabricated or cryptographically-signed mock events.
 import { useState, useMemo } from 'react'
-import { ShieldCheck, Search, Lock, Filter, FileText } from 'lucide-react'
+import { Search } from 'lucide-react'
 import PageHeader from '../../components/ui/PageHeader'
 import DataTable from '../../components/ui/DataTable'
 import Badge from '../../components/ui/Badge'
 import Select from '../../components/ui/Select'
-import { useAsync } from '../../hooks/useAsync'
-import { getAuditLogs } from '../../services/mock/auditLogs'
+import { useComplaintEngine } from '../../app/store/complaintEngine'
+import { useIdentityStore } from '../../features/department/identity/identityStore'
 import { formatDateTime } from '../../utils/format'
 
 export default function AuditLogs() {
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
 
-  const { data: logs, loading } = useAsync(() => Promise.resolve(getAuditLogs()), [])
+  const complaintLogs = useComplaintEngine((s) => s.auditLogs)
+  const identityLogs = useIdentityStore((s) => s.auditLogs)
+
+  const logs = useMemo(() => {
+    const complaintRows = (complaintLogs || []).map((log) => ({
+      id: log.id,
+      category: 'complaints',
+      label: log.action,
+      detail: log.newValue && log.oldValue ? `${log.oldValue} → ${log.newValue}` : log.location,
+      actor: log.actorName,
+      targetEntityId: log.complaintId,
+      timestamp: log.timestamp,
+    }))
+    const identityRows = (identityLogs || []).map((log) => ({
+      id: log.id,
+      category: 'workforce',
+      label: log.action,
+      detail: log.module || '',
+      actor: log.actor,
+      targetEntityId: log.entityId || '',
+      timestamp: log.timestamp,
+    }))
+    return [...complaintRows, ...identityRows].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+  }, [complaintLogs, identityLogs])
 
   const filteredLogs = useMemo(() => {
-    if (!logs) return []
+    if (!logs.length) return []
     return logs.filter((log) => {
       if (categoryFilter !== 'all' && log.category !== categoryFilter) return false
       if (searchQuery.trim()) {
@@ -34,28 +60,36 @@ export default function AuditLogs() {
 
   const columns = [
     { key: 'id', label: 'Log ID', render: (r) => <span className="kbd-mono text-[11.5px]">{r.id}</span>, hideOn: 'sm' },
-    { key: 'action', label: 'Action & Description', render: (r) => <span className="font-semibold text-ink-950">{r.label}</span> },
-    { key: 'actor', label: 'Actor / User', render: (r) => <span className="text-ink-800">{r.actor}</span>, hideOn: 'md' },
-    { key: 'entity', label: 'Target Entity', render: (r) => <span className="kbd-mono text-[11.5px] text-ink-600">{r.targetEntityId}</span>, hideOn: 'md' },
-    { key: 'ip', label: 'IP Address', render: (r) => <span className="kbd-mono text-[11.5px] text-ink-500">{r.ipAddress}</span>, hideOn: 'md' },
-    { key: 'timestamp', label: 'Timestamp', render: (r) => formatDateTime(r.timestamp) },
     {
-      key: 'hash',
-      label: 'Cryptographic Hash Signature',
+      key: 'action',
+      label: 'Action & Description',
       render: (r) => (
-        <span className="kbd-mono text-[10.5px] bg-ink-100 text-ink-700 px-1.5 py-0.5 rounded flex items-center gap-1 w-fit">
-          <Lock size={10} className="text-leaf-600" /> {r.hashSignature}
-        </span>
+        <div>
+          <span className="font-semibold text-ink-950 block">{r.label}</span>
+          {r.detail && <span className="text-[11.5px] text-ink-500 block">{r.detail}</span>}
+        </div>
       ),
     },
+    { key: 'actor', label: 'Actor / User', render: (r) => <span className="text-ink-800">{r.actor}</span>, hideOn: 'md' },
+    { key: 'entity', label: 'Target Entity', render: (r) => <span className="kbd-mono text-[11.5px] text-ink-600">{r.targetEntityId}</span>, hideOn: 'md' },
+    {
+      key: 'category',
+      label: 'Source',
+      render: (r) => (
+        <Badge tone={r.category === 'complaints' ? 'sky' : 'ink'}>
+          {r.category === 'complaints' ? 'Complaint Timeline' : 'Workforce & Identity'}
+        </Badge>
+      ),
+    },
+    { key: 'timestamp', label: 'Timestamp', render: (r) => formatDateTime(r.timestamp) },
   ]
 
   return (
     <div>
       <PageHeader
         eyebrow="Admin Portal · Vol 2 §14"
-        title="Governance & immutable audit trail"
-        description="Tamper-evident audit log (log_audit_event). Every financial sanction, data ingest, and administrative decision is cryptographically signed."
+        title="Governance & audit trail"
+        description="Event trail rebuilt from the backend complaint timeline plus locally recorded workforce actions. Cryptographic event signing is not exposed by the backend."
         action={
           <div className="flex items-center gap-2">
             <div className="relative w-56">
@@ -73,11 +107,9 @@ export default function AuditLogs() {
               value={categoryFilter}
               onChange={setCategoryFilter}
               options={[
-                { value: 'all', label: 'All Categories' },
-                { value: 'workflow', label: 'Workflows & Approvals' },
-                { value: 'ingestion', label: 'CSV Ingestion' },
-                { value: 'field', label: 'Field Ops & Inspections' },
-                { value: 'analytics', label: 'Analytics Computation' },
+                { value: 'all', label: 'All Sources' },
+                { value: 'complaints', label: 'Complaint Timeline' },
+                { value: 'workforce', label: 'Workforce & Identity' },
               ]}
             />
           </div>
@@ -86,11 +118,13 @@ export default function AuditLogs() {
 
       <div className="p-6">
         <div className="card">
-          {loading ? (
-            <div className="p-6 text-center text-ink-400 text-[12.5px]">Loading compliance logs…</div>
-          ) : (
-            <DataTable columns={columns} rows={filteredLogs} emptyLabel="No audit events found" />
-          )}
+          <DataTable
+            columns={columns}
+            rows={filteredLogs}
+            emptyLabel={
+              logs.length ? 'No audit events match the current filters' : 'No audit events recorded yet — events appear as complaints transition and workforce actions are recorded'
+            }
+          />
         </div>
       </div>
     </div>

@@ -13,7 +13,7 @@ import { ChevronLeft, ChevronRight, MapPin, Navigation, Search, X, Footprints, L
 import clsx from 'clsx'
 import MapView from '../../components/map/MapView'
 import MapToolbar from '../../components/map/MapToolbar'
-import { DepartmentLegend } from '../../components/map/MapLegend'
+import { DepartmentLegendControl } from '../../components/map/MapLegend'
 import FacilityInfoPanel from '../../components/map/FacilityInfoPanel'
 import FacilityCard from '../shared/FacilityCard'
 import { SkeletonCard } from '../../components/ui/Skeleton'
@@ -514,7 +514,17 @@ export default function CitizenHome() {
               Expand panel
             </button>
           )}
-          <DepartmentLegend departments={departments.map((d) => ({ id: String(d.id), name: d.name || d.label, color: d.color }))} activeIds={activeIds} onToggle={toggleDept} />
+          {/* Department selector: full legend on desktop; compact pill + bottom
+              sheet on mobile/tablet. Hidden while the drawer is open so it
+              never overlaps the panel. GIS filtering logic is untouched. */}
+          {(!isMobile || !mobileOpen) && (
+            <DepartmentLegendControl
+              departments={departments.map((d) => ({ id: String(d.id), name: d.name || d.label, color: d.color }))}
+              activeIds={activeIds}
+              onToggle={toggleDept}
+              allActive={allActive}
+            />
+          )}
         </div>
 
         {/* Honest location-permission banner with retry */}

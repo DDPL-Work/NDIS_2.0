@@ -8,6 +8,10 @@ import { useProjectEngine } from '../../../app/store/projectEngine'
 import { useIdentityStore } from '../identity/identityStore'
 import { useAuthorization } from '../identity/hooks/useAuthorization'
 import { departmentSlugFromName } from '../../../api/mappers/complaintMapper'
+import { backendGisApi } from '../../../api/gisApi'
+import { backendEmployeeApi } from '../../../api/employeeApi'
+import { useAsync } from '../../../hooks/useAsync'
+import { DATA_SCOPES } from '../../../app/store/dataVersionStore'
 
 export default function DepartmentWorkspaceProvider({ departmentIdOverride, children }) {
   const user = useAuthStore((s) => s.user)
@@ -28,13 +32,13 @@ export default function DepartmentWorkspaceProvider({ departmentIdOverride, chil
   const { permissions, can } = useAuthorization()
   const complaints = useComplaintEngine((s) => s.complaints)
 
-  // ProjectEngine store states
+  // ProjectEngine store states (planning/execution lifecycle, per Phase 2-14
+  // decisions these stay local; only department-scoped slices are exposed)
   const proposals = useProjectEngine((s) => s.proposals)
   const projects = useProjectEngine((s) => s.projects)
   const workOrders = useProjectEngine((s) => s.workOrders)
   const inspections = useProjectEngine((s) => s.inspections)
   const officers = useProjectEngine((s) => s.officers)
-  const lifecycleAssets = useProjectEngine((s) => s.assets)
   const assetOverrides = useProjectEngine((s) => s.assetOverrides)
   const maintenanceTasks = useProjectEngine((s) => s.maintenanceTasks)
   const documents = useProjectEngine((s) => s.documents)
@@ -55,6 +59,20 @@ export default function DepartmentWorkspaceProvider({ departmentIdOverride, chil
     const name = String(user?.departmentName || '').trim()
     return { ...config, label: name || config.label }
   }, [activeDeptId, user?.departmentName])
+
+  // Asset registry: live facilities for the department (GET /api/facilities/)
+  // — the department's own assets from the backend GIS registry, never a
+  // static sample list. Engine lifecycle overrides still apply on top.
+  const facilities = useAsync(
+    () => backendGisApi.facilities({ department: activeDeptId }),
+    [activeDeptId],
+    { deps: [DATA_SCOPES.FACILITIES, DATA_SCOPES.GIS] },
+  )
+  const backendEmployees = useAsync(
+    () => backendEmployeeApi.list(),
+    [activeDeptId],
+    { deps: [DATA_SCOPES.EMPLOYEES] },
+  )
 
   // Filter complaints for active department (backend ids vs. app slugs)
   const departmentComplaints = useMemo(() => {
@@ -79,13 +97,45 @@ export default function DepartmentWorkspaceProvider({ departmentIdOverride, chil
   }, [inspections, activeDeptId])
 
   const departmentOfficers = useMemo(() => {
-    return officers.filter((o) => o.dept === activeDeptId)
-  }, [officers, activeDeptId])
+    const engine = officers.filter((o) => o.dept === activeDeptId)
+    const fromBackend = (backendEmployees.data || [])
+      .filter((employee) => employee.departmentId === activeDeptId)
+      .map((employee) => ({
+        id: employee.id,
+        name: employee.name,
+        dept: activeDeptId,
+        role: employee.designation || 'Officer',
+        status: employee.status === 'ACTIVE' ? 'active' : 'inactive',
+        assigned: 'Backend registry',
+        inspectionCount: 0,
+        activeTasks: 0,
+        employeeNumber: employee.employeeNumber || null,
+      }))
+    // Backend employee registry is the primary officer source; the engine
+    // adds any planning-created officers on top.
+    return [...fromBackend, ...engine.filter((o) => !fromBackend.some((b) => b.id === o.id))]
+  }, [officers, backendEmployees.data, activeDeptId])
 
-  const departmentAssets = useMemo(() => [
-    ...(deptConfig.sampleAssets || []).map((asset) => ({ ...asset, ...(assetOverrides[asset.id] || {}), departmentId: activeDeptId, lifecycleState: assetOverrides[asset.id]?.lifecycleState || asset.lifecycleState || 'operational', health: asset.health || 85 })),
-    ...lifecycleAssets.filter((asset) => asset.departmentId === activeDeptId),
-  ], [deptConfig, lifecycleAssets, assetOverrides, activeDeptId])
+  const departmentAssets = useMemo(() => {
+    const registered = (facilities.data || [])
+      .filter((f) => f.departmentId === activeDeptId || !f.departmentId)
+      .map((f) => ({
+        ...f,
+        id: f.id,
+        name: f.name,
+        type: f.categoryId || 'civic_infrastructure',
+        typeLabel: f.categoryLabel,
+        departmentId: activeDeptId,
+        status: f.status || 'active',
+        health: f.attributes?.condition_rating ? 70 : 75,
+        lifecycleState: 'operational',
+        position: [f.latitude, f.longitude],
+        source: 'backend',
+      }))
+    const withOverrides = registered.map((asset) => ({ ...asset, ...(assetOverrides[asset.id] || {}) }))
+    return withOverrides
+  }, [facilities.data, assetOverrides, activeDeptId])
+
   const departmentMaintenance = useMemo(() => {
     const stored = maintenanceTasks.filter((task) => task.departmentId === activeDeptId)
     const scheduledAssetIds = new Set(stored.map((task) => task.assetId))
@@ -108,7 +158,7 @@ export default function DepartmentWorkspaceProvider({ departmentIdOverride, chil
     budgetUsed: departmentBudgets.reduce((sum, item) => sum + item.expenditure, 0), budgetAllocated: departmentBudgets.reduce((sum, item) => sum + item.allocation, 0),
     inventoryLow: departmentInventory.filter((item) => item.status === 'low_stock').length,
     officerProductivity: departmentOfficers.length ? Math.round(departmentOfficers.reduce((sum, officer) => sum + officer.inspectionCount, 0) / departmentOfficers.length) : 0,
-    assetHealth: departmentAssets.length ? Math.round(departmentAssets.reduce((sum, asset) => sum + (asset.health || 85), 0) / departmentAssets.length) : 0,
+    assetHealth: departmentAssets.length ? Math.round(departmentAssets.reduce((sum, asset) => sum + (asset.health || 75), 0) / departmentAssets.length) : 0,
   }), [departmentBudgets, departmentInventory, departmentOfficers, departmentAssets])
 
   // Compute live KPIs reacting to simulation engine

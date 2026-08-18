@@ -1,54 +1,134 @@
 // Master data store — Departments, Districts, Financial Years, Budget Heads,
-// Schemes. All configurable by State Admin; nothing is hard-coded.
+// Schemes. BACKEND-INTEGRATED: departments (GET /api/departments/), schemes
+// (GET/POST/PATCH /api/schemes/) and users (GET/POST/PATCH /api/users/) are
+// hydrated from the live backend; mutations write through the same APIs.
+// Districts, financial years and budget heads are configuration constants —
+// no backend endpoint is documented for them (BACKEND GAP for CRUD).
 import { create } from 'zustand'
 import { FINANCIAL_YEARS as FY_SEED, BUDGET_HEADS } from '../../../config/stateConstants'
-import {
-  SEED_DEPARTMENTS, SEED_DISTRICTS, SEED_SCHEMES, SEED_SCHEME_CATEGORIES, SEED_USERS,
-} from './seed/stateSeedData'
+import { SEED_DISTRICTS } from './seed/stateSeedData'
+import { backendDepartmentApi } from '../../../api/departmentApi'
+import { backendBudgetApi } from '../../../api/budgetApi'
+import { backendUserApi } from '../../../api/userApi'
+import { BackendCapabilityError } from '../../../api/apiClient'
+
+const mapDepartment = (dto) => ({
+  id: String(dto.id),
+  code: dto.raw?.code || String(dto.id).toUpperCase().slice(0, 4),
+  name: dto.name || 'Unnamed department',
+  type: dto.raw?.type || 'department',
+  status: dto.raw?.status || 'active',
+  head: dto.raw?.head || '',
+  contact: dto.raw?.contact || '',
+  phone: dto.raw?.phone || '',
+  address: dto.raw?.address || '',
+  parentId: dto.raw?.parent_id ?? null,
+  raw: dto.raw || dto,
+})
+
+const mapScheme = (dto) => ({
+  id: String(dto.id),
+  code: dto.raw?.code || String(dto.id).toUpperCase().slice(0, 6),
+  name: dto.schemeName || dto.raw?.name || 'Unnamed scheme',
+  departmentId: dto.departmentId,
+  departmentName: dto.departmentName || '',
+  type: dto.raw?.type || 'state_scheme',
+  fundingSource: dto.raw?.funding_source || 'state_budget',
+  budgetHeadId: dto.head || 'bh-continuing',
+  fy: dto.financialYear || '',
+  status: dto.status || 'active',
+  guidelines: dto.raw?.guidelines || '',
+  eligibility: dto.raw?.eligibility || '',
+  targetDistrictIds: dto.raw?.target_district_ids || null,
+  raw: dto.raw || dto,
+})
+
+const mapUser = (dto) => ({
+  id: String(dto.id),
+  name: dto.fullName || dto.username || 'Unnamed user',
+  username: dto.username || '',
+  email: dto.email || '',
+  role: dto.role || '',
+  designation: dto.designation || '',
+  departmentId: dto.departmentId ?? null,
+  departmentName: dto.departmentName || '',
+  districtId: dto.districtId ?? null,
+  districtName: dto.districtName || '',
+  status: dto.isActive ? 'active' : 'inactive',
+  raw: dto.raw || dto,
+})
 
 export const useStateMasterStore = create((set, get) => ({
-  departments: SEED_DEPARTMENTS,
+  departments: [],
   districts: SEED_DISTRICTS,
-  schemes: SEED_SCHEMES,
-  schemeCategories: SEED_SCHEME_CATEGORIES,
+  schemes: [],
+  schemeCategories: [],
   financialYears: FY_SEED,
   budgetHeads: BUDGET_HEADS,
-  users: SEED_USERS,
+  users: [],
   roles: [],
   lastAction: null,
+  hydrationError: null,
+
+  async hydrateFromBackend() {
+    try {
+      const [departments, schemes, users] = await Promise.all([
+        backendDepartmentApi.list().catch(() => []),
+        backendBudgetApi.schemes.list().catch(() => []),
+        backendUserApi.list().catch(() => []),
+      ])
+      set({
+        departments: departments.map(mapDepartment),
+        schemes: schemes.map(mapScheme),
+        users: users.map(mapUser),
+        hydrationError: null,
+      })
+    } catch (error) {
+      set({ hydrationError: error })
+    }
+  },
 
   setBudgetHeads(heads) { set({ budgetHeads: heads }) },
   setUsers(users) { set({ users }) },
   setRoles(roles) { set({ roles }) },
 
-  addDepartment(department) {
-    const exists = get().departments.some((d) => d.id === department.id || d.code === department.code)
-    if (exists) throw new Error('Department ID or code already exists in the master.')
-    set((s) => ({ departments: [...s.departments, department], lastAction: `created ${department.id}` }))
-  },
-  updateDepartment(id, updates) {
-    set((s) => ({ departments: s.departments.map((d) => (d.id === id ? { ...d, ...updates } : d)) }))
-  },
-  toggleDepartmentStatus(id) {
-    set((s) => ({ departments: s.departments.map((d) => (d.id === id ? { ...d, status: d.status === 'active' ? 'inactive' : 'active' } : d)) }))
-  },
+  // Department CRUD — only GET /api/departments/ is documented (BACKEND GAP).
+  async addDepartment() { throw new BackendCapabilityError('department master CRUD') },
+  async updateDepartment() { throw new BackendCapabilityError('department master CRUD') },
+  async toggleDepartmentStatus() { throw new BackendCapabilityError('department master CRUD') },
 
-  addDistrict(district) {
-    const exists = get().districts.some((d) => d.id === district.id || d.code === district.code)
-    if (exists) throw new Error('District ID or code already exists in the master.')
-    set((s) => ({ districts: [...s.districts, district] }))
-  },
-  updateDistrict(id, updates) {
-    set((s) => ({ districts: s.districts.map((d) => (d.id === id ? { ...d, ...updates } : d)) }))
-  },
+  // District CRUD — no backend endpoint is documented (BACKEND GAP).
+  async addDistrict() { throw new BackendCapabilityError('district master CRUD') },
+  async updateDistrict() { throw new BackendCapabilityError('district master CRUD') },
 
-  addScheme(scheme) {
-    const exists = get().schemes.some((s) => s.id === scheme.id || s.code === scheme.code)
-    if (exists) throw new Error('Scheme ID or code already exists in the master.')
-    set((s) => ({ schemes: [...s.schemes, scheme] }))
+  // Scheme CRUD — backend /api/schemes/.
+  async addScheme(scheme) {
+    if (get().schemes.some((s) => s.id === String(scheme.id) || s.code === scheme.code)) throw new Error('Scheme ID or code already exists in the master.')
+    const record = await backendBudgetApi.schemes.create({
+      name: scheme.name,
+      code: scheme.code,
+      department: scheme.departmentId,
+      type: scheme.type,
+      funding_source: scheme.fundingSource,
+      budget_head: scheme.budgetHeadId,
+      financial_year: scheme.fy,
+      status: scheme.status || 'active',
+      guidelines: scheme.guidelines || '',
+      eligibility: scheme.eligibility || '',
+      target_district_ids: scheme.targetDistrictIds || null,
+    })
+    await get().hydrateFromBackend()
+    return record
   },
-  updateScheme(id, updates) {
-    set((s) => ({ schemes: s.schemes.map((x) => (x.id === id ? { ...x, ...updates } : x)) }))
+  async updateScheme(id, updates) {
+    const record = await backendBudgetApi.schemes.update(id, {
+      name: updates.name,
+      status: updates.status,
+      guidelines: updates.guidelines,
+      eligibility: updates.eligibility,
+    })
+    await get().hydrateFromBackend()
+    return record
   },
 
   addFinancialYear(fy) {
@@ -61,7 +141,7 @@ export const useStateMasterStore = create((set, get) => ({
     set((s) => ({ budgetHeads: [...s.budgetHeads, head] }))
   },
 
-  reset() { set({ departments: SEED_DEPARTMENTS, districts: SEED_DISTRICTS, schemes: SEED_SCHEMES, schemeCategories: SEED_SCHEME_CATEGORIES, financialYears: FY_SEED, budgetHeads: [], users: [], roles: [] }) },
+  reset() { set({ departments: [], districts: SEED_DISTRICTS, schemes: [], schemeCategories: [], financialYears: FY_SEED, budgetHeads: BUDGET_HEADS, users: [], roles: [] }) },
 }))
 
 export const masterDataSelectors = {

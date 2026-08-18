@@ -5,10 +5,9 @@ import { DEFAULT_ROLE_PERMISSIONS } from './permissions/permissionCatalog'
 const id = (prefix, count) => `${prefix}-2026-${String(count + 101).padStart(5, '0')}`
 const audit = (actor, action, module, entityId, previousValue, newValue) => ({ id: `AUD-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, actor: actor?.name || 'System', userId: actor?.id || actor?.sub || 'system', action, module, entityId, previousValue, newValue, ip: '127.0.0.1', timestamp: new Date().toISOString() })
 
-const INITIAL_EMPLOYEES = [
-  { id: 'EMP-2026-00101', employeeNumber: 'GOV-100101', name: 'Eng. Vijay Kumar', email: 'vijay.kumar@nalanda.gov.in', designation: 'Executive Engineer', role: 'dept_head', departmentId: 'water', office: 'District Water Office', block: 'Silao', status: 'active', attendanceStatus: 'field', joinedAt: '2021-04-12' },
-  { id: 'EMP-2026-00102', employeeNumber: 'GOV-100102', name: 'Anil Mehta', email: 'anil.mehta@nalanda.gov.in', designation: 'Assistant Engineer', role: 'engineer', departmentId: 'water', office: 'District Water Office', block: 'Silao', managerId: 'EMP-2026-00101', status: 'active', attendanceStatus: 'present', joinedAt: '2022-08-01' },
-]
+// Employee records are backend-authoritative (GET /api/employees/); this
+// store starts EMPTY and only holds records the local identity actions create.
+const INITIAL_EMPLOYEES = []
 
 export const useIdentityStore = create(persist((set, get) => ({
   employees: INITIAL_EMPLOYEES, roles: Object.entries(DEFAULT_ROLE_PERMISSIONS).map(([key, permissions]) => ({ id: key, name: key.replace(/_/g, ' '), permissions, system: true })),
@@ -27,4 +26,4 @@ export const useIdentityStore = create(persist((set, get) => ({
   decideLeave: (actor, leaveId, status) => set((s) => ({ leaves: s.leaves.map((leave) => leave.id === leaveId ? { ...leave, status, decidedAt: new Date().toISOString() } : leave), auditLogs: [audit(actor, `LEAVE_${status.toUpperCase()}`, 'leave', leaveId), ...s.auditLogs] })),
   assignTask: (actor, payload) => set((s) => ({ tasks: [{ id: id('TSK', s.tasks.length), status: 'assigned', createdAt: new Date().toISOString(), ...payload }, ...s.tasks], auditLogs: [audit(actor, 'TASK_ASSIGNED', 'workforce', payload.assigneeId, null, payload), ...s.auditLogs] })),
   grantTemporaryPermission: (actor, payload) => set((s) => ({ temporaryPermissions: [...s.temporaryPermissions, { id: id('TMP', s.temporaryPermissions.length), grantedAt: new Date().toISOString(), ...payload }], auditLogs: [audit(actor, 'TEMPORARY_PERMISSION_GRANTED', 'authorization', payload.employeeId, null, payload), ...s.auditLogs] })),
-}), { name: 'ndisp-department-identity-v1' }))
+}), { name: 'ndisp-department-identity-v2' }))

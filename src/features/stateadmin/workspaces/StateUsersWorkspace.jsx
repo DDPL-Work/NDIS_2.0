@@ -1,7 +1,7 @@
 // Users & Roles workspace (P8).
 // State administration user registry — role assignments, status, designation,
-// department scope and the permission matrix for each role. User records live
-// in the state master store; every change lands in the immutable audit trail.
+// department scope and the permission matrix for each role. User records are
+// hydrated from GET /api/users/ and every change writes through the backend.
 import { useMemo, useState } from 'react'
 import { ShieldCheck, UserPlus, Power, Search, KeyRound } from 'lucide-react'
 import PageHeader from '../../../components/ui/PageHeader'
@@ -13,6 +13,7 @@ import EmptyState from '../../../components/ui/EmptyState'
 import Pagination, { usePagedRows } from '../../../components/ui/Pagination'
 import { useStateMasterStore } from '../store/stateMasterStore'
 import { useStateFinanceStore } from '../store/stateFinanceStore'
+import { backendUserApi } from '../../../api/userApi'
 import { useStatePermission, useStateActor } from '../hooks/useStatePermissions'
 import { useUiStore } from '../../../app/store/uiStore'
 import { Field, SelectField, FilterStrip, SummaryPill } from '../components/StateUI'
@@ -46,30 +47,37 @@ export default function StateUsersWorkspace() {
 
   const { page, setPage, pageSize, setPageSize, pageRows, total } = usePagedRows(rows)
 
-  const changeRole = (user, role) => {
-    master.setUsers(master.users.map((u) => (u.id === user.id ? { ...u, role } : u)))
-    finance.writeAudit({ actor, action: 'USER_ROLE_CHANGED', entity: 'user', entityId: user.id, oldValue: user.role, newValue: role, reason: `Role updated to ${ROLE_LABELS[role] || role} (${user.username}).` })
-    pushToast(`${user.name} → ${ROLE_LABELS[role] || role}.`, 'success')
+  const changeRole = async (user, role) => {
+    try {
+      await backendUserApi.update(user.id, { role })
+      master.setUsers(master.users.map((u) => (u.id === user.id ? { ...u, role } : u)))
+      finance.writeAudit({ actor, action: 'USER_ROLE_CHANGED', entity: 'user', entityId: user.id, oldValue: user.role, newValue: role, reason: `Role updated to ${ROLE_LABELS[role] || role} (${user.username}).` })
+      pushToast(`${user.name} → ${ROLE_LABELS[role] || role}.`, 'success')
+    } catch (e) { pushToast(e.message, 'error') }
   }
 
-  const toggleStatus = (user) => {
+  const toggleStatus = async (user) => {
     const status = user.status === 'active' ? 'inactive' : 'active'
-    master.setUsers(master.users.map((u) => (u.id === user.id ? { ...u, status } : u)))
-    finance.writeAudit({ actor, action: 'USER_STATUS_CHANGED', entity: 'user', entityId: user.id, oldValue: user.status, newValue: status })
-    pushToast(`${user.name} ${status === 'active' ? 'activated' : 'deactivated'}.`, 'success')
+    try {
+      await backendUserApi.update(user.id, { is_active: status === 'active' })
+      master.setUsers(master.users.map((u) => (u.id === user.id ? { ...u, status } : u)))
+      finance.writeAudit({ actor, action: 'USER_STATUS_CHANGED', entity: 'user', entityId: user.id, oldValue: user.status, newValue: status })
+      pushToast(`${user.name} ${status === 'active' ? 'activated' : 'deactivated'}.`, 'success')
+    } catch (e) { pushToast(e.message, 'error') }
   }
 
-  const save = () => {
+  const save = async () => {
     if (!form.username || !form.name) throw new Error('Username and display name are required.')
     if (master.users.some((u) => u.username === form.username.trim())) throw new Error(`Username ${form.username.trim()} already exists.`)
-    master.setUsers([...master.users, {
-      id: `U-${Date.now().toString(36).toUpperCase()}`,
-      name: form.name.trim(), username: form.username.trim(),
+    const created = await backendUserApi.create({
+      username: form.username.trim(),
+      first_name: form.name.trim(),
       role: form.role || STATE_PORTAL_ROLES[0],
-      designation: form.designation || 'Officer', departmentId: form.departmentId || null,
-      districtId: null, status: 'active',
-    }])
-    finance.writeAudit({ actor, action: 'USER_CREATED', entity: 'user', entityId: form.username.trim(), newValue: { name: form.name.trim(), role: form.role || STATE_PORTAL_ROLES[0] } })
+      designation: form.designation || 'Officer',
+      department: form.departmentId || null,
+    })
+    finance.writeAudit({ actor, action: 'USER_CREATED', entity: 'user', entityId: created.username, newValue: { name: form.name.trim(), role: form.role || STATE_PORTAL_ROLES[0] } })
+    await master.hydrateFromBackend()
     setCreateOpen(false)
     setForm({})
   }

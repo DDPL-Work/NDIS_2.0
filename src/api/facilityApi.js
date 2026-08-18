@@ -45,4 +45,12 @@ export const backendFacilityApi = {
       }))
     } catch { return [] }
   },
+  // POST /api/facilities/bulk-sync-gis/ — multipart (CSV/GeoJSON + optional
+  // category).  The backend validates the payload and reports per-row results;
+  // the frontend never fabricates a sync summary.
+  async bulkSyncGis(formData) {
+    const response = await apiRequest('/facilities/bulk-sync-gis/', { method: 'POST', body: formData })
+    touched()
+    return response
+  },
 }
