@@ -19,39 +19,39 @@ export const TOURS = [
     steps: [
       {
         id: 'dashboard',
-        targets: ['[data-tour="citizen-dashboard"]'],
+        targets: ['[data-tour="citizen-dashboard-main"]'],
         title: 'Your Dashboard',
         description: 'Start here for an overview of your services, recent activity and important updates.',
       },
       {
         id: 'explore-map',
-        targets: ['[data-tour="citizen-explore-map"]'],
+        targets: ['[data-tour="citizen-quick-nearby"]', '[data-tour="citizen-explore-map"]'],
         title: 'Find Facilities Near You',
         description: 'Use Explore Map to find nearby hospitals, schools, banks and other government facilities.',
       },
       {
         id: 'register-complaint',
-        targets: ['[data-tour="citizen-register-complaint"]'],
+        targets: ['[data-tour="citizen-quick-report"]', '[data-tour="citizen-register-complaint"]'],
         title: 'Report a Problem',
         description: 'Have a problem that needs attention? Use Register Complaint to report it to the concerned department.',
       },
       {
         id: 'my-complaints',
-        targets: ['[data-tour="citizen-my-complaints"]'],
+        targets: ['[data-tour="citizen-complaints-list"]', '[data-tour="citizen-my-complaints"]'],
         title: 'My Complaints',
         description: 'See the complaints you have submitted and check their current status.',
       },
       {
         id: 'track-complaint',
-        targets: ['[data-tour="citizen-track-complaint"]'],
+        targets: ['[data-tour="citizen-quick-track"]', '[data-tour="citizen-track-complaint"]'],
         title: 'Track a Complaint',
         description: 'Use Track Complaint to check the progress of a complaint using its tracking number.',
       },
       {
         id: 'schemes',
-        targets: ['[data-tour="citizen-schemes"]'],
+        targets: ['[data-tour="citizen-schemes"]', '[data-tour="citizen-dashboard-main"]'],
         title: 'Government Schemes',
-        description: 'Explore government schemes and see services that may be available to you.',
+        description: 'Explore government schemes from the Schemes tab — it has its own guided tour once you are there.',
       },
       {
         id: 'profile',
@@ -227,9 +227,9 @@ export const TOURS = [
     steps: [
       {
         id: 'heading',
-        targets: ['[data-tour="citizen-dashboard-main"]'],
+        targets: ['[data-tour="citizen-profile-page"]'],
         title: 'Your Profile',
-        description: 'Keep your contact and account information up to date. Your complaint summary is shown here too.',
+        description: 'Your identity, district and language preferences. Contact details are managed by the district registration desk.',
       },
     ],
   },
@@ -240,7 +240,7 @@ export const TOURS = [
     steps: [
       {
         id: 'heading',
-        targets: ['[data-tour="citizen-dashboard-main"]'],
+        targets: ['[data-tour="citizen-notifications-page"]'],
         title: 'Notifications',
         description: 'Important updates about your complaints and services appear here, and in the bell icon at the top.',
       },

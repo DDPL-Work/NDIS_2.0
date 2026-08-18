@@ -11,6 +11,7 @@ import { notificationApi } from '../../services/api'
 import { DISTRICTS, DEPARTMENTS, ROLE_LABELS, ROLES } from '../../config/constants'
 import { useNavigate } from 'react-router-dom'
 import { useTourStore } from '../tour/tourStore'
+import { markReadLocal } from '../../utils/notificationRead'
 
 function useOutsideClick(ref, onOutside) {
   useEffect(() => {
@@ -77,6 +78,14 @@ export default function Topbar({ title, subtitle, showDistrict = true, showDepar
   useEffect(() => {
     if (notifications) setLocalNotifs(notifications)
   }, [notifications])
+
+  // "Mark all read" is a device-local preference — the notification API has
+  // no mark-read endpoint (see utils/notificationRead.js).
+  function handleMarkAllRead() {
+    const ids = localNotifs.map((n) => n.id)
+    markReadLocal(ids)
+    setLocalNotifs((current) => current.map((n) => ({ ...n, read: true })))
+  }
 
   const unreadCount = localNotifs.filter((n) => !n.read).length
   const canSwitchDepartment = [ROLES.DISTRICT_COLLECTOR, ROLES.DM, ROLES.ADM, ROLES.STATE_ADMIN, ROLES.SYSTEM_ADMIN].includes(user?.role)
@@ -194,6 +203,7 @@ export default function Topbar({ title, subtitle, showDistrict = true, showDepar
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         notifications={localNotifs}
+        onMarkAllRead={handleMarkAllRead}
       />
 
       <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />

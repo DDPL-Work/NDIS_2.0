@@ -1,12 +1,124 @@
-import { useState } from 'react'
-import { AlertCircle, Search } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { AlertCircle, Building2, Clock, MapPin, RefreshCw, Search } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
+import { SkeletonCard } from '../../components/ui/Skeleton'
 import CitizenComplaintDetail from './CitizenComplaintDetail'
+import ComplaintStatusStepper, { complaintStateLabel } from './ComplaintStatusStepper'
 import { workflowApi } from '../../services/api'
+import { formatDateTime } from '../../utils/format'
 
 export default function TrackGrievance() {
-  const [code, setCode] = useState(''); const [result, setResult] = useState(undefined); const [loading, setLoading] = useState(false); const [error, setError] = useState(null)
-  async function search(event) { event.preventDefault(); if (!code.trim()) return; setLoading(true); setError(null); try { setResult(await workflowApi.trackGrievance(code.trim())) } catch (requestError) { setError(requestError); setResult(undefined) } finally { setLoading(false) } }
-  return <div className="max-w-2xl mx-auto p-6"><div className="text-center mb-6"><h2 className="text-xl font-display font-semibold">Track Complaint</h2><p className="text-sm text-ink-500 mt-1">Enter the tracking number you received after submitting your complaint.</p></div><form onSubmit={search} className="flex gap-2"><div className="relative flex-1"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400"/><input data-tour="citizen-track-input" className="w-full input-field !pl-9 kbd-mono" value={code} onChange={(event) => setCode(event.target.value)} placeholder="Enter tracking number"/></div><Button type="submit" data-tour="citizen-track-button" loading={loading}>Track</Button></form>{error && <p className="mt-5 rounded-xl border border-alert-200 bg-alert-50 p-3 text-sm text-alert-700 flex gap-2"><AlertCircle size={16}/>{error.message || 'Unable to track this complaint.'}</p>}{result === null && <p className="mt-5 rounded-xl border border-alert-200 bg-alert-50 p-3 text-sm text-alert-700 flex gap-2"><AlertCircle size={16}/>No complaint found. Please check the tracking number.</p>}{result && <div className="mt-6 card p-4"><span className="text-xs text-ink-400">Tracking number</span><h3 className="font-semibold">{result.title}</h3><p className="text-sm text-ink-600 mt-1">Current update: {result.state.replace(/_/g, ' ')}</p><Button className="mt-3" onClick={() => setResult({ ...result, open: true })}>View details</Button></div>}<Modal open={Boolean(result?.open)} onClose={() => setResult((current) => current && { ...current, open: false })} width="max-w-3xl">{result?.open && <CitizenComplaintDetail complaintId={result.id} onClose={() => setResult((current) => current && { ...current, open: false })}/>}</Modal></div>
+  const [params] = useSearchParams()
+  const [code, setCode] = useState('')
+  const [result, setResult] = useState(undefined)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [detailOpen, setDetailOpen] = useState(false)
+
+  async function search(term) {
+    const trackingCode = String(term || code || '').trim()
+    if (!trackingCode) return
+    setLoading(true)
+    setError(null)
+    try {
+      setResult(await workflowApi.trackGrievance(trackingCode))
+    } catch (requestError) {
+      setError(requestError)
+      setResult(undefined)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Deep link: /citizen/track?code=… auto-searches (used by dashboard cards).
+  useEffect(() => {
+    const fromUrl = params.get('code')
+    if (fromUrl) {
+      setCode(fromUrl)
+      search(fromUrl)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params])
+
+  return (
+    <div className="mx-auto max-w-2xl p-4 sm:p-6" data-tour="citizen-track-page">
+      <div className="text-center">
+        <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-saffron-600">Citizen Portal</p>
+        <h1 className="mt-1 font-display text-2xl font-bold tracking-tight text-ink-950 sm:text-3xl">Track Complaint</h1>
+        <p className="mt-2 text-[13.5px] text-ink-500">Enter the tracking number you received after submitting your complaint.</p>
+      </div>
+
+      <form onSubmit={(e) => { e.preventDefault(); search() }} className="mt-6 flex gap-2">
+        <div className="relative flex-1">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
+          <input
+            data-tour="citizen-track-input"
+            className="input-field w-full !pl-9 kbd-mono"
+            value={code}
+            onChange={(event) => setCode(event.target.value)}
+            placeholder="Enter tracking number"
+            aria-label="Tracking number"
+          />
+        </div>
+        <Button type="submit" data-tour="citizen-track-button" loading={loading}>Track</Button>
+      </form>
+
+      {error && (
+        <div className="mt-5 flex items-center justify-between gap-3 rounded-xl border border-alert-200 bg-alert-50 p-3.5 text-[13px] text-alert-700">
+          <span className="flex items-center gap-2"><AlertCircle size={16} />Something went wrong while tracking this complaint.</span>
+          <Button size="sm" variant="outline" icon={RefreshCw} onClick={() => search()}>Try Again</Button>
+        </div>
+      )}
+      {result === null && (
+        <div className="mt-5 rounded-xl border border-alert-200 bg-alert-50 p-3.5 text-[13px] text-alert-700 flex items-center gap-2">
+          <AlertCircle size={16} />No complaint found. Please check the tracking number.
+        </div>
+      )}
+
+      {loading && (
+        <div className="mt-6 space-y-3">
+          {Array.from({ length: 2 }).map((_, i) => <SkeletonCard key={i} />)}
+        </div>
+      )}
+
+      {result && !loading && (
+        <div className="card mt-6 border p-4 sm:p-5">
+          <span className="kbd-mono text-[11px] text-ink-400">Tracking number · {result.trackingCode || result.id}</span>
+          <h2 className="mt-1 text-[16px] font-semibold text-ink-950">{result.title}</h2>
+
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            <div className="rounded-xl bg-ink-50/60 p-3">
+              <p className="flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-ink-400"><Building2 size={11} /> Department</p>
+              <p className="mt-1 text-[12.5px] font-medium text-ink-800">{result.departmentName || '—'}</p>
+            </div>
+            <div className="rounded-xl bg-ink-50/60 p-3">
+              <p className="flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-ink-400"><MapPin size={11} /> Location</p>
+              <p className="mt-1 text-[12.5px] font-medium text-ink-800 line-clamp-2">{result.location?.village || result.location?.address || '—'}</p>
+            </div>
+            <div className="rounded-xl bg-ink-50/60 p-3">
+              <p className="flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-ink-400"><Clock size={11} /> Last update</p>
+              <p className="mt-1 text-[12.5px] font-medium text-ink-800">{result.updatedAt || result.createdAt ? formatDateTime(result.updatedAt || result.createdAt) : '—'}</p>
+            </div>
+          </div>
+
+          <div className="mt-5 rounded-xl border border-ink-100 p-4">
+            <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-400">
+              Status · {complaintStateLabel(result.state)}
+            </p>
+            <ComplaintStatusStepper state={result.state} size="full" />
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button onClick={() => setDetailOpen(true)}>View Details</Button>
+          </div>
+        </div>
+      )}
+
+      <Modal open={detailOpen} onClose={() => setDetailOpen(false)} width="max-w-3xl">
+        {detailOpen && result && <CitizenComplaintDetail complaintId={result.id} onClose={() => setDetailOpen(false)} />}
+      </Modal>
+    </div>
+  )
 }

@@ -4,8 +4,8 @@
 // Ref: LLD Vol 1 §10.3 GIS interaction requirements.
 import { useState } from 'react'
 import {
-  Layers, Ruler, Circle, Navigation, Camera, Crosshair,
-  Maximize2, Radio, ChevronDown, X,
+  Layers, Ruler, Circle, Navigation, Camera,
+  Maximize2, Radio, ChevronDown, X, MoreHorizontal,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { MAP_TOOLS, BASEMAPS } from '../../hooks/useMapTools'
@@ -44,8 +44,45 @@ export default function MapToolbar({
   onMyLocation,
   onSnapshot,
   className = '',
+  // Citizen mode: only the everyday tools stay on the strip — Locate, Fit,
+  // Basemap, Snapshot.  Measure / Radius / Cluster move behind "More tools",
+  // a popover that opens upward so it never collides with the bottom bar.
+  groupAdvanced = false,
 }) {
   const [basemapOpen, setBasemapOpen] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
+  const advancedToolActive = TOOL_BTNS.some(({ tool }) => tool === activeTool)
+
+  const advancedTools = (
+    <div className="absolute bottom-full right-0 mb-1.5 card !p-1 flex flex-col gap-0.5 w-44 z-50 border-ink-200 shadow-popover animate-fade-in">
+      {TOOL_BTNS.map(({ tool, icon: Icon, label, shortLabel }) => (
+        <button
+          key={tool}
+          onClick={() => { onSelectTool(tool); setMoreOpen(false) }}
+          title={label}
+          className={clsx(
+            'flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[11.5px] font-medium transition-colors',
+            activeTool === tool ? 'bg-ink-900 text-white' : 'text-ink-700 hover:bg-ink-100'
+          )}
+        >
+          <Icon size={14} className="shrink-0" />
+          {shortLabel}
+        </button>
+      ))}
+      <div className="h-px bg-ink-100" />
+      <button
+        onClick={() => { onToggleCluster(); setMoreOpen(false) }}
+        title="Toggle clustering"
+        className={clsx(
+          'flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[11.5px] font-medium transition-colors',
+          clusterEnabled ? 'bg-saffron-500 text-white' : 'text-ink-700 hover:bg-ink-100'
+        )}
+      >
+        <Radio size={14} className="shrink-0" />
+        Cluster
+      </button>
+    </div>
+  )
 
   return (
     <div className={clsx('flex flex-col gap-1.5', className)}>
@@ -58,7 +95,7 @@ export default function MapToolbar({
             title="Switch basemap"
             className="flex items-center gap-1.5 w-full rounded-lg px-2 py-1.5 text-[11.5px] font-medium text-ink-700 hover:bg-ink-100 transition-colors"
           >
-                        <Layers size={14} className="shrink-0" />
+            <Layers size={14} className="shrink-0" />
             <span className="hidden sm:inline flex-1 text-left">{BASEMAPS.find((b) => b.id === basemapId)?.label || 'Basemap'}</span>
             <ChevronDown size={12} className={clsx('transition-transform', basemapOpen && 'rotate-180')} />
           </button>
@@ -84,7 +121,7 @@ export default function MapToolbar({
         <div className="h-px bg-ink-100" />
 
         {/* Tool buttons */}
-        {TOOL_BTNS.map(({ tool, icon: Icon, label, shortLabel }) => (
+        {!groupAdvanced && TOOL_BTNS.map(({ tool, icon: Icon, label, shortLabel }) => (
           <button
             key={tool}
             onClick={() => onSelectTool(tool)}
@@ -96,23 +133,25 @@ export default function MapToolbar({
                 : 'text-ink-700 hover:bg-ink-100'
             )}
           >
-                        <Icon size={14} className="shrink-0" />
+            <Icon size={14} className="shrink-0" />
             <span className="hidden sm:inline">{shortLabel}</span>
           </button>
         ))}
 
-        {/* Cluster toggle */}
-        <button
-          onClick={onToggleCluster}
-          title="Toggle clustering"
-          className={clsx(
-            'flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[11.5px] font-medium transition-colors',
-            clusterEnabled ? 'bg-saffron-500 text-white' : 'text-ink-700 hover:bg-ink-100'
-          )}
-        >
-                    <Radio size={14} className="shrink-0" />
-          <span className="hidden sm:inline">Cluster</span>
-        </button>
+        {/* Cluster toggle (un-grouped mode only) */}
+        {!groupAdvanced && (
+          <button
+            onClick={onToggleCluster}
+            title="Toggle clustering"
+            className={clsx(
+              'flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[11.5px] font-medium transition-colors',
+              clusterEnabled ? 'bg-saffron-500 text-white' : 'text-ink-700 hover:bg-ink-100'
+            )}
+          >
+            <Radio size={14} className="shrink-0" />
+            <span className="hidden sm:inline">Cluster</span>
+          </button>
+        )}
 
         <div className="h-px bg-ink-100" />
 
@@ -122,7 +161,7 @@ export default function MapToolbar({
           title="Fit to district"
           className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[11.5px] font-medium text-ink-700 hover:bg-ink-100 transition-colors"
         >
-                    <Maximize2 size={14} className="shrink-0" />
+          <Maximize2 size={14} className="shrink-0" />
           <span className="hidden sm:inline">Fit</span>
         </button>
         <button
@@ -130,7 +169,7 @@ export default function MapToolbar({
           title="My location"
           className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[11.5px] font-medium text-ink-700 hover:bg-ink-100 transition-colors"
         >
-                    <Navigation size={14} className="shrink-0" />
+          <Navigation size={14} className="shrink-0" />
           <span className="hidden sm:inline">Locate</span>
         </button>
         <button
@@ -138,9 +177,33 @@ export default function MapToolbar({
           title="Download map snapshot"
           className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[11.5px] font-medium text-ink-700 hover:bg-ink-100 transition-colors"
         >
-                    <Camera size={14} className="shrink-0" />
+          <Camera size={14} className="shrink-0" />
           <span className="hidden sm:inline">Snapshot</span>
         </button>
+
+        {/* Citizen mode: "More tools" popover for the advanced tools */}
+        {groupAdvanced && (
+          <>
+            <div className="h-px bg-ink-100" />
+            <div className="relative">
+              <button
+                onClick={() => setMoreOpen((o) => !o)}
+                title="More tools"
+                aria-expanded={moreOpen}
+                className={clsx(
+                  'flex items-center gap-1.5 w-full rounded-lg px-2 py-1.5 text-[11.5px] font-medium transition-colors',
+                  moreOpen || advancedToolActive || clusterEnabled
+                    ? 'bg-saffron-500 text-white'
+                    : 'text-ink-700 hover:bg-ink-100'
+                )}
+              >
+                <MoreHorizontal size={14} className="shrink-0" />
+                <span className="hidden sm:inline">More tools</span>
+              </button>
+              {moreOpen && advancedTools}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Radius config panel */}

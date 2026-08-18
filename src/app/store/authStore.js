@@ -3,6 +3,12 @@ import { persist } from 'zustand/middleware'
 import { AuthService } from '../../services/auth/AuthService'
 import { getDefaultRoute } from '../../app/authRoutes'
 
+// Demo-access marker.  Demo personas have no gateway tokens, so a full page
+// reload would otherwise wipe the persisted user during session restore
+// (AuthService.restoreSession returns null without tokens).  The marker keeps
+// a demo session alive across reloads; real SSO sessions never set it.
+const DEMO_MARKER = 'ndisp.demo.session'
+
 let restoreInFlight = null
 
 export const useAuthStore = create(persist((set, get) => ({
@@ -19,6 +25,7 @@ export const useAuthStore = create(persist((set, get) => ({
   // production SSO flow. Role/permissions are still fed through the same
   // permission checks as a real session.
   demoSignIn(persona) {
+    localStorage.setItem(DEMO_MARKER, '1')
     set({ user: persona.user, status: 'authenticated', error: null })
     return getDefaultRoute(persona.user.role)
   },
@@ -29,13 +36,20 @@ export const useAuthStore = create(persist((set, get) => ({
     if (restoreInFlight) return restoreInFlight
     set({ status: 'restoring', error: null })
     restoreInFlight = (async () => {
-      try { const user = await AuthService.restoreSession(); set({ user, status: user ? 'authenticated' : 'idle' }); return user }
-      catch { AuthService.logout(); set({ user: null, status: 'idle' }); return null }
+      try {
+        const user = await AuthService.restoreSession()
+        if (user) { set({ user, status: 'authenticated' }); return user }
+        // Demo build: keep the persisted persona session across reloads
+        // instead of clearing it (see DEMO_MARKER).
+        if (localStorage.getItem(DEMO_MARKER) && get().user) { set({ status: 'authenticated' }); return get().user }
+        set({ user: null, status: 'idle' }); return null
+      }
+      catch { AuthService.logout(); localStorage.removeItem(DEMO_MARKER); set({ user: null, status: 'idle' }); return null }
       finally { restoreInFlight = null }
     })()
     return restoreInFlight
   },
-  signOut() { AuthService.logout(); set({ user: null, status: 'idle', error: null }) },
+  signOut() { AuthService.logout(); localStorage.removeItem(DEMO_MARKER); set({ user: null, status: 'idle', error: null }) },
   hasPermission(permission) { const user = get().user; return Boolean(user?.permissions?.includes(permission) || user?.permissions?.includes('ALL_READ') || user?.permissions?.includes('SYSADMIN')) },
   setDistrict(districtId) { set((s) => ({ user: s.user ? { ...s.user, districtId } : null })) },
   setDepartment(departmentId) { set((s) => ({ user: s.user ? { ...s.user, departmentId } : null })) },

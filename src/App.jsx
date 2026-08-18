@@ -5,7 +5,6 @@ import { useAuthStore } from './app/store/authStore'
 import RequireRole from './app/RequireRole'
 import AppShell from './components/layout/AppShell'
 import LoginPage from './features/auth/LoginPage'
-import SimulationControlPanel from './components/ui/SimulationControlPanel'
 import AuthBootstrap from './app/AuthBootstrap'
 
 const PublicLandingPage = lazy(() => import('./features/landing/PublicLandingPage'))
@@ -23,6 +22,10 @@ import ReportIssue from './features/citizen/ReportIssue'
 import TrackGrievance from './features/citizen/TrackGrievance'
 import Schemes from './features/citizen/Schemes'
 import CitizenReports from './features/citizen/Reports'
+import CitizenNotifications from './features/citizen/CitizenNotifications'
+import CitizenProfile from './features/citizen/CitizenProfile'
+import CitizenMobileNav from './features/citizen/CitizenMobileNav'
+import './features/citizen/citizen.css'
 
 // Admin & Collector Views
 import DistrictCommandPlatform from './features/admin/platform/DistrictCommandPlatform'
@@ -88,7 +91,17 @@ function CitizenShell() {
   const nav = useFilteredNav(CITIZEN_NAV)
   return (
     <>
-      <AppShell navItems={nav} portalLabel="Citizen Portal" portalIcon="User" accentClassName="bg-leaf-600" title="Citizen Portal" subtitle="NDISP Public Services & Complaint Tracking" showDistrict showDepartment={false} />
+      <AppShell
+        navItems={nav}
+        portalLabel="Citizen Portal"
+        portalIcon="User"
+        accentClassName="bg-leaf-600"
+        title="Citizen Portal"
+        subtitle="NDISP Public Services & Complaint Tracking"
+        showDistrict
+        showDepartment={false}
+        bottomNav={({ onOpenNav }) => <CitizenMobileNav onOpenNav={onOpenNav} />}
+      />
       <CitizenTourHost />
     </>
   )
@@ -133,8 +146,8 @@ export default function App() {
               <Route path="track" element={<TrackGrievance />} />
               <Route path="schemes" element={<Schemes />} />
               <Route path="facilities" element={<CitizenHome />} />
-              <Route path="notifications" element={<CitizenDashboard />} />
-              <Route path="profile" element={<CitizenDashboard />} />
+              <Route path="notifications" element={<CitizenNotifications />} />
+              <Route path="profile" element={<CitizenProfile />} />
               <Route path="reports" element={<CitizenReports />} />
             </Route>
           </Route>

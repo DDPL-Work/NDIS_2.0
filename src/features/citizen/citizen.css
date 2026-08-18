@@ -1,0 +1,82 @@
+/* Citizen portal — micro-interactions and layout helpers.
+   Small, GPU-friendly, and every animation is disabled under
+   prefers-reduced-motion (mirrors the landing-page approach). */
+
+/* Current-step pulse in the complaint status stepper */
+@keyframes ndisp-step-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(224, 122, 44, 0.35); }
+  70% { box-shadow: 0 0 0 7px rgba(224, 122, 44, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(224, 122, 44, 0); }
+}
+.ndisp-step-current {
+  animation: ndisp-step-pulse 2.2s ease-out infinite;
+}
+
+/* Bottom sheets (mobile facility detail, map results) */
+@keyframes ndisp-sheet-up {
+  from { transform: translateY(24px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.ndisp-sheet-up {
+  animation: ndisp-sheet-up 0.22s ease-out both;
+}
+
+/* Desktop right drawer (facility detail) */
+@keyframes ndisp-sheet-in {
+  from { transform: translateX(32px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.ndisp-sheet-in {
+  animation: ndisp-sheet-in 0.22s ease-out both;
+}
+
+/* Single animation class for the CitizenFacilitySheet: slides up on mobile,
+   slides in from the right on desktop (variant-based classes cannot wrap
+   custom keyframes, so the breakpoints live in this file). */
+.ndisp-sheet-responsive {
+  animation: none;
+}
+@media (min-width: 1024px) {
+  .ndisp-sheet-responsive {
+    animation: ndisp-sheet-in 0.22s ease-out both;
+  }
+}
+@media (max-width: 1023.98px) {
+  .ndisp-sheet-responsive {
+    animation: ndisp-sheet-up 0.22s ease-out both;
+  }
+}
+
+/* Search suggestions: soft fade + slide */
+@keyframes ndisp-suggest {
+  from { transform: translateY(-4px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.ndisp-suggest {
+  animation: ndisp-suggest 0.16s ease-out both;
+}
+
+/* Notification rows: subtle highlight flash when they contain an update */
+@keyframes ndisp-notif-in {
+  from { background-color: rgba(224, 122, 44, 0.08); }
+  to { background-color: transparent; }
+}
+.ndisp-notif-in {
+  animation: ndisp-notif-in 1.6s ease-out both;
+}
+
+/* Mobile bottom navigation safe area */
+.ndisp-bottom-nav {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ndisp-step-current,
+  .ndisp-sheet-up,
+  .ndisp-sheet-in,
+  .ndisp-sheet-responsive,
+  .ndisp-suggest,
+  .ndisp-notif-in {
+    animation: none !important;
+  }
+}

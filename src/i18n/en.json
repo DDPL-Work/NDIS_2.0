@@ -24,5 +24,10 @@
   "citizen.searchPlaceholder": "Search for a hospital, school, water source…",
   "citizen.reportIssue": "Report an issue",
   "citizen.trackGrievance": "Track your grievance",
+  "dashboard.greeting": "Good day",
+  "dashboard.greetingMorning": "Good morning",
+  "dashboard.greetingAfternoon": "Good afternoon",
+  "dashboard.greetingEvening": "Good evening",
+  "bottomNav.more": "More",
   "footer.tagline": "A Spatial Decision Support System for district governance"
 }

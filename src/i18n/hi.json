@@ -24,5 +24,10 @@
   "citizen.searchPlaceholder": "अस्पताल, स्कूल, जल स्रोत खोजें…",
   "citizen.reportIssue": "समस्या दर्ज करें",
   "citizen.trackGrievance": "अपनी शिकायत ट्रैक करें",
+  "dashboard.greeting": "आपका दिन शुभ हो",
+  "dashboard.greetingMorning": "सुप्रभात",
+  "dashboard.greetingAfternoon": "शुभ दोपहर",
+  "dashboard.greetingEvening": "शुभ संध्या",
+  "bottomNav.more": "अधिक",
   "footer.tagline": "जिला शासन के लिए स्थानिक निर्णय समर्थन प्रणाली"
 }

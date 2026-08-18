@@ -1,10 +1,15 @@
 //// Citizen Home — GIS facility search, Map Toolbar, Near Me sorting, and walking distance estimates.
 //// Data sources: GET /api/gis/catalog/, /api/gis/layers/{name}/, /api/facilities/,
-//// /api/departments/ (backend_guide.md).  UI unchanged but interaction is role-aware:
-//// citizens open the Facility Detail page; DM/ADM/Executive/Department Officer roles
-//// open the right-side FacilityInfoPanel instead (production NDISP behaviour).
+//// /api/departments/ (backend_guide.md).
+//// Explore Map sidebar states (Google Maps-style):
+////   desktop  open (360px) / rail (48px icon column) / closed (0px)
+////   mobile   off-canvas drawer / closed
+//// Citizens open the in-map CitizenFacilitySheet on any facility click;
+//// DM/ADM/Executive/Department Officer roles open the right-side FacilityInfoPanel.
+//// Deep links from the dashboard: ?q= runs the shared GIS search,
+//// ?dept=health filters one department, ?near=1 starts device location.
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
-import { Search, Navigation, Footprints, MapPin, ChevronLeft } from 'lucide-react'
+import { ChevronLeft, ChevronRight, MapPin, Navigation, Search, X, Footprints, Layers } from 'lucide-react'
 import clsx from 'clsx'
 import MapView from '../../components/map/MapView'
 import MapToolbar from '../../components/map/MapToolbar'
@@ -13,26 +18,27 @@ import FacilityInfoPanel from '../../components/map/FacilityInfoPanel'
 import FacilityCard from '../shared/FacilityCard'
 import { SkeletonCard } from '../../components/ui/Skeleton'
 import EmptyState from '../../components/ui/EmptyState'
+import Button from '../../components/ui/Button'
+import Icon from '../../components/ui/Icon'
 import { useMapTools } from '../../hooks/useMapTools'
 import { useGISCatalog } from '../../hooks/useGISCatalog'
 import { useLeafletLayers } from '../../hooks/useLeafletLayers'
 import { useFacilities } from '../../hooks/useFacilities'
 import { useAsync } from '../../hooks/useAsync'
-import { useFacilityClickHandler } from '../../hooks/useFacilityClickHandler'
+import { useMediaQuery } from '../../hooks/useMediaQuery'
 import { useDepartments, departmentMapFrom } from '../../hooks/useDepartments'
 import { useRoute } from '../../hooks/useRoute'
 import { createPulseMarker } from '../../services/LeafletLayerService'
 import { GISRepository } from '../../gis/repositories/GISRepository'
 import CitizenLayerPanel from './CitizenLayerPanel'
+import CitizenFacilitySheet from './CitizenFacilitySheet'
 import RouteSummary from '../../gis/components/RouteSummary'
+import GISSearchPanel from '../../gis/components/GISSearchPanel'
 import { useAuthStore } from '../../app/store/authStore'
 import { useUiStore } from '../../app/store/uiStore'
 import { useI18n } from '../../i18n/i18n'
 import { DEPARTMENTS, DISTRICTS, ROLES } from '../../config/constants'
 import { distanceMeters } from '../../utils/geo'
-import Icon from '../../components/ui/Icon'
-import Button from '../../components/ui/Button'
-import GISSearchPanel from '../../gis/components/GISSearchPanel'
 
 // Visual icon lookup by department name (presentation only — the department
 // list itself always comes from /api/departments/).
@@ -71,15 +77,15 @@ export default function CitizenHome() {
   const [activeDepts, setActiveDepts] = useState(null)
   const [selectedId, setSelectedId] = useState(null)
   const [selectedFacility, setSelectedFacility] = useState(null)
+  const [sheetFacility, setSheetFacility] = useState(null)
   const [userGps, setUserGps] = useState(null)
-  const [isLocating, setIsLocating] = useState(false)
+  const [locationStatus, setLocationStatus] = useState('idle') // idle | locating | active | denied
   const [gisResults, setGisResults] = useState(null)
   const [leafletMap, setLeafletMap] = useState(null)
-  // Explore Map sidebar (Google Maps-style).  Desktop: width-based collapse so
-  // the map expands into the freed space; mobile: overlay drawer via transform.
-  // All search/layer/route/selection state lives in components that stay
-  // mounted, so toggling never refetches data or touches the route.
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  // Sidebar state — desktop: open / rail / closed; mobile: drawer open/closed.
+  const [desktopMode, setDesktopMode] = useState('open')
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const isMobile = useMediaQuery('(max-width: 1023px)')
   const routing = useRoute()
   const routeActiveId = routing.routeActiveId
   const pushToast = useUiStore((s) => s.pushToast)
@@ -88,60 +94,58 @@ export default function CitizenHome() {
   // MapView ResizeObserver already fires invalidateSize, and this explicit call
   // covers the moment the transition ends.  Transform-based (mobile) toggles
   // never change the map container size, so no invalidateSize is needed.
-  const handleToggleSidebar = useCallback(() => {
-    setSidebarOpen((open) => {
-      const next = !open
-      if (typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches) {
-        setTimeout(() => {
-          try { mapRef.current?.map?.invalidateSize?.() } catch { /* map teardown mid-transition */ }
-        }, 320)
-      }
-      return next
-    })
+  const scheduleInvalidate = useCallback(() => {
+    setTimeout(() => {
+      try { mapRef.current?.map?.invalidateSize?.() } catch { /* map teardown mid-transition */ }
+    }, 320)
   }, [])
 
-  // The citizen guided tour opens the collapsed Explore Map sidebar before
-  // highlighting targets inside it (desktop width collapse / mobile drawer).
+  const openSidebar = useCallback(() => {
+    if (typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches) {
+      setDesktopMode('open')
+      scheduleInvalidate()
+    } else {
+      setMobileOpen(true)
+    }
+  }, [scheduleInvalidate])
+
+  const closeSidebar = useCallback(() => {
+    if (typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches) {
+      setDesktopMode((mode) => (mode === 'rail' ? 'closed' : 'rail'))
+      scheduleInvalidate()
+    } else {
+      setMobileOpen(false)
+    }
+  }, [scheduleInvalidate])
+
+  // The citizen guided tour opens the Explore Map sidebar before highlighting
+  // targets inside it (desktop width collapse / mobile drawer).
   useEffect(() => {
-    const openForTour = () => setSidebarOpen((open) => {
-      if (!open && typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches) {
-        setTimeout(() => {
-          try { mapRef.current?.map?.invalidateSize?.() } catch { /* map teardown mid-transition */ }
-        }, 320)
-      }
-      return true
-    })
-    window.addEventListener('ndisp-tour-open-sidebar', openForTour)
-    return () => window.removeEventListener('ndisp-tour-open-sidebar', openForTour)
-  }, [])
+    window.addEventListener('ndisp-tour-open-sidebar', openSidebar)
+    return () => window.removeEventListener('ndisp-tour-open-sidebar', openSidebar)
+  }, [openSidebar])
 
   // ONE route source of truth: facility markers and search results feed the
   // same useRoute instance.  STRICT TWO-POINT semantics: "Route to here" sets
   // the destination (a GPS origin is used when no route exists yet).
-  // Selecting an entity that is already the other endpoint is rejected
-  // (A → A) and reported to the user.  GIS layer features (boundaries etc.)
-  // are display-only and can never become routing targets.
   const handleFacilityRouteTo = useCallback(async (entity) => {
     const result = await routing.routeTo(entity)
     if (result?.reason === 'same-as-origin' || result?.reason === 'same-as-destination') {
       pushToast(`${entity?.name || 'This location'} is already ${result.reason === 'same-as-origin' ? 'the start point' : 'the destination'}.`, 'info')
     }
-  }, [routing.routeTo, pushToast])
+  }, [routing, pushToast])
 
   // Backend data sources
   const { data: departmentsData } = useDepartments()
   const { data: catalog } = useGISCatalog()
   const { data: facilities, loading } = useFacilities(district.id)
-  // Catalog layers (District_boundary / Block_boundary / ...) are display-only
-  // — hover/identify, never routing targets.
   const layers = useLeafletLayers(leafletMap)
   const { data: facilityGrievances } = useAsync(
     () => selectedFacility ? GISRepository.complaints({ facility_id: selectedFacility.id }) : Promise.resolve([]),
     [selectedFacility?.id]
   )
 
-  // Fallback to the legacy constants while /api/departments/ loads, so the
-  // first paint stays identical; backend departments take over once loaded.
+  // Fallback to the legacy constants while /api/departments/ loads.
   const departments = departmentsData && departmentsData.length ? departmentsData : DEPARTMENTS
   const departmentColors = useMemo(() => Object.fromEntries(departments.map((d) => [String(d.id), d.color])), [departments])
   const deptMap = useMemo(
@@ -149,44 +153,65 @@ export default function CitizenHome() {
     [departmentsData]
   )
 
-  // Role decision from the authenticated user (never hardcoded): every role
-  // except citizen uses the right-side inspection panel (ISSUE 5).
   const isCitizenRole = user?.role === ROLES.CITIZEN
 
   // Seed the department chips from the loaded departments exactly once.
-  // Departments behave like multi-select checkboxes (ISSUE 1).
   useEffect(() => {
     if (departmentsData?.length && activeDepts === null) {
       setActiveDepts(departmentsData.map((d) => String(d.id)))
     }
   }, [departmentsData, activeDepts])
   const activeIds = activeDepts || DEPARTMENTS.map((d) => d.id)
+  const allActive = departments.length > 0 && activeIds.length === departments.length
 
-  // Locate user using Geolocation API
+  // Locate user using Geolocation API; a permission denial is surfaced as an
+  // honest banner with a retry ("Enable Location") instead of silent failure.
   const handleLocateMe = useCallback(() => {
-    setIsLocating(true)
+    setLocationStatus('locating')
     mapRef.current?.locateUser()
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setUserGps([pos.coords.longitude, pos.coords.latitude])
-          setIsLocating(false)
-        },
-        () => setIsLocating(false)
-      )
-    } else {
-      setIsLocating(false)
+    if (!navigator.geolocation) {
+      setLocationStatus('idle')
+      return
     }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUserGps([pos.coords.longitude, pos.coords.latitude])
+        setLocationStatus('active')
+      },
+      (error) => {
+        setLocationStatus(error?.code === 1 ? 'denied' : 'idle')
+      }
+    )
   }, [])
+
+  // Dashboard deep links: ?q= runs the shared GIS search, ?dept= isolates one
+  // department, ?near=1 starts location.  Params are consumed once and removed.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const q = params.get('q')
+    const dept = params.get('dept')
+    const near = params.get('near')
+    if (!q && !dept && !near) return
+    if (q) {
+      window.dispatchEvent(new CustomEvent('ndisp-gis-ask', { detail: q }))
+      openSidebar()
+    }
+    if (dept && departmentsData?.length) {
+      const term = String(dept).toLowerCase()
+      const match = departmentsData.find(
+        (d) => String(d.id) === dept || String(d.slug || d.name || d.label || '').toLowerCase().includes(term)
+      )
+      if (match) setActiveDepts([String(match.id)])
+    }
+    if (near) handleLocateMe()
+    window.history.replaceState({}, '', window.location.pathname)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [departmentsData])
 
   const referencePoint = userGps || district.center
 
   const filtered = useMemo(() => {
     if (!facilities) return []
-    // Facilities merge across every active department (ISSUE 1/ISSUE 10) —
-    // filtered locally from the single loaded collection (ISSUE 12).  Rows
-    // without a valid geometry are dropped: the distance sort below and the
-    // map markers both require a real position.
     let list = facilities.filter((f) => activeIds.includes(String(f.departmentId)) && Array.isArray(f.position) && f.position.length >= 2)
     if (tools.radiusCenter) {
       const radiusMeters = tools.radiusKm * 1000
@@ -212,7 +237,7 @@ export default function CitizenHome() {
   }, [facilities, activeIds, query, referencePoint, tools.radiusCenter, tools.radiusKm])
 
   // Multi-select department toggle: adding/removing one department never
-  // disables the others (ISSUE 1).
+  // disables the others.
   function toggleDept(id) {
     setActiveDepts((cur) => {
       const base = cur || DEPARTMENTS.map((d) => d.id)
@@ -223,12 +248,18 @@ export default function CitizenHome() {
     })
   }
 
-  const handleFacilityClick = useFacilityClickHandler({
-    onOpenPanel: useCallback((facility) => {
-      setSelectedFacility(facility)
-      setSelectedId(facility.id)
-    }, []),
-  })
+  function selectAllDepts() {
+    setActiveDepts(departments.map((d) => String(d.id)))
+  }
+
+  // Single facility-click behaviour: citizens open the in-map sheet (page
+  // stays on the map), every other role opens the right-side inspection panel.
+  const handleFacilityClick = useCallback((facility) => {
+    if (!facility) return
+    setSelectedId(facility.id)
+    if (isCitizenRole) setSheetFacility(facility)
+    else setSelectedFacility(facility)
+  }, [isCitizenRole])
 
   // Map highlight when arriving from another module with URL params
   // (facility_id / lat / lng / layer), REF.html checkUrlParamsAndHighlight().
@@ -251,33 +282,37 @@ export default function CitizenHome() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leafletMap, catalog])
 
+  const sheetWalkMin = sheetFacility ? filtered.find((f) => f.id === sheetFacility.id)?.walkMin : undefined
+  const mobileResults = isMobile && gisResults?.results?.length ? gisResults.results : null
+
   return (
     <div className="relative flex h-full overflow-hidden">
       {/* Left: search + layers + results — collapsible sidebar.
-          Desktop: width-animated (360px ↔ 0) so the map expands into the freed
-          space; inner content keeps a fixed width and is clipped during the
-          transition.  Mobile: full-height overlay drawer translated off-canvas;
-          the map stays full width behind it.  The sidebar stays MOUNTED in both
-          modes, preserving search text, results, GIS layer state, selection and
-          the active route. */}
+          Desktop: width-animated (360px ↔ 48px ↔ 0).  Mobile: overlay drawer
+          translated off-canvas.  The sidebar stays MOUNTED in every state,
+          preserving search text, results, GIS layers, selection and the route. */}
       <aside
-        data-tour-sidebar={sidebarOpen ? 'open' : 'closed'}
+        data-tour-sidebar={desktopMode}
         className={clsx(
           'flex flex-col overflow-hidden bg-white border-r border-ink-100',
           'absolute inset-y-0 left-0 z-[130] w-[min(88vw,360px)] transition-transform duration-300 ease-out',
           'lg:relative lg:z-auto lg:translate-x-0 lg:transition-[width]',
-          sidebarOpen ? 'translate-x-0 lg:w-[360px]' : '-translate-x-full lg:w-0'
+          mobileOpen ? 'translate-x-0' : '-translate-x-full',
+          desktopMode === 'open' && 'lg:translate-x-0 lg:w-[360px]',
+          desktopMode === 'rail' && 'lg:w-12',
+          desktopMode === 'closed' && 'lg:w-0'
         )}
       >
-        <div className="flex w-full min-h-0 flex-1 flex-col lg:w-[360px]">
+        {/* Full panel */}
+        <div className={clsx('flex w-full min-h-0 flex-1 flex-col lg:w-[360px]', desktopMode === 'rail' && 'lg:hidden')}>
           <div className="flex items-center justify-between gap-2 border-b border-ink-100 px-4 py-3">
             <span className="flex items-center gap-1.5 text-[13px] font-semibold text-ink-900">
               <MapPin size={14} className="text-leaf-600" />
               Explore Map
             </span>
             <button
-              onClick={handleToggleSidebar}
-              aria-label="Close explore panel"
+              onClick={closeSidebar}
+              aria-label="Collapse explore panel"
               className="flex items-center gap-1 rounded-lg border border-ink-200 px-2 py-1 text-[11px] font-semibold text-ink-600 hover:bg-ink-50 hover:text-ink-900 transition-colors"
             >
               <ChevronLeft size={13} /> Collapse
@@ -286,7 +321,17 @@ export default function CitizenHome() {
           <div className="p-4 border-b border-ink-100" data-tour="citizen-map-searchpanel">
             <GISSearchPanel center={referencePoint} user={user} allowedDepartments={activeIds} compact onResults={setGisResults} onResultClick={(result) => mapRef.current?.showResult(result)} onShowRoute={routing.showRoute} onClearRoute={routing.clearRoute} routeActiveId={routeActiveId} routeLoading={routing.status === 'loading'} onRouteStart={routing.setRouteStart} onRouteDestination={routing.setRouteDestination} routeStartId={routing.routeStartId} routeDestinationId={routing.routeDestinationId} />
 
-            <div className="flex items-center gap-1.5 mt-3 overflow-x-auto pb-0.5">
+            {/* Category pills — "All" + one chip per real department */}
+            <div className="flex items-center gap-1.5 mt-3 overflow-x-auto pb-0.5" role="group" aria-label="Filter by department">
+              <button
+                onClick={selectAllDepts}
+                className={clsx(
+                  'flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-[11.5px] font-medium transition-colors',
+                  allActive ? 'border-ink-900 bg-ink-900 text-white' : 'border-ink-200 bg-transparent text-ink-600 hover:bg-ink-50'
+                )}
+              >
+                All
+              </button>
               {departments.map((d) => {
                 const chip = chipFor(d)
                 const active = activeIds.includes(String(d.id))
@@ -294,6 +339,7 @@ export default function CitizenHome() {
                   <button
                     key={String(d.id)}
                     onClick={() => toggleDept(String(d.id))}
+                    aria-pressed={active}
                     className="flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-[11.5px] font-medium transition-colors"
                     style={{
                       borderColor: active ? chip.color : '#e4e7ec',
@@ -327,7 +373,7 @@ export default function CitizenHome() {
               size="sm"
               variant={userGps ? 'positive' : 'outline'}
               icon={Navigation}
-              loading={isLocating}
+              loading={locationStatus === 'locating'}
               onClick={handleLocateMe}
               className="!py-1 !text-[11px]"
             >
@@ -370,10 +416,29 @@ export default function CitizenHome() {
               ))}
           </div>
         </div>
+
+        {/* Rail — 48px icon column (desktop only) */}
+        <div className={clsx('hidden w-12 flex-col items-center gap-1 border-r border-ink-100 py-3', desktopMode === 'rail' ? 'lg:flex' : 'lg:hidden')}>
+          <button onClick={openSidebar} title="Expand explore panel" aria-label="Expand explore panel" className="grid h-9 w-9 place-items-center rounded-lg text-ink-600 hover:bg-ink-100 transition-colors">
+            <ChevronRight size={16} />
+          </button>
+          <button onClick={openSidebar} title="Search places, services or facilities" aria-label="Search" className="grid h-9 w-9 place-items-center rounded-lg text-ink-600 hover:bg-ink-100 transition-colors">
+            <Search size={16} />
+          </button>
+          <button onClick={openSidebar} title="Map layers" aria-label="Map layers" className="grid h-9 w-9 place-items-center rounded-lg text-ink-600 hover:bg-ink-100 transition-colors">
+            <Layers size={16} />
+          </button>
+          <button onClick={handleLocateMe} title="Near me" aria-label="Near me" className="grid h-9 w-9 place-items-center rounded-lg text-ink-600 hover:bg-ink-100 transition-colors">
+            <Navigation size={16} />
+          </button>
+          <button onClick={() => setDesktopMode('closed')} title="Close explore panel" aria-label="Close explore panel" className="grid h-9 w-9 place-items-center rounded-lg text-ink-400 hover:bg-ink-100 transition-colors">
+            <X size={16} />
+          </button>
+        </div>
       </aside>
 
       {/* Right: map */}
-        <div className="flex-1 relative p-2 sm:p-3 z-0 min-w-0" data-tour="citizen-map-canvas">
+      <div className="flex-1 relative p-2 sm:p-3 z-0 min-w-0" data-tour="citizen-map-canvas">
         <MapView
           ref={mapRef}
           center={district.center}
@@ -405,7 +470,7 @@ export default function CitizenHome() {
         </div>
 
         {/* Right-side information panel for administrative roles only.
-            Citizens never see this panel — they navigate to Facility Detail. */}
+            Citizens use the in-map CitizenFacilitySheet instead. */}
         {!isCitizenRole && selectedFacility && (
           <div className="absolute right-6 top-6 bottom-6 z-[140]">
             <FacilityInfoPanel
@@ -417,10 +482,21 @@ export default function CitizenHome() {
           </div>
         )}
 
+        {/* Google-Maps-style search pill (mobile, panel closed) + open button (desktop) */}
         <div className="absolute top-6 left-6 flex flex-col gap-2 w-[min(320px,calc(100vw-24px))] z-[120]">
-          {!sidebarOpen && (
+          {isMobile && !mobileOpen && (
             <button
-              onClick={handleToggleSidebar}
+              onClick={() => setMobileOpen(true)}
+              aria-label="Open explore panel"
+              className="flex items-center gap-2 rounded-full bg-white border border-ink-200 px-4 py-2.5 text-[12.5px] font-medium text-ink-600 shadow-lg hover:bg-ink-50 transition-colors"
+            >
+              <Search size={14} className="text-leaf-600" />
+              Search places, services or facilities
+            </button>
+          )}
+          {!isMobile && desktopMode === 'closed' && (
+            <button
+              onClick={openSidebar}
               aria-label="Open explore panel"
               className="flex items-center gap-1.5 rounded-xl bg-white border border-ink-200 px-3 py-2 text-[12px] font-semibold text-ink-800 shadow-lg hover:bg-ink-50 transition-colors"
             >
@@ -428,11 +504,33 @@ export default function CitizenHome() {
               Open Explore Map
             </button>
           )}
+          {!isMobile && desktopMode === 'rail' && (
+            <button
+              onClick={openSidebar}
+              aria-label="Expand explore panel"
+              className="flex items-center gap-1.5 rounded-xl bg-white border border-ink-200 px-3 py-2 text-[12px] font-semibold text-ink-800 shadow-lg hover:bg-ink-50 transition-colors"
+            >
+              <ChevronRight size={14} className="text-leaf-600" />
+              Expand panel
+            </button>
+          )}
           <DepartmentLegend departments={departments.map((d) => ({ id: String(d.id), name: d.name || d.label, color: d.color }))} activeIds={activeIds} onToggle={toggleDept} />
         </div>
 
+        {/* Honest location-permission banner with retry */}
+        {locationStatus === 'denied' && (
+          <div className="absolute top-6 right-6 z-[120] flex items-center gap-3 rounded-xl border border-alert-200 bg-white p-3 shadow-popover" role="alert">
+            <div className="min-w-0">
+              <p className="text-[12px] font-semibold text-ink-900">Location access is off</p>
+              <p className="text-[11px] text-ink-500">Enable location to sort facilities nearest to you.</p>
+            </div>
+            <Button size="sm" icon={Navigation} onClick={handleLocateMe}>Enable Location</Button>
+          </div>
+        )}
+
         <div className="absolute bottom-6 right-6 z-[120]" data-tour="citizen-map-tools">
           <MapToolbar
+            groupAdvanced={isCitizenRole}
             activeTool={tools.activeTool}
             onSelectTool={tools.selectTool}
             clusterEnabled={tools.clusterEnabled}
@@ -454,6 +552,52 @@ export default function CitizenHome() {
           />
         </div>
       </div>
+
+      {/* In-map facility detail (citizen portal) */}
+      {isCitizenRole && (
+        <CitizenFacilitySheet
+          facility={sheetFacility}
+          deptMap={deptMap}
+          walkMin={sheetWalkMin}
+          onShowRoute={handleFacilityRouteTo}
+          onClose={() => setSheetFacility(null)}
+        />
+      )}
+
+      {/* Mobile search results bottom sheet */}
+      {mobileResults && (
+        <div className="ndisp-sheet-up fixed inset-x-0 bottom-16 lg:hidden z-[150] max-h-[45dvh] overflow-hidden rounded-t-2xl border-t border-ink-100 bg-white shadow-2xl">
+          <div className="flex items-center justify-between gap-2 border-b border-ink-100 px-4 py-2.5">
+            <span className="text-[12px] font-semibold text-ink-800">
+              {mobileResults.length} result{mobileResults.length === 1 ? '' : 's'} for “{gisResults.query}”
+            </span>
+            <button
+              onClick={() => { setGisResults(null) }}
+              aria-label="Close results"
+              className="grid h-7 w-7 place-items-center rounded-lg text-ink-500 hover:bg-ink-100 transition-colors"
+            >
+              <X size={14} />
+            </button>
+          </div>
+          <div className="max-h-[38dvh] overflow-y-auto divide-y divide-ink-50">
+            {mobileResults.map((row) => (
+              <button
+                key={row.id}
+                onClick={() => handleFacilityClick(row)}
+                className="flex w-full items-start gap-2.5 px-4 py-3 text-left hover:bg-ink-50/60 transition-colors"
+              >
+                <MapPin size={14} className="mt-0.5 shrink-0 text-sky-600" />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13px] font-semibold leading-snug text-ink-900 line-clamp-2">{row.name}</span>
+                  <span className="mt-0.5 block text-[11px] leading-snug text-ink-500 line-clamp-1">
+                    {row.categoryLabel}{row.departmentName ? ` · ${row.departmentName}` : ''}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

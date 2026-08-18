@@ -1,4 +1,4 @@
-import { Loader2, Navigation, X } from 'lucide-react'
+import { ExternalLink, Loader2, Navigation, X } from 'lucide-react'
 import Button from '../../components/ui/Button'
 
 function TargetRow({ label, target }) {
@@ -10,6 +10,22 @@ function TargetRow({ label, target }) {
         {target?.sub ? <div className="truncate text-[10px] text-ink-400">{target.sub}</div> : null}
       </div>
     </div>
+  )
+}
+
+// Turn-by-turn directions open in Google Maps (external).  Both endpoints must
+// carry real [lng, lat] positions; the destination is required, the origin is
+// optional (Google Maps then uses the device location).
+function openDirections(origin, destination) {
+  const destPos = destination?.position
+  if (!Array.isArray(destPos) || destPos.length < 2) return
+  const originPos = Array.isArray(origin?.position) && origin.position.length >= 2
+    ? `&origin=${origin.position[1]},${origin.position[0]}`
+    : ''
+  window.open(
+    `https://www.google.com/maps/dir/?api=1${originPos}&destination=${destPos[1]},${destPos[0]}`,
+    '_blank',
+    'noopener,noreferrer'
   )
 }
 
@@ -100,8 +116,9 @@ export default function RouteSummary({ status, route, origin = null, destination
         </div>
       </div>
       <div className="flex gap-2 border-t border-ink-100 px-2.5 py-2">
-        <Button size="sm" variant="primary" icon={Navigation} onClick={onCalculate} className="flex-1">Recalculate</Button>
-        <Button size="sm" variant="outline" icon={X} onClick={onClear} className="flex-1">Clear Route</Button>
+        <Button size="sm" variant="primary" icon={ExternalLink} onClick={() => openDirections(origin, destination)} className="flex-1">Navigate</Button>
+        <Button size="sm" variant="outline" icon={Navigation} onClick={onCalculate}>Recalculate</Button>
+        <Button size="sm" variant="ghost" icon={X} onClick={onClear} aria-label="Clear route">Clear</Button>
       </div>
     </div>
   )

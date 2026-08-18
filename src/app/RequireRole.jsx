@@ -6,9 +6,9 @@ export default function RequireRole({ roles }) {
   const user = useAuthStore((s) => s.user)
   const status = useAuthStore((s) => s.status)
   if (status === 'restoring') return <div className="grid min-h-screen place-items-center text-sm text-ink-500">Restoring secure session…</div>
-  if (!user) return <Navigate to="/" replace />
+  if (!user) return <Navigate to="/login" replace />
   if (roles && !roles.includes(user.role)) {
-    return <Navigate to="/" replace />
+    return <Navigate to="/login" replace />
   }
   return <Outlet />
 }

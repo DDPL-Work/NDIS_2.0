@@ -4,7 +4,7 @@ import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 import Toaster from '../ui/Toaster'
 
-export default function AppShell({ navItems, sections, portalLabel, portalIcon, accentClassName, title, subtitle, showDistrict, showDepartment }) {
+export default function AppShell({ navItems, sections, portalLabel, portalIcon, accentClassName, title, subtitle, showDistrict, showDepartment, bottomNav }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   return (
@@ -20,10 +20,11 @@ export default function AppShell({ navItems, sections, portalLabel, portalIcon, 
       />
       <div className="flex flex-1 flex-col min-w-0">
         <Topbar title={title} subtitle={subtitle} showDistrict={showDistrict} showDepartment={showDepartment} onMenuClick={() => setMobileNavOpen(true)} />
-        <main className="flex-1 overflow-y-auto">
+        <main className={bottomNav ? 'flex-1 overflow-y-auto pb-16 lg:pb-0' : 'flex-1 overflow-y-auto'}>
           <Outlet />
         </main>
       </div>
+      {typeof bottomNav === 'function' ? bottomNav({ onOpenNav: () => setMobileNavOpen(true) }) : bottomNav}
       <Toaster />
     </div>
   )

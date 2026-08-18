@@ -111,6 +111,26 @@ export const DEMO_PERSONAS = [
       permissions: ['ALL_READ', 'ALL_WRITE'],
     },
   },
+  {
+    id: 'demo-citizen',
+    label: 'Citizen (Nalanda)',
+    portal: 'citizen',
+    icon: 'User',
+    user: {
+      id: 'DEMO-U-007',
+      username: 'demo.citizen',
+      name: 'Citizen of Nalanda (Demo)',
+      role: ROLES.CITIZEN,
+      roleCode: ROLES.CITIZEN,
+      roleName: 'Citizen',
+      designation: 'Registered Citizen — Nalanda (Demo)',
+      districtId: 'nalanda',
+      districtName: 'Nalanda',
+      district: { id: 'nalanda', label: 'Nalanda', name: 'Nalanda' },
+      email: 'citizen.demo@ndisp.example',
+      permissions: ['ALL_READ'],
+    },
+  },
 ]
 
 export const DEMO_PERSONAS_BY_ID = Object.fromEntries(DEMO_PERSONAS.map((p) => [p.id, p]))
