@@ -492,7 +492,7 @@ export default function CitizenHome() {
         )}
 
         {/* Google-Maps-style search pill (mobile, panel closed) + open button (desktop) */}
-        <div className="absolute top-6 left-6 flex flex-col gap-2 w-[min(320px,calc(100vw-24px))] z-[120]">
+        <div className="absolute top-6 left-6 flex flex-col gap-2 w-[min(180px,calc(100vw-20px))] z-[120]">
           {isMobile && !mobileOpen && (
             <button
               onClick={() => setMobileOpen(true)}
@@ -500,7 +500,7 @@ export default function CitizenHome() {
               className="flex items-center gap-2 rounded-full bg-white border border-ink-200 px-4 py-2.5 text-[12.5px] font-medium text-ink-600 shadow-lg hover:bg-ink-50 transition-colors"
             >
               <Search size={14} className="text-leaf-600" />
-              Search places, services or facilities
+              Search places or facilities
             </button>
           )}
           {!isMobile && desktopMode === 'closed' && (
