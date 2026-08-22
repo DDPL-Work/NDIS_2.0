@@ -13,7 +13,7 @@ import WhyNdisSection from './sections/WhyNdisSection'
 import TrustSection from './sections/TrustSection'
 import FinalCtaSection from './sections/FinalCtaSection'
 import PublicFooter from './sections/PublicFooter'
-import PublicLandingTour, { hasCompletedTour } from './PublicLandingTour'
+import PublicLandingTour from './PublicLandingTour'
 
 // Public entry page — works fully unauthenticated. Auth-aware header shows
 // "Continue to Citizen Portal" for signed-in users; the hero search uses the
@@ -55,7 +55,6 @@ export default function PublicLandingPage() {
       </main>
       <PublicFooter />
       {tourStarted && <PublicLandingTour open={tourOpen} onClose={() => setTourOpen(false)} />}
-      {!hasCompletedTour() && !tourStarted && <PublicLandingTour open onClose={() => setTourOpen(false)} />}
     </div>
   )
 }
