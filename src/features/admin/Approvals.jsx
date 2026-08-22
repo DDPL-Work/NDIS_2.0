@@ -212,8 +212,10 @@ export default function Approvals() {
     runAction('reject', () => backendProposalApi.reject(selected.id, { review_notes: remarks.trim() }), `Proposal ${selected.proposalId} rejected.`)
   }
   const sanction = () => {
+    const authoritativeAmount = getFinalSanctionAmount(proposal)
+    if (!authoritativeAmount) { pushToast('Final accepted amount unavailable.', 'error'); return }
     const amount = Number(sanctionAmount)
-    if (!Number.isFinite(amount) || amount <= 0) { pushToast('Enter a valid sanctioned amount.', 'error'); return }
+    if (amount !== authoritativeAmount) { pushToast('Sanction amount must equal the authoritative final accepted amount.', 'error'); return }
     runAction('sanction', () => backendProposalApi.sanction(selected.id, { sanctioned_amount: amount }), `Proposal ${selected.proposalId} sanctioned.`)
   }
   const openNegotiation = (mode) => {
@@ -329,7 +331,7 @@ export default function Approvals() {
           ) : isApproved ? (
             <>
               <Button variant="outline" onClick={() => setSelected(null)}>Close</Button>
-              <Button variant="positive" loading={busyAction === 'sanction'} onClick={() => { setSanctionAmount(String(getFinalSanctionAmount(selected))); setSanctionOpen(true) }}>Sanction Budget</Button>
+              <Button variant="positive" disabled={!getFinalSanctionAmount(proposal)} loading={busyAction === 'sanction'} onClick={() => { setSanctionAmount(String(getFinalSanctionAmount(proposal))); setSanctionOpen(true) }}>Sanction Budget</Button>
             </>
           ) : EXECUTION_STATUSES.includes(selected?.status) ? (
             <>
@@ -400,9 +402,13 @@ export default function Approvals() {
               <p className="rounded-lg bg-ink-50/60 border border-ink-100 p-3 text-[12.5px] text-ink-700">{proposal.problemStatement || 'Not provided'}</p>
               <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <Field label="Gap Score" value={proposal.gapScore ?? '—'} />
+                <Field label="Source Priority" value={proposal.sourcePriority || proposal.sourcePriorityId} />
+                <Field label="Facility" value={proposal.facilityName || proposal.facilityId} />
                 <Field label="Population Impact" value={proposal.populationImpact ?? '—'} />
                 <Field label="Linked Complaints" value={proposal.linkedComplaintIds.length ? proposal.linkedComplaintIds.join(', ') : 'None'} />
               </div>
+              {proposal.gapEvidence && <p className="mt-3 rounded-lg border border-sky-100 bg-sky-50/40 p-3 text-[12.5px] text-ink-700"><strong>Gap evidence:</strong> {proposal.gapEvidence}</p>}
+              {proposal.recommendedAction && <p className="mt-2 text-[12.5px] text-ink-700"><strong>Recommended action:</strong> {proposal.recommendedAction}</p>}
             </Section>
 
             <Section title="Survey & Site Inspection">
@@ -435,14 +441,15 @@ export default function Approvals() {
 
             <Section title="Financial Summary">
               <div className="rounded-lg border border-ink-100 divide-y divide-ink-100">
-                <MoneyRow label="Original Estimated Cost" value={formatCurrencyINR(proposal.estimatedCost)} />
+                <MoneyRow label="Original DPR Estimate (immutable)" value={formatCurrencyINR(proposal.estimatedCost)} />
                 {isNegotiatedAgreement(proposal) && (
                   <>
-                    <MoneyRow label="Negotiated / Agreed Amount" value={formatCurrencyINR(proposal.agreedAmount)} strong tone="leaf" />
+                    <MoneyRow label="Negotiated Amount" value={formatCurrencyINR(proposal.agreedAmount)} strong tone="leaf" />
                     <MoneyRow label="Difference / Savings" value={proposal.estimatedCost > 0 ? formatCurrencyINR(proposal.estimatedCost - proposal.agreedAmount) : '—'} />
                   </>
                 )}
-                <MoneyRow label="Final Amount for Approval" value={formatCurrencyINR(getFinalSanctionAmount(proposal))} strong />
+                <MoneyRow label="Final Accepted Amount" value={getFinalSanctionAmount(proposal) ? formatCurrencyINR(getFinalSanctionAmount(proposal)) : 'Final accepted amount unavailable.'} strong />
+                <MoneyRow label="Sanction Amount" value={proposal.sanctionAmount > 0 ? formatCurrencyINR(proposal.sanctionAmount) : 'Not sanctioned'} />
               </div>
               {isNegotiatedAgreement(proposal) && (
                 <span className="mt-2 inline-block rounded-md bg-leaf-50 border border-leaf-200 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-leaf-800">Final Agreed Amount</span>
@@ -462,11 +469,20 @@ export default function Approvals() {
               </div>
             )}
 
+            <Section title="Sanction & Budget">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <Field label="Sanction Amount" value={proposal.sanctionAmount > 0 ? formatCurrencyINR(proposal.sanctionAmount) : 'Not sanctioned'} />
+                <Field label="Sanction Order" value={proposal.sanctionOrder} />
+                <Field label="Budget Status" value={proposal.budgetStatus} />
+                <Field label="Authority" value={proposal.approvalAuthority} />
+              </div>
+            </Section>
+
             {(isNegotiatedAgreement(proposal) || proposal.approvalMode === 'DIRECT') && (
               <Section title="Final Agreement">
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <Field label="Approval Mode" value={proposal.approvalMode} />
-                  <Field label="Agreed Amount" value={isNegotiatedAgreement(proposal) ? formatCurrencyINR(proposal.agreedAmount) : formatCurrencyINR(proposal.estimatedCost)} />
+                  <Field label="Final Accepted Amount" value={getFinalSanctionAmount(proposal) ? formatCurrencyINR(getFinalSanctionAmount(proposal)) : 'Final accepted amount unavailable.'} />
                   <Field label="Agreed Timeline" value={proposal.agreedTimelineDays > 0 ? `${proposal.agreedTimelineDays} days` : '—'} />
                   <Field label="Agreed Scope" value={proposal.agreedScope || (isNegotiatedAgreement(proposal) ? 'Not specified' : '—')} />
                 </div>
@@ -637,26 +653,24 @@ export default function Approvals() {
         footer={
           <>
             <Button variant="outline" onClick={() => setSanctionOpen(false)}>Cancel</Button>
-            <Button variant="positive" loading={busyAction === 'sanction'} onClick={sanction}>Sanction</Button>
+            <Button variant="positive" disabled={!getFinalSanctionAmount(proposal)} loading={busyAction === 'sanction'} onClick={sanction}>Sanction</Button>
           </>
         }
       >
         <div className="space-y-3">
           <div className="rounded-lg border border-ink-100 divide-y divide-ink-100">
             <MoneyRow label="Original DPR Estimate" value={formatCurrencyINR(proposal?.estimatedCost)} />
-            {isNegotiatedAgreement(proposal) && <MoneyRow label="Final Agreed Amount" value={formatCurrencyINR(proposal?.agreedAmount)} strong tone="leaf" />}
-            <MoneyRow label="Amount to be Sanctioned" value={formatCurrencyINR(getFinalSanctionAmount(proposal))} strong />
+            <MoneyRow label="Negotiated Amount" value={isNegotiatedAgreement(proposal) ? formatCurrencyINR(proposal?.agreedAmount) : 'Not negotiated'} />
+            <MoneyRow label="Final Accepted Amount" value={getFinalSanctionAmount(proposal) ? formatCurrencyINR(getFinalSanctionAmount(proposal)) : 'Final accepted amount unavailable.'} strong tone="leaf" />
+            <MoneyRow label="Sanction Amount" value={getFinalSanctionAmount(proposal) ? formatCurrencyINR(getFinalSanctionAmount(proposal)) : 'Unavailable'} strong />
           </div>
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-500">Sanctioned amount (₹)</label>
             <input
               type="number"
-              min="0"
-              step="0.01"
               value={sanctionAmount}
-              onChange={(e) => setSanctionAmount(e.target.value)}
-              className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-sky-500"
-              placeholder="e.g. 12000000"
+              readOnly
+              className="w-full rounded-lg border border-ink-200 bg-ink-50 px-3 py-2 text-sm text-ink-700"
             />
           </div>
           {isNegotiatedAgreement(proposal) && (

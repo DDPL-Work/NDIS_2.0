@@ -90,7 +90,7 @@ export default function DepartmentWorkflowWorkspace() {
         </div>
       </div>
 
-      <Modal open={!!selectedTicketId} onClose={() => setSelectedTicketId(null)} width="max-w-4xl">
+      <Modal open={!!selectedTicketId} onClose={() => setSelectedTicketId(null)} width="max-w-4xl" scrollBody={false}>
         {selectedTicketId && <ComplaintDetailHub complaintId={selectedTicketId} onClose={() => setSelectedTicketId(null)} />}
       </Modal>
     </div>

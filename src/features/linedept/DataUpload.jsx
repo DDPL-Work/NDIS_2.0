@@ -11,6 +11,7 @@ import { ingestionApi } from '../../services/api'
 import { useAuthStore } from '../../app/store/authStore'
 import { DEPARTMENT_MAP } from '../../config/constants'
 import { formatNumber, formatDateTime } from '../../utils/format'
+import { validateImportRows } from '../../gis/validation/geoIntegrity'
 
 const REQUIRED_SCHEMA_FIELDS = [
   { key: 'facility_name', label: 'Facility Name', required: true },
@@ -32,6 +33,7 @@ export default function DataUpload() {
   const [selectedFile, setSelectedFile] = useState(null)
   const [csvHeaders, setCsvHeaders] = useState([])
   const [previewRows, setPreviewRows] = useState([])
+  const [csvRows, setCsvRows] = useState([])
   const [columnMapping, setColumnMapping] = useState({})
 
   const [result, setResult] = useState(null)
@@ -44,9 +46,9 @@ export default function DataUpload() {
     const parseLine = (line) => line.split(',').map((cell) => cell.replace(/^"|"$/g, '').trim())
 
     const headers = parseLine(lines[0])
-    const rows = lines.slice(1, 10).map((l) => parseLine(l)) // preview first 9 rows
+    const rows = lines.slice(1).map((l) => parseLine(l))
 
-    return { headers, rows }
+    return { headers, rows, preview: rows.slice(0, 9) }
   }
 
   const handleFiles = useCallback((files) => {
@@ -57,9 +59,10 @@ export default function DataUpload() {
     const reader = new FileReader()
     reader.onload = (e) => {
       const text = e.target.result
-      const { headers, rows } = parseCsvText(text)
+      const { headers, rows, preview } = parseCsvText(text)
       setCsvHeaders(headers)
-      setPreviewRows(rows)
+      setCsvRows(rows)
+      setPreviewRows(preview)
 
       // Auto-map matching headers
       const autoMap = {}
@@ -74,6 +77,27 @@ export default function DataUpload() {
   }, [])
 
   const runIngestionPipeline = async () => {
+    const mappedIndexes = Object.fromEntries(Object.entries(columnMapping).map(([key, header]) => [key, csvHeaders.indexOf(header)]))
+    const preflight = validateImportRows(csvRows, mappedIndexes)
+    const invalidRows = preflight.rows.filter((row) => row.missing.length || !row.coordinate.valid)
+    if (invalidRows.length) {
+      const rejectedRows = invalidRows.map((row) => ({
+        row: row.row,
+        reason: [
+          row.missing.length ? `Missing required fields: ${row.missing.join(', ')}` : null,
+          ...Object.values(row.coordinate.errors),
+        ].filter(Boolean).join(' '),
+      }))
+      const localReport = {
+        batchId: 'LOCAL-PREFLIGHT', fileName: selectedFile?.name, totalRows: csvRows.length,
+        accepted: preflight.valid, rejected: invalidRows.length, geocodedPct: 0, rejectedRows,
+        validationSummary: preflight, completedAt: new Date().toISOString(),
+      }
+      setResult(localReport)
+      setHistory((history) => [localReport, ...history])
+      setStep('report')
+      return
+    }
     setUploading(true)
     try {
       const report = await ingestionApi.uploadCsv(selectedFile.name, dept.id)
@@ -90,6 +114,7 @@ export default function DataUpload() {
     setSelectedFile(null)
     setCsvHeaders([])
     setPreviewRows([])
+    setCsvRows([])
     setColumnMapping({})
     setResult(null)
   }
@@ -273,6 +298,17 @@ export default function DataUpload() {
                   </div>
                 </div>
 
+                {result.validationSummary && (
+                  <div className="mb-4 grid grid-cols-2 gap-2 rounded-lg border border-ink-100 bg-ink-50 p-2 text-[11px] sm:grid-cols-4">
+                    <Metric label="Valid records" value={result.validationSummary.valid} tone="text-leaf-700" />
+                    <Metric label="Invalid coordinates" value={result.validationSummary.invalidCoordinates} tone="text-alert-600" />
+                    <Metric label="Outside boundary" value={result.validationSummary.outsideBoundary} tone="text-saffron-700" />
+                    <Metric label="Duplicates" value={result.validationSummary.duplicates} tone="text-saffron-700" />
+                    <Metric label="Missing required" value={result.validationSummary.missingRequiredFields} tone="text-alert-600" />
+                    <p className="col-span-2 text-ink-500 sm:col-span-3">Boundary and duplicate checks remain pending backend validation; invalid coordinate and required-field rows are quarantined locally.</p>
+                  </div>
+                )}
+
                 <div className="flex items-center gap-2 text-[12.5px] text-ink-600 mb-3">
                   <FileCheck2 size={14} className="text-leaf-600" /> {result.geocodedPct}% of accepted rows geocoded successfully
                 </div>
@@ -313,4 +349,8 @@ export default function DataUpload() {
       </div>
     </div>
   )
+}
+
+function Metric({ label, value, tone }) {
+  return <p><span className="block text-ink-400">{label}</span><b className={tone}>{value}</b></p>
 }

@@ -1,69 +1,120 @@
-import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, CheckCircle2, ClipboardCheck, FileText, Gauge, IndianRupee, PackageCheck, Plus, ReceiptText, ShieldAlert } from 'lucide-react'
-import PageHeader from '../../../components/ui/PageHeader'
-import DataTable from '../../../components/ui/DataTable'
-import Badge from '../../../components/ui/Badge'
-import Button from '../../../components/ui/Button'
-import Modal from '../../../components/ui/Modal'
-import StatCard from '../../../components/ui/StatCard'
-import Tabs from '../../../components/ui/Tabs'
-import StatusBadge from '../../../components/ui/StatusBadge'
-import { Card, CardBody, CardHeader } from '../../../components/ui/Card'
-import { useDepartment } from '../framework/DepartmentContext'
-import { useCurrentUser, useCan } from '../identity/hooks/useAuthorization'
-import { useAsync } from '../../../hooks/useAsync'
-import { useDataVersion, DATA_SCOPES } from '../../../app/store/dataVersionStore'
-import { useUiStore } from '../../../app/store/uiStore'
-import { backendProjectApi } from '../../../api/projectApi'
-import { backendSiteDiaryApi } from '../../../api/siteDiaryApi'
-import { backendMeasurementBookApi } from '../../../api/measurementBookApi'
-import { backendBillApi } from '../../../api/billApi'
-import { backendExecutionRiskApi } from '../../../api/executionRiskApi'
-import { formatCurrencyINR, formatDate } from '../../../utils/format'
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ClipboardCheck,
+  FileText,
+  Gauge,
+  IndianRupee,
+  PackageCheck,
+  Plus,
+  ReceiptText,
+  ShieldAlert,
+} from "lucide-react";
+import PageHeader from "../../../components/ui/PageHeader";
+import DataTable from "../../../components/ui/DataTable";
+import Badge from "../../../components/ui/Badge";
+import Button from "../../../components/ui/Button";
+import Modal from "../../../components/ui/Modal";
+import StatCard from "../../../components/ui/StatCard";
+import Tabs from "../../../components/ui/Tabs";
+import StatusBadge from "../../../components/ui/StatusBadge";
+import { Card, CardBody, CardHeader } from "../../../components/ui/Card";
+import { useDepartment } from "../framework/DepartmentContext";
+import { useCurrentUser, useCan } from "../identity/hooks/useAuthorization";
+import { useAsync } from "../../../hooks/useAsync";
+import {
+  useDataVersion,
+  DATA_SCOPES,
+} from "../../../app/store/dataVersionStore";
+import { useUiStore } from "../../../app/store/uiStore";
+import { backendProjectApi } from "../../../api/projectApi";
+import { backendSiteDiaryApi } from "../../../api/siteDiaryApi";
+import { backendMeasurementBookApi } from "../../../api/measurementBookApi";
+import { backendBillApi } from "../../../api/billApi";
+import { backendExecutionRiskApi } from "../../../api/executionRiskApi";
+import { formatCurrencyINR, formatDate } from "../../../utils/format";
 
-const inputClass = 'w-full rounded-lg border border-ink-200 px-3 py-2 text-sm'
-const tabs = [{ value: 'projects', label: 'Running projects' }, { value: 'diary', label: 'Site diary' }, { value: 'measurements', label: 'Measurement book' }, { value: 'bills', label: 'Bills & payments' }, { value: 'risks', label: 'Risk center' }]
+const inputClass = "w-full rounded-lg border border-ink-200 px-3 py-2 text-sm";
+const tabs = [
+  { value: "projects", label: "Running projects" },
+  { value: "diary", label: "Site diary" },
+  { value: "measurements", label: "Measurement book" },
+  { value: "bills", label: "Bills & payments" },
+  { value: "risks", label: "Risk center" },
+];
 
 // `submitted` is the initial payment_status issued by the live backend
 // (verified during Phase 2.1; the guide's draft/pending_approval vocabulary is
 // not produced by the current serializer).
-const PAYMENT_STATUS_TONE = { draft: 'neutral', submitted: 'info', pending_approval: 'warning', approved: 'positive', disbursed: 'info', rejected: 'negative' }
-const SEVERITY_TONE = { low: 'positive', medium: 'warning', high: 'negative', critical: 'negative' }
+const PAYMENT_STATUS_TONE = {
+  draft: "neutral",
+  submitted: "info",
+  pending_approval: "warning",
+  approved: "positive",
+  disbursed: "info",
+  rejected: "negative",
+};
+const SEVERITY_TONE = {
+  low: "positive",
+  medium: "warning",
+  high: "negative",
+  critical: "negative",
+};
 
 const departmentPk = (user) => {
-  const raw = (user && typeof user.department === 'object' && user.department) ? (user.department.id ?? user.department.departmentId) : (user?.department ?? user?.departmentId)
-  const parsed = Number(raw)
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined
-}
+  const raw =
+    user && typeof user.department === "object" && user.department
+      ? user.department.id ?? user.department.departmentId
+      : user?.department ?? user?.departmentId;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+};
 
 const emptyForm = () => ({
-  projectId: '', date: '', workPerformed: '', labour: '', materials: '', observations: '', weather: 'Clear',
-  itemDescription: '', unit: '', measuredQuantity: '', itemRate: '', measuringOfficer: '',
-  billType: 'RUNNING_BILL', claimedAmount: '', remarks: '',
-  severity: 'medium', signal: '', recommendation: '',
-})
+  projectId: "",
+  date: "",
+  workPerformed: "",
+  labour: "",
+  materials: "",
+  observations: "",
+  weather: "Clear",
+  itemDescription: "",
+  unit: "",
+  measuredQuantity: "",
+  itemRate: "",
+  measuringOfficer: "",
+  billType: "RUNNING_BILL",
+  claimedAmount: "",
+  remarks: "",
+  severity: "medium",
+  signal: "",
+  recommendation: "",
+});
 
 const formFromRecord = (record) => ({
   ...emptyForm(),
-  projectId: String(record.projectId ?? ''),
-  date: record.date ? String(record.date).slice(0, 10) : '',
-  workPerformed: record.workPerformed || '',
-  labour: record.labour ? String(record.labour) : '',
-  materials: record.materials || '',
-  observations: record.observations || '',
-  weather: record.weather || 'Clear',
-  itemDescription: record.itemDescription || '',
-  unit: record.unit || '',
-  measuredQuantity: record.measuredQuantity ? String(record.measuredQuantity) : '',
-  itemRate: record.itemRate ? String(record.itemRate) : '',
-  measuringOfficer: record.measuringOfficer || '',
-  claimedAmount: record.claimedAmount ? String(record.claimedAmount) : '',
-  remarks: record.remarks || '',
-  severity: record.severity || 'medium',
-  signal: record.signal || '',
-  recommendation: record.recommendation || '',
-})
+  projectId: String(record.projectId ?? ""),
+  date: record.date ? String(record.date).slice(0, 10) : "",
+  workPerformed: record.workPerformed || "",
+  labour: record.labour ? String(record.labour) : "",
+  materials: record.materials || "",
+  observations: record.observations || "",
+  weather: record.weather || "Clear",
+  itemDescription: record.itemDescription || "",
+  unit: record.unit || "",
+  measuredQuantity: record.measuredQuantity
+    ? String(record.measuredQuantity)
+    : "",
+  itemRate: record.itemRate ? String(record.itemRate) : "",
+  measuringOfficer: record.measuringOfficer || "",
+  claimedAmount: record.claimedAmount ? String(record.claimedAmount) : "",
+  remarks: record.remarks || "",
+  severity: record.severity || "medium",
+  signal: record.signal || "",
+  recommendation: record.recommendation || "",
+});
 
 // Write payloads use the backend serializer vocabulary verified live during
 // Phase 2.1 (OPTIONS metadata for each endpoint):
@@ -76,206 +127,888 @@ const formFromRecord = (record) => ({
 //  - bill:        project, bill_type, claimed_amount, remarks (bill_number is
 //                 auto-generated by the backend when omitted)
 //  - risk:        project, severity, risk_signal, recommendation
-const buildDiaryPayload = (f) => ({ project: Number(f.projectId), log_date: f.date || null, work_description: f.workPerformed, labour_count: Number(f.labour || 0), materials_used: f.materials, weather_condition: f.weather })
-const buildMbPayload = (f) => ({ project: Number(f.projectId), measurement_date: f.date || null, item_description: f.itemDescription, unit: f.unit, quantity_measured: Number(f.measuredQuantity || 0), rate: Number(f.itemRate || 0), total_amount: Math.round(Number(f.measuredQuantity || 0) * Number(f.itemRate || 0) * 100) / 100, measured_by: f.measuringOfficer })
-const buildBillPayload = (f) => ({ project: Number(f.projectId), bill_type: f.billType, claimed_amount: Number(f.claimedAmount || 0), remarks: f.remarks })
-const buildRiskPayload = (f) => ({ project: Number(f.projectId), severity: f.severity, risk_signal: f.signal, recommendation: f.recommendation })
+const buildDiaryPayload = (f) => ({
+  project: Number(f.projectId),
+  log_date: f.date || null,
+  work_description: f.workPerformed,
+  labour_count: Number(f.labour || 0),
+  materials_used: f.materials,
+  weather_condition: f.weather,
+});
+const buildMbPayload = (f) => ({
+  project: Number(f.projectId),
+  measurement_date: f.date || null,
+  item_description: f.itemDescription,
+  unit: f.unit,
+  quantity_measured: Number(f.measuredQuantity || 0),
+  rate: Number(f.itemRate || 0),
+  total_amount:
+    Math.round(
+      Number(f.measuredQuantity || 0) * Number(f.itemRate || 0) * 100
+    ) / 100,
+  measured_by: f.measuringOfficer,
+});
+const buildBillPayload = (f) => ({
+  project: Number(f.projectId),
+  bill_type: f.billType,
+  claimed_amount: Number(f.claimedAmount || 0),
+  remarks: f.remarks,
+});
+const buildRiskPayload = (f) => ({
+  project: Number(f.projectId),
+  severity: f.severity,
+  risk_signal: f.signal,
+  recommendation: f.recommendation,
+});
 
-const noop = async () => null
+const noop = async () => null;
 
 export default function DepartmentExecutionWorkspace() {
-  const { dept } = useDepartment()
-  const user = useCurrentUser()
-  const canWrite = useCan('projects.inspection') || useCan('projects.create')
-  const navigate = useNavigate()
-  const pushToast = useUiStore((s) => s.pushToast)
-  const [tab, setTab] = useState('projects')
-  const [modal, setModal] = useState(null)
-  const [editRecord, setEditRecord] = useState(null)
-  const [form, setForm] = useState(emptyForm)
-  const [projectFilter, setProjectFilter] = useState('all')
-  const [saving, setSaving] = useState(false)
-  const [actionError, setActionError] = useState(null)
-  const deptPk = useMemo(() => departmentPk(user), [user])
-  const projectsVersion = useDataVersion((s) => s.versions[DATA_SCOPES.PROJECTS] || 0)
-  const diariesVersion = useDataVersion((s) => s.versions[DATA_SCOPES.SITE_DIARIES] || 0)
-  const mbVersion = useDataVersion((s) => s.versions[DATA_SCOPES.MEASUREMENT_BOOKS] || 0)
-  const billsVersion = useDataVersion((s) => s.versions[DATA_SCOPES.BILLS] || 0)
-  const risksVersion = useDataVersion((s) => s.versions[DATA_SCOPES.RISKS] || 0)
+  const { dept } = useDepartment();
+  const user = useCurrentUser();
+  const canWrite = useCan("projects.inspection") || useCan("projects.create");
+  const navigate = useNavigate();
+  const pushToast = useUiStore((s) => s.pushToast);
+  const [tab, setTab] = useState("projects");
+  const [modal, setModal] = useState(null);
+  const [editRecord, setEditRecord] = useState(null);
+  const [form, setForm] = useState(emptyForm);
+  const [projectFilter, setProjectFilter] = useState("all");
+  const [saving, setSaving] = useState(false);
+  const [actionError, setActionError] = useState(null);
+  const deptPk = useMemo(() => departmentPk(user), [user]);
+  const projectsVersion = useDataVersion(
+    (s) => s.versions[DATA_SCOPES.PROJECTS] || 0
+  );
+  const diariesVersion = useDataVersion(
+    (s) => s.versions[DATA_SCOPES.SITE_DIARIES] || 0
+  );
+  const mbVersion = useDataVersion(
+    (s) => s.versions[DATA_SCOPES.MEASUREMENT_BOOKS] || 0
+  );
+  const billsVersion = useDataVersion(
+    (s) => s.versions[DATA_SCOPES.BILLS] || 0
+  );
+  const risksVersion = useDataVersion(
+    (s) => s.versions[DATA_SCOPES.RISKS] || 0
+  );
 
-  const summaryFetcher = useMemo(() => () => backendProjectApi.summary(), [])
-  const { data: summary, loading: summaryLoading, error: summaryError, refetch: refetchSummary } = useAsync(summaryFetcher, [projectsVersion])
+  const summaryFetcher = useMemo(() => () => backendProjectApi.summary(), []);
+  const {
+    data: summary,
+    loading: summaryLoading,
+    error: summaryError,
+    refetch: refetchSummary,
+  } = useAsync(summaryFetcher, [projectsVersion]);
 
   const rowFetcher = useMemo(() => {
-    if (tab === 'projects') return () => backendProjectApi.list(deptPk ? { departmentId: deptPk } : {})
-    if (tab === 'diary') return () => backendSiteDiaryApi.list(projectFilter === 'all' ? {} : { project: projectFilter })
-    if (tab === 'measurements') return () => backendMeasurementBookApi.list(projectFilter === 'all' ? {} : { project: projectFilter })
-    if (tab === 'bills') return () => backendBillApi.list({})
-    if (tab === 'risks') return () => backendExecutionRiskApi.list({})
-    return noop
-  }, [tab, deptPk, projectFilter])
-  const { data: tabRows, loading, error, refetch } = useAsync(rowFetcher, [tab, deptPk, projectFilter, projectsVersion, diariesVersion, mbVersion, billsVersion, risksVersion])
+    if (tab === "projects")
+      return () =>
+        backendProjectApi.list(deptPk ? { departmentId: deptPk } : {});
+    if (tab === "diary")
+      return () =>
+        backendSiteDiaryApi.list(
+          projectFilter === "all" ? {} : { project: projectFilter }
+        );
+    if (tab === "measurements")
+      return () =>
+        backendMeasurementBookApi.list(
+          projectFilter === "all" ? {} : { project: projectFilter }
+        );
+    if (tab === "bills") return () => backendBillApi.list({});
+    if (tab === "risks") return () => backendExecutionRiskApi.list({});
+    return noop;
+  }, [tab, deptPk, projectFilter]);
+  const {
+    data: tabRows,
+    loading,
+    error,
+    refetch,
+  } = useAsync(rowFetcher, [
+    tab,
+    deptPk,
+    projectFilter,
+    projectsVersion,
+    diariesVersion,
+    mbVersion,
+    billsVersion,
+    risksVersion,
+  ]);
 
-  const projectsFetcher = useMemo(() => () => backendProjectApi.list(deptPk ? { departmentId: deptPk } : {}), [deptPk])
-  const { data: projectsLookup } = useAsync(tab === 'projects' ? noop : projectsFetcher, [tab, deptPk, projectsVersion])
-  const projects = tab === 'projects' ? (tabRows || []) : (projectsLookup || [])
-  const nameFor = (id) => projects.find((item) => item.id === id)?.title || String(id ?? '—')
+  const projectsFetcher = useMemo(
+    () => () => backendProjectApi.list(deptPk ? { departmentId: deptPk } : {}),
+    [deptPk]
+  );
+  const { data: projectsLookup } = useAsync(
+    tab === "projects" ? noop : projectsFetcher,
+    [tab, deptPk, projectsVersion]
+  );
+  const projects = tab === "projects" ? tabRows || [] : projectsLookup || [];
+  const nameFor = (id) =>
+    projects.find((item) => item.id === id)?.title || String(id ?? "—");
 
   const openForm = (kind, record = null) => {
-    setEditRecord(record)
-    setForm(record ? formFromRecord(record) : emptyForm())
-    setActionError(null)
-    setModal(kind)
-  }
-  const closeForm = () => { setModal(null); setEditRecord(null); setForm(emptyForm()); setActionError(null) }
+    setEditRecord(record);
+    setForm(record ? formFromRecord(record) : emptyForm());
+    setActionError(null);
+    setModal(kind);
+  };
+  const closeForm = () => {
+    setModal(null);
+    setEditRecord(null);
+    setForm(emptyForm());
+    setActionError(null);
+  };
 
   const save = async (event) => {
-    event.preventDefault()
-    if (!form.projectId) { pushToast('Select a project first.', 'error'); return }
+    event.preventDefault();
+    if (!form.projectId) {
+      pushToast("Select a project first.", "error");
+      return;
+    }
     const actions = {
       diary: { api: backendSiteDiaryApi, payload: buildDiaryPayload(form) },
-      measurement: { api: backendMeasurementBookApi, payload: buildMbPayload(form) },
+      measurement: {
+        api: backendMeasurementBookApi,
+        payload: buildMbPayload(form),
+      },
       bill: { api: backendBillApi, payload: buildBillPayload(form) },
       risk: { api: backendExecutionRiskApi, payload: buildRiskPayload(form) },
-    }
-    const action = actions[modal]
-    if (!action) return
-    setSaving(true)
-    setActionError(null)
+    };
+    const action = actions[modal];
+    if (!action) return;
+    setSaving(true);
+    setActionError(null);
     try {
-      if (editRecord) await action.api.update(editRecord.id, action.payload)
-      else await action.api.create(action.payload)
-      pushToast(editRecord ? 'Record updated on the backend.' : 'Record saved on the backend.', 'success')
-      closeForm()
-    } catch (e) { setActionError(e) } finally { setSaving(false) }
-  }
+      if (editRecord) await action.api.update(editRecord.id, action.payload);
+      else await action.api.create(action.payload);
+      pushToast(
+        editRecord
+          ? "Record updated on the backend."
+          : "Record saved on the backend.",
+        "success"
+      );
+      closeForm();
+    } catch (e) {
+      setActionError(e);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const projectColumns = [
-    { key: 'projectId', label: 'Project ID', render: (row) => <span className="kbd-mono text-[12px]">{row.projectId}</span> },
-    { key: 'title', label: 'Project', render: (row) => <span className="font-semibold text-ink-950">{row.title}</span> },
-    { key: 'proposal', label: 'Proposal', render: (row) => row.proposalIdStr || (row.proposalId ? <span className="kbd-mono text-[12px]">{row.proposalId}</span> : '—') },
-    { key: 'progress', label: 'Progress', render: (row) => <span className="font-semibold text-leaf-700">{row.progress}%</span> },
-    { key: 'budget', label: 'Budget', render: (row) => formatCurrencyINR(row.budgetSanctioned) },
-    { key: 'status', label: 'Status', render: (row) => <StatusBadge status={row.status} /> },
-    { key: 'risk', label: 'Risk', render: (row) => <Badge tone={SEVERITY_TONE[row.risk] || 'neutral'}>{row.risk || '—'}</Badge> },
-    { key: 'actions', label: '', render: (row) => row.proposalId ? <div className="flex gap-1.5" onClick={(event) => event.stopPropagation()}><Button size="sm" variant="ghost" onClick={() => navigate(`/linedept/planning/proposals/${row.proposalId}`)}>Open DPR</Button></div> : '—' },
-  ]
+    {
+      key: "projectId",
+      label: "Project ID",
+      render: (row) => (
+        <span className="kbd-mono text-[12px]">{row.projectId}</span>
+      ),
+    },
+    {
+      key: "title",
+      label: "Project",
+      render: (row) => (
+        <span className="font-semibold text-ink-950">{row.title}</span>
+      ),
+    },
+    {
+      key: "proposal",
+      label: "Proposal",
+      render: (row) =>
+        row.proposalIdStr ||
+        (row.proposalId ? (
+          <span className="kbd-mono text-[12px]">{row.proposalId}</span>
+        ) : (
+          "—"
+        )),
+    },
+    {
+      key: "progress",
+      label: "Progress",
+      render: (row) => (
+        <span className="font-semibold text-leaf-700">{row.progress}%</span>
+      ),
+    },
+    {
+      key: "budget",
+      label: "Budget",
+      render: (row) => formatCurrencyINR(row.budgetSanctioned),
+    },
+    {
+      key: "status",
+      label: "Status",
+      render: (row) => <StatusBadge status={row.status} />,
+    },
+    {
+      key: "risk",
+      label: "Risk",
+      render: (row) => (
+        <Badge tone={SEVERITY_TONE[row.risk] || "neutral"}>
+          {row.risk || "—"}
+        </Badge>
+      ),
+    },
+    {
+      key: "actions",
+      label: "",
+      render: (row) =>
+        row.proposalId ? (
+          <div
+            className="flex gap-1.5"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() =>
+                navigate(`/linedept/planning/proposals/${row.proposalId}`)
+              }
+            >
+              Open DPR
+            </Button>
+          </div>
+        ) : (
+          "—"
+        ),
+    },
+  ];
   const diaryColumns = [
-    { key: 'date', label: 'Date', render: (row) => row.date ? formatDate(row.date) : '—' },
-    { key: 'project', label: 'Project', render: (row) => nameFor(row.projectId) },
-    { key: 'workPerformed', label: 'Work performed', render: (row) => row.workPerformed || '—' },
-    { key: 'labour', label: 'Labour', render: (row) => row.labour || '—' },
-    { key: 'materials', label: 'Materials', render: (row) => row.materials || '—' },
-    { key: 'weather', label: 'Weather', render: (row) => row.weather || '—' },
-    { key: 'status', label: 'Status', render: (row) => row.status ? <StatusBadge status={row.status} /> : '—' },
-  ]
+    {
+      key: "date",
+      label: "Date",
+      render: (row) => (row.date ? formatDate(row.date) : "—"),
+    },
+    {
+      key: "project",
+      label: "Project",
+      render: (row) => nameFor(row.projectId),
+    },
+    {
+      key: "workPerformed",
+      label: "Work performed",
+      render: (row) => row.workPerformed || "—",
+    },
+    { key: "labour", label: "Labour", render: (row) => row.labour || "—" },
+    {
+      key: "materials",
+      label: "Materials",
+      render: (row) => row.materials || "—",
+    },
+    { key: "weather", label: "Weather", render: (row) => row.weather || "—" },
+    {
+      key: "status",
+      label: "Status",
+      render: (row) => (row.status ? <StatusBadge status={row.status} /> : "—"),
+    },
+  ];
   const mbColumns = [
-    { key: 'date', label: 'Date', render: (row) => row.date ? formatDate(row.date) : '—' },
-    { key: 'project', label: 'Project', render: (row) => nameFor(row.projectId) },
-    { key: 'itemDescription', label: 'Work item' },
-    { key: 'unit', label: 'Unit', render: (row) => row.unit || '—' },
-    { key: 'measuredQuantity', label: 'Quantity' },
-    { key: 'itemRate', label: 'Rate', render: (row) => row.itemRate ? formatCurrencyINR(row.itemRate) : '—' },
-    { key: 'totalAmount', label: 'Amount', render: (row) => row.totalAmount ? formatCurrencyINR(row.totalAmount) : '—' },
-    { key: 'verified', label: 'Verified', render: (row) => <Badge tone={row.verified ? 'positive' : 'warning'}>{row.verified ? 'Verified' : (row.status || 'Pending')}</Badge> },
-  ]
+    {
+      key: "date",
+      label: "Date",
+      render: (row) => (row.date ? formatDate(row.date) : "—"),
+    },
+    {
+      key: "project",
+      label: "Project",
+      render: (row) => nameFor(row.projectId),
+    },
+    { key: "itemDescription", label: "Work item" },
+    { key: "unit", label: "Unit", render: (row) => row.unit || "—" },
+    { key: "measuredQuantity", label: "Quantity" },
+    {
+      key: "itemRate",
+      label: "Rate",
+      render: (row) => (row.itemRate ? formatCurrencyINR(row.itemRate) : "—"),
+    },
+    {
+      key: "totalAmount",
+      label: "Amount",
+      render: (row) =>
+        row.totalAmount ? formatCurrencyINR(row.totalAmount) : "—",
+    },
+    {
+      key: "verified",
+      label: "Verified",
+      render: (row) => (
+        <Badge tone={row.verified ? "positive" : "warning"}>
+          {row.verified ? "Verified" : row.status || "Pending"}
+        </Badge>
+      ),
+    },
+  ];
   const billColumns = [
-    { key: 'billNumber', label: 'Bill ID' },
-    { key: 'project', label: 'Project', render: (row) => row.projectName || nameFor(row.projectId) },
-    { key: 'billType', label: 'Type', render: (row) => row.billType ? row.billType.replace(/_/g, ' ') : '—' },
-    { key: 'claimedAmount', label: 'Claimed', render: (row) => formatCurrencyINR(row.claimedAmount) },
-    { key: 'netPayableAmount', label: 'Net payable', render: (row) => row.netPayableAmount ? formatCurrencyINR(row.netPayableAmount) : '—' },
-    { key: 'paymentStatus', label: 'Status', render: (row) => <Badge tone={PAYMENT_STATUS_TONE[row.paymentStatus] || 'neutral'}>{row.paymentStatus ? row.paymentStatus.replace(/_/g, ' ') : '—'}</Badge> },
-    { key: 'pfmsReference', label: 'PFMS ref', render: (row) => row.pfmsReference || '—' },
-  ]
+    { key: "billNumber", label: "Bill ID" },
+    {
+      key: "project",
+      label: "Project",
+      render: (row) => row.projectName || nameFor(row.projectId),
+    },
+    {
+      key: "billType",
+      label: "Type",
+      render: (row) => (row.billType ? row.billType.replace(/_/g, " ") : "—"),
+    },
+    {
+      key: "claimedAmount",
+      label: "Claimed",
+      render: (row) => formatCurrencyINR(row.claimedAmount),
+    },
+    {
+      key: "netPayableAmount",
+      label: "Net payable",
+      render: (row) =>
+        row.netPayableAmount ? formatCurrencyINR(row.netPayableAmount) : "—",
+    },
+    {
+      key: "paymentStatus",
+      label: "Status",
+      render: (row) => (
+        <Badge tone={PAYMENT_STATUS_TONE[row.paymentStatus] || "neutral"}>
+          {row.paymentStatus ? row.paymentStatus.replace(/_/g, " ") : "—"}
+        </Badge>
+      ),
+    },
+    {
+      key: "pfmsReference",
+      label: "PFMS ref",
+      render: (row) => row.pfmsReference || "—",
+    },
+  ];
   const riskColumns = [
-    { key: 'project', label: 'Project', render: (row) => row.projectName || nameFor(row.projectId) },
-    { key: 'severity', label: 'Severity', render: (row) => <Badge tone={SEVERITY_TONE[row.severity] || 'neutral'}>{row.severity || '—'}</Badge> },
-    { key: 'signal', label: 'Risk signal', render: (row) => row.signal || '—' },
-    { key: 'recommendation', label: 'Recommendation', render: (row) => row.recommendation || '—' },
-    { key: 'status', label: 'Status', render: (row) => row.status ? <StatusBadge status={row.status} /> : '—' },
-  ]
+    {
+      key: "project",
+      label: "Project",
+      render: (row) => row.projectName || nameFor(row.projectId),
+    },
+    {
+      key: "severity",
+      label: "Severity",
+      render: (row) => (
+        <Badge tone={SEVERITY_TONE[row.severity] || "neutral"}>
+          {row.severity || "—"}
+        </Badge>
+      ),
+    },
+    { key: "signal", label: "Risk signal", render: (row) => row.signal || "—" },
+    {
+      key: "recommendation",
+      label: "Recommendation",
+      render: (row) => row.recommendation || "—",
+    },
+    {
+      key: "status",
+      label: "Status",
+      render: (row) => (row.status ? <StatusBadge status={row.status} /> : "—"),
+    },
+  ];
 
   const tableState = (columnsToUse, emptyLabel, onRow = null) => {
     if (error) {
-      const blocked = error.status === 401 || error.status === 403
+      const blocked = error.status === 401 || error.status === 403;
       return (
         <div className="flex items-start gap-3 px-4 py-6">
-          {blocked && <ShieldAlert size={18} className="mt-0.5 text-saffron-600 shrink-0" />}
+          {blocked && (
+            <ShieldAlert
+              size={18}
+              className="mt-0.5 text-saffron-600 shrink-0"
+            />
+          )}
           <div className="flex-1">
-            <p className="text-sm font-semibold text-ink-900">{blocked ? 'Restricted information' : 'Unable to load data'}</p>
-            <p className="mt-1 text-sm text-ink-600">{blocked ? 'You are not authorized to access this information.' : `${error.message} Retry the request.`}</p>
+            <p className="text-sm font-semibold text-ink-900">
+              {blocked ? "Restricted information" : "Unable to load data"}
+            </p>
+            <p className="mt-1 text-sm text-ink-600">
+              {blocked
+                ? "You are not authorized to access this information."
+                : `${error.message} Retry the request.`}
+            </p>
           </div>
-          {!blocked && <Button size="sm" variant="outline" onClick={refetch}>Retry</Button>}
+          {!blocked && (
+            <Button size="sm" variant="outline" onClick={refetch}>
+              Retry
+            </Button>
+          )}
         </div>
-      )
+      );
     }
-    if (loading && !tabRows) return <p className="px-4 py-4 text-sm text-ink-500">{tab === 'projects' ? 'Loading projects…' : tab === 'diary' ? 'Loading site diary…' : tab === 'measurements' ? 'Loading measurement book…' : tab === 'bills' ? 'Loading bills…' : 'Loading risks…'}</p>
-    return <DataTable rows={tabRows || []} columns={columnsToUse} onRowClick={onRow} emptyLabel={emptyLabel} />
-  }
+    if (loading && !tabRows)
+      return (
+        <p className="px-4 py-4 text-sm text-ink-500">
+          {tab === "projects"
+            ? "Loading projects…"
+            : tab === "diary"
+            ? "Loading site diary…"
+            : tab === "measurements"
+            ? "Loading measurement book…"
+            : tab === "bills"
+            ? "Loading bills…"
+            : "Loading risks…"}
+        </p>
+      );
+    return (
+      <DataTable
+        rows={tabRows || []}
+        columns={columnsToUse}
+        onRowClick={onRow}
+        emptyLabel={emptyLabel}
+      />
+    );
+  };
 
   const content = {
-    projects: <><CardHeader title="Sanctioned execution pipeline" subtitle="Projects originate only from DM-approved and sanctioned DPRs" icon={Gauge} /><CardBody className="!p-0">{tableState(projectColumns, 'No projects found.', (row) => navigate(`/linedept/projects/${row.id}`))}</CardBody></>,
-    diary: <><CardHeader title="Daily site diary" subtitle="Engineer notes, labour, materials and observations from the backend" icon={FileText} action={canWrite && <span className="flex gap-2">{projects.length > 1 && <select className={`${inputClass} !w-52`} value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}><option value="all">All projects</option>{projects.map((project) => <option key={project.id} value={String(project.id)}>{project.title}</option>)}</select>}<Button size="sm" icon={Plus} onClick={() => openForm('diary')}>Add log</Button></span>} /><CardBody className="!p-0">{tableState(diaryColumns, 'No site diary entries', (row) => openForm('diary', row))}</CardBody></>,
-    measurements: <><CardHeader title="Government measurement book" subtitle="Quantity evidence awaiting verification" icon={PackageCheck} action={canWrite && <span className="flex gap-2">{projects.length > 1 && <select className={`${inputClass} !w-52`} value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}><option value="all">All projects</option>{projects.map((project) => <option key={project.id} value={String(project.id)}>{project.title}</option>)}</select>}<Button size="sm" icon={Plus} onClick={() => openForm('measurement')}>MB entry</Button></span>} /><CardBody className="!p-0">{tableState(mbColumns, 'No measurement entries', (row) => openForm('measurement', row))}</CardBody></>,
-    bills: <><CardHeader title="Bills & payments" subtitle="Financial authorizations visible to DM and Department Heads only" icon={ReceiptText} action={canWrite && <Button size="sm" icon={Plus} onClick={() => openForm('bill')}>Submit bill</Button>} /><CardBody className="!p-0">{tableState(billColumns, 'No running bills')}</CardBody></>,
-    risks: <><CardHeader title="Execution risk center" subtitle="Backend-registered schedule, quality and material risk signals" icon={AlertTriangle} action={canWrite && <Button size="sm" icon={Plus} onClick={() => openForm('risk')}>Register risk</Button>} /><CardBody className="!p-0">{tableState(riskColumns, 'No material execution risks', (row) => openForm('risk', row))}</CardBody></>,
-  }[tab]
+    projects: (
+      <>
+        <CardHeader
+          title="Sanctioned execution pipeline"
+          subtitle="Projects originate only from DM-approved and sanctioned DPRs"
+          icon={Gauge}
+        />
+        <CardBody className="!p-0">
+          {tableState(projectColumns, "No projects found.", (row) =>
+            navigate(`/linedept/projects/${row.id}`)
+          )}
+        </CardBody>
+      </>
+    ),
+    diary: (
+      <>
+        <CardHeader
+          title="Daily site diary"
+          subtitle="Engineer notes, labour, materials and observations from the backend"
+          icon={FileText}
+          action={
+            canWrite && (
+              <span className="flex gap-2">
+                {projects.length > 1 && (
+                  <select
+                    className={`${inputClass} !w-52`}
+                    value={projectFilter}
+                    onChange={(e) => setProjectFilter(e.target.value)}
+                  >
+                    <option value="all">All projects</option>
+                    {projects.map((project) => (
+                      <option key={project.id} value={String(project.id)}>
+                        {project.title}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <Button size="sm" icon={Plus} onClick={() => openForm("diary")}>
+                  Add log
+                </Button>
+              </span>
+            )
+          }
+        />
+        <CardBody className="!p-0">
+          {tableState(diaryColumns, "No site diary entries", (row) =>
+            openForm("diary", row)
+          )}
+        </CardBody>
+      </>
+    ),
+    measurements: (
+      <>
+        <CardHeader
+          title="Government measurement book"
+          subtitle="Quantity evidence awaiting verification"
+          icon={PackageCheck}
+          action={
+            canWrite && (
+              <span className="flex gap-2">
+                {projects.length > 1 && (
+                  <select
+                    className={`${inputClass} !w-52`}
+                    value={projectFilter}
+                    onChange={(e) => setProjectFilter(e.target.value)}
+                  >
+                    <option value="all">All projects</option>
+                    {projects.map((project) => (
+                      <option key={project.id} value={String(project.id)}>
+                        {project.title}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <Button
+                  size="sm"
+                  icon={Plus}
+                  onClick={() => openForm("measurement")}
+                >
+                  MB entry
+                </Button>
+              </span>
+            )
+          }
+        />
+        <CardBody className="!p-0">
+          {tableState(mbColumns, "No measurement entries", (row) =>
+            openForm("measurement", row)
+          )}
+        </CardBody>
+      </>
+    ),
+    bills: (
+      <>
+        <CardHeader
+          title="Bills & payments"
+          subtitle="Financial authorizations visible to DM and Department Heads only"
+          icon={ReceiptText}
+          action={
+            canWrite && (
+              <Button size="sm" icon={Plus} onClick={() => openForm("bill")}>
+                Submit bill
+              </Button>
+            )
+          }
+        />
+        <CardBody className="!p-0">
+          {tableState(billColumns, "No running bills")}
+        </CardBody>
+      </>
+    ),
+    risks: (
+      <>
+        <CardHeader
+          title="Execution risk center"
+          subtitle="Backend-registered schedule, quality and material risk signals"
+          icon={AlertTriangle}
+          action={
+            canWrite && (
+              <Button size="sm" icon={Plus} onClick={() => openForm("risk")}>
+                Register risk
+              </Button>
+            )
+          }
+        />
+        <CardBody className="!p-0">
+          {tableState(riskColumns, "No material execution risks", (row) =>
+            openForm("risk", row)
+          )}
+        </CardBody>
+      </>
+    ),
+  }[tab];
 
-  const modalTitle = { diary: editRecord ? 'Edit site diary entry' : 'Record daily site progress', measurement: editRecord ? 'Edit measurement entry' : 'Measurement book entry', bill: 'Submit running bill', risk: editRecord ? 'Edit execution risk' : 'Register execution risk' }[modal]
+  const modalTitle = {
+    diary: editRecord ? "Edit site diary entry" : "Record daily site progress",
+    measurement: editRecord
+      ? "Edit measurement entry"
+      : "Measurement book entry",
+    bill: "Submit running bill",
+    risk: editRecord ? "Edit execution risk" : "Register execution risk",
+  }[modal];
 
   return (
     <div className="space-y-6 pb-8">
-      <PageHeader eyebrow={`${dept.code} · Projects & Execution`} title="Government Project Execution ERP" description="Monitor sanctioned projects, field execution, quality, finances and asset handover." action={canWrite && <Button icon={Plus} onClick={() => openForm('diary')}>Daily progress</Button>} />
+      <PageHeader
+        eyebrow={`${dept.code} · Projects & Execution`}
+        title="Government Project Execution ERP"
+        description="Monitor sanctioned projects, field execution, quality, finances and asset handover."
+        action={
+          canWrite && (
+            <Button icon={Plus} onClick={() => openForm("diary")}>
+              Daily progress
+            </Button>
+          )
+        }
+      />
       {summaryError ? (
-        <div className="px-6"><div className="flex items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3"><p className="text-sm text-red-700">{summaryError.status === 401 || summaryError.status === 403 ? 'You are not authorized to access execution KPIs.' : `Unable to load execution KPIs: ${summaryError.message}`}</p><Button size="sm" variant="outline" onClick={refetchSummary}>Retry</Button></div></div>
+        <div className="px-6">
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+            <p className="text-sm text-red-700">
+              {summaryError.status === 401 || summaryError.status === 403
+                ? "You are not authorized to access execution KPIs."
+                : `Unable to load execution KPIs: ${summaryError.message}`}
+            </p>
+            <Button size="sm" variant="outline" onClick={refetchSummary}>
+              Retry
+            </Button>
+          </div>
+        </div>
       ) : (
         <div className="px-6 grid grid-cols-2 gap-3 md:grid-cols-4">
-          <StatCard label="Running projects" value={summaryLoading ? '…' : summary?.runningProjects ?? 0} icon={Gauge} tone="sky" />
-          <StatCard label="Completed" value={summaryLoading ? '…' : summary?.completed ?? 0} icon={CheckCircle2} tone="leaf" />
-          <StatCard label="Inspection due" value={summaryLoading ? '…' : summary?.inspectionDue ?? 0} icon={ClipboardCheck} tone="saffron" />
-          <StatCard label="Budget utilized" value={summaryLoading ? '…' : formatCurrencyINR(summary?.budgetUtilized ?? 0)} icon={IndianRupee} tone="ink" />
+          <StatCard
+            label="Running projects"
+            value={summaryLoading ? "…" : summary?.runningProjects ?? 0}
+            icon={Gauge}
+            tone="sky"
+          />
+          <StatCard
+            label="Completed"
+            value={summaryLoading ? "…" : summary?.completed ?? 0}
+            icon={CheckCircle2}
+            tone="leaf"
+          />
+          <StatCard
+            label="Inspection due"
+            value={summaryLoading ? "…" : summary?.inspectionDue ?? 0}
+            icon={ClipboardCheck}
+            tone="saffron"
+          />
+          <StatCard
+            label="Budget utilized"
+            value={
+              summaryLoading
+                ? "…"
+                : formatCurrencyINR(summary?.budgetUtilized ?? 0)
+            }
+            icon={IndianRupee}
+            tone="ink"
+          />
         </div>
       )}
-      {tab === 'projects' && (summary?.completed ?? 0) > 0 && (
+      {tab === "projects" && (summary?.completed ?? 0) > 0 && (
         <div className="px-6">
-          <div className="flex items-start gap-2.5 rounded-lg border border-leaf-200 bg-leaf-50 px-4 py-3 text-sm text-leaf-800"><PackageCheck size={16} className="mt-0.5 shrink-0" /><div><strong>{summary.completed} completed project{summary.completed === 1 ? '' : 's'}</strong> — ready for asset handover and maintenance planning.<Button size="sm" variant="outline" className="ml-2 !border-leaf-300 !text-leaf-800" icon={PackageCheck} onClick={() => navigate('/linedept/assets')}>Asset workspace</Button></div></div>
+          <div className="flex items-start gap-2.5 rounded-lg border border-leaf-200 bg-leaf-50 px-4 py-3 text-sm text-leaf-800">
+            <PackageCheck size={16} className="mt-0.5 shrink-0" />
+            <div>
+              <strong>
+                {summary.completed} completed project
+                {summary.completed === 1 ? "" : "s"}
+              </strong>{" "}
+              — ready for asset handover and maintenance planning.
+              <Button
+                size="sm"
+                variant="outline"
+                className="ml-2 !border-leaf-300 !text-leaf-800"
+                icon={PackageCheck}
+                onClick={() => navigate("/linedept/assets")}
+              >
+                Asset workspace
+              </Button>
+            </div>
+          </div>
         </div>
       )}
-      <div className="px-6"><Tabs tabs={tabs} active={tab} onChange={setTab} /></div>
-      <div className="px-6"><Card>{content}</Card></div>
-      <Modal open={!!modal} onClose={closeForm} title={modalTitle} footer={<Button form="execution-form" type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save record'}</Button>}>
+      <div className="px-6">
+        <Tabs tabs={tabs} active={tab} onChange={setTab} />
+      </div>
+      <div className="px-6">
+        <Card>{content}</Card>
+      </div>
+      <Modal
+        open={!!modal}
+        onClose={closeForm}
+        title={modalTitle}
+        footer={
+          <Button form="execution-form" type="submit" disabled={saving}>
+            {saving ? "Saving…" : "Save record"}
+          </Button>
+        }
+      >
         <form id="execution-form" onSubmit={save} className="space-y-3">
-          {actionError && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">{actionError.message}</div>}
-          <select className={inputClass} value={form.projectId} onChange={(event) => setForm({ ...form, projectId: event.target.value })}><option value="">Select project</option>{projects.map((project) => <option key={project.id} value={String(project.id)}>{project.title}</option>)}</select>
-          {modal === 'diary' && <>
-            <input className={inputClass} type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} />
-            <input className={inputClass} placeholder="Work performed" value={form.workPerformed} onChange={(event) => setForm({ ...form, workPerformed: event.target.value })} />
-            <input className={inputClass} type="number" min="0" placeholder="Labour deployed" value={form.labour} onChange={(event) => setForm({ ...form, labour: event.target.value })} />
-            <input className={inputClass} placeholder="Materials consumed" value={form.materials} onChange={(event) => setForm({ ...form, materials: event.target.value })} />
-            <select className={inputClass} value={form.weather} onChange={(event) => setForm({ ...form, weather: event.target.value })}>{['Clear', 'Overcast', 'Rain', 'Hot', 'Cold', 'Windy'].map((option) => <option key={option}>{option}</option>)}</select>
-            <textarea className={inputClass} rows="3" placeholder="Observations" value={form.observations} onChange={(event) => setForm({ ...form, observations: event.target.value })} />
-          </>}
-          {modal === 'measurement' && <>
-            <input className={inputClass} type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} />
-            <input className={inputClass} placeholder="Work item" value={form.itemDescription} onChange={(event) => setForm({ ...form, itemDescription: event.target.value })} />
-            <input className={inputClass} placeholder="Unit of measurement" value={form.unit} onChange={(event) => setForm({ ...form, unit: event.target.value })} />
-            <input className={inputClass} type="number" min="0" step="any" placeholder="Measured quantity" value={form.measuredQuantity} onChange={(event) => setForm({ ...form, measuredQuantity: event.target.value })} />
-            <input className={inputClass} type="number" min="0" step="any" placeholder="Item rate" value={form.itemRate} onChange={(event) => setForm({ ...form, itemRate: event.target.value })} />
-            <input className={inputClass} placeholder="Measuring officer" value={form.measuringOfficer} onChange={(event) => setForm({ ...form, measuringOfficer: event.target.value })} />
-          </>}
-          {modal === 'bill' && <>
-            <select className={inputClass} value={form.billType} onChange={(event) => setForm({ ...form, billType: event.target.value })}>{['ADVANCE_BILL', 'RUNNING_BILL', 'FINAL_BILL'].map((option) => <option key={option} value={option}>{option.replace(/_/g, ' ')}</option>)}</select>
-            <input className={inputClass} type="number" min="0" step="any" placeholder="Claimed amount" value={form.claimedAmount} onChange={(event) => setForm({ ...form, claimedAmount: event.target.value })} />
-          </>}
-          {modal === 'risk' && <>
-            <select className={inputClass} value={form.severity} onChange={(event) => setForm({ ...form, severity: event.target.value })}><option>low</option><option>medium</option><option>high</option><option>critical</option></select>
-            <input className={inputClass} placeholder="Risk signal" value={form.signal} onChange={(event) => setForm({ ...form, signal: event.target.value })} />
-            <textarea className={inputClass} rows="3" placeholder="Recommendation" value={form.recommendation} onChange={(event) => setForm({ ...form, recommendation: event.target.value })} />
-          </>}
-          <textarea className={inputClass} rows="3" placeholder="Remarks / observations" value={form.remarks} onChange={(event) => setForm({ ...form, remarks: event.target.value })} />
+          {actionError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">
+              {actionError.message}
+            </div>
+          )}
+          <select
+            className={inputClass}
+            value={form.projectId}
+            onChange={(event) =>
+              setForm({ ...form, projectId: event.target.value })
+            }
+          >
+            <option value="">Select project</option>
+            {projects.map((project) => (
+              <option key={project.id} value={String(project.id)}>
+                {project.title}
+              </option>
+            ))}
+          </select>
+          {modal === "diary" && (
+            <>
+              <input
+                className={inputClass}
+                type="date"
+                value={form.date}
+                onChange={(event) =>
+                  setForm({ ...form, date: event.target.value })
+                }
+              />
+              <input
+                className={inputClass}
+                placeholder="Work performed"
+                value={form.workPerformed}
+                onChange={(event) =>
+                  setForm({ ...form, workPerformed: event.target.value })
+                }
+              />
+              <input
+                className={inputClass}
+                type="number"
+                min="0"
+                placeholder="Labour deployed"
+                value={form.labour}
+                onChange={(event) =>
+                  setForm({ ...form, labour: event.target.value })
+                }
+              />
+              <input
+                className={inputClass}
+                placeholder="Materials consumed"
+                value={form.materials}
+                onChange={(event) =>
+                  setForm({ ...form, materials: event.target.value })
+                }
+              />
+              <select
+                className={inputClass}
+                value={form.weather}
+                onChange={(event) =>
+                  setForm({ ...form, weather: event.target.value })
+                }
+              >
+                {["Clear", "Overcast", "Rain", "Hot", "Cold", "Windy"].map(
+                  (option) => (
+                    <option key={option}>{option}</option>
+                  )
+                )}
+              </select>
+              <textarea
+                className={inputClass}
+                rows="3"
+                placeholder="Observations"
+                value={form.observations}
+                onChange={(event) =>
+                  setForm({ ...form, observations: event.target.value })
+                }
+              />
+            </>
+          )}
+          {modal === "measurement" && (
+            <>
+              <input
+                className={inputClass}
+                type="date"
+                value={form.date}
+                onChange={(event) =>
+                  setForm({ ...form, date: event.target.value })
+                }
+              />
+              <input
+                className={inputClass}
+                placeholder="Work item"
+                value={form.itemDescription}
+                onChange={(event) =>
+                  setForm({ ...form, itemDescription: event.target.value })
+                }
+              />
+              <input
+                className={inputClass}
+                placeholder="Unit of measurement"
+                value={form.unit}
+                onChange={(event) =>
+                  setForm({ ...form, unit: event.target.value })
+                }
+              />
+              <input
+                className={inputClass}
+                type="number"
+                min="0"
+                step="any"
+                placeholder="Measured quantity"
+                value={form.measuredQuantity}
+                onChange={(event) =>
+                  setForm({ ...form, measuredQuantity: event.target.value })
+                }
+              />
+              <input
+                className={inputClass}
+                type="number"
+                min="0"
+                step="any"
+                placeholder="Item rate"
+                value={form.itemRate}
+                onChange={(event) =>
+                  setForm({ ...form, itemRate: event.target.value })
+                }
+              />
+              <input
+                className={inputClass}
+                placeholder="Measuring officer"
+                value={form.measuringOfficer}
+                onChange={(event) =>
+                  setForm({ ...form, measuringOfficer: event.target.value })
+                }
+              />
+            </>
+          )}
+          {modal === "bill" && (
+            <>
+              <select
+                className={inputClass}
+                value={form.billType}
+                onChange={(event) =>
+                  setForm({ ...form, billType: event.target.value })
+                }
+              >
+                {["ADVANCE_BILL", "RUNNING_BILL", "FINAL_BILL"].map(
+                  (option) => (
+                    <option key={option} value={option}>
+                      {option.replace(/_/g, " ")}
+                    </option>
+                  )
+                )}
+              </select>
+              <input
+                className={inputClass}
+                type="number"
+                min="0"
+                step="any"
+                placeholder="Claimed amount"
+                value={form.claimedAmount}
+                onChange={(event) =>
+                  setForm({ ...form, claimedAmount: event.target.value })
+                }
+              />
+            </>
+          )}
+          {modal === "risk" && (
+            <>
+              <select
+                className={inputClass}
+                value={form.severity}
+                onChange={(event) =>
+                  setForm({ ...form, severity: event.target.value })
+                }
+              >
+                <option>low</option>
+                <option>medium</option>
+                <option>high</option>
+                <option>critical</option>
+              </select>
+              <input
+                className={inputClass}
+                placeholder="Risk signal"
+                value={form.signal}
+                onChange={(event) =>
+                  setForm({ ...form, signal: event.target.value })
+                }
+              />
+              <textarea
+                className={inputClass}
+                rows="3"
+                placeholder="Recommendation"
+                value={form.recommendation}
+                onChange={(event) =>
+                  setForm({ ...form, recommendation: event.target.value })
+                }
+              />
+            </>
+          )}
+          <textarea
+            className={inputClass}
+            rows="3"
+            placeholder="Remarks / observations"
+            value={form.remarks}
+            onChange={(event) =>
+              setForm({ ...form, remarks: event.target.value })
+            }
+          />
         </form>
       </Modal>
     </div>
-  )
+  );
 }

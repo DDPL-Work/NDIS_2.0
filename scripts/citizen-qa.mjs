@@ -244,19 +244,27 @@ async function main() {
     await page.screenshot({ path: path.join(OUT, '9-mobile-dashboard.png') })
 
     await goto(page, `${BASE}/citizen/map`)
-    const searchPill = await page.evaluate(() => {
-      const button = Array.from(document.querySelectorAll('button')).find((b) => b.textContent.includes('Search places, services or facilities'))
+    // The mobile search pill is mounted once the map screen renders; the
+    // facility payload can take a while on slow connections, so wait for the
+    // pill instead of racing the very first evaluate.
+    const MOBILE_PILL_TEXT = 'Search places or facilities'
+    await page.waitForFunction((text) => {
+      const button = Array.from(document.querySelectorAll('button')).find((b) => b.textContent.includes(text))
       return Boolean(button)
-    })
+    }, { timeout: 20000 }, MOBILE_PILL_TEXT).catch(() => {})
+    const searchPill = await page.evaluate((text) => {
+      const button = Array.from(document.querySelectorAll('button')).find((b) => b.textContent.includes(text))
+      return Boolean(button)
+    }, MOBILE_PILL_TEXT)
     check('mobile map shows search pill', searchPill)
     await page.screenshot({ path: path.join(OUT, '10-mobile-map.png') })
 
     // Mobile: open the drawer via the search pill, then the facility sheet
-    const drawerOpened = await page.evaluate(() => {
-      const button = Array.from(document.querySelectorAll('button')).find((b) => b.textContent.includes('Search places, services or facilities'))
+    const drawerOpened = await page.evaluate((text) => {
+      const button = Array.from(document.querySelectorAll('button')).find((b) => b.textContent.includes(text))
       if (button) { button.click(); return true }
       return false
-    })
+    }, MOBILE_PILL_TEXT)
     await wait(900)
     const drawerOpen = await page.$eval('aside[data-tour-sidebar]', (el) => getComputedStyle(el).transform !== 'matrix(1, 0, 0, 1, 0, 0)' || el.getBoundingClientRect().left === 0)
     check('mobile drawer opens from search pill', drawerOpen)

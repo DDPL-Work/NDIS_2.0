@@ -81,7 +81,7 @@ export function DepartmentLegendControl({ departments = [], activeIds = [], onTo
               role="dialog"
               aria-modal="true"
               aria-label="Departments"
-              className="ndisp-sheet-up fixed inset-x-0 bottom-16 z-[150] flex max-h-[70dvh] flex-col overflow-hidden rounded-t-2xl border-t border-ink-100 bg-white shadow-2xl"
+              className="ndisp-sheet-up fixed inset-x-0 bottom-[calc(var(--citizen-bottom-nav-height,64px)+var(--safe-bottom,0px))] z-[150] flex max-h-[70dvh] flex-col overflow-hidden rounded-t-2xl border-t border-ink-100 bg-white shadow-2xl"
             >
               <div className="flex shrink-0 justify-center pt-2.5 pb-1">
                 <span className="h-1 w-10 rounded-full bg-ink-200" />

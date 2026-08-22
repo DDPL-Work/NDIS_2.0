@@ -64,7 +64,7 @@ const formFromProposal = (p) => ({
 
 const emptyForm = (prefill = {}) => ({
   title: prefill.title || '',
-  category: '',
+  category: prefill.category || '',
   village: prefill.village || '',
   block: prefill.block || '',
   population: '',
@@ -72,11 +72,11 @@ const emptyForm = (prefill = {}) => ({
   linkedComplaints: '',
   surveyDate: '',
   surveyTeam: '',
-  surveyNotes: '',
+  surveyNotes: prefill.surveyNotes || '',
   gisReference: '',
   latitude: '',
   longitude: '',
-  technicalScope: '',
+  technicalScope: prefill.technicalScope || '',
   engineeringNotes: '',
   timeline: '',
   civilWorks: '',
@@ -929,7 +929,12 @@ export default function DepartmentPlanningWorkspace({ view = 'dashboard' }) {
   )
 
   if (view === 'new') {
-    const prefill = { title: searchParams.get('title') || '', village: searchParams.get('village') || '', block: searchParams.get('block') || '', gapScore: searchParams.get('gapScore') || '' }
+    const prefill = {
+      title: searchParams.get('title') || '', village: searchParams.get('village') || '', block: searchParams.get('block') || '', gapScore: searchParams.get('gapScore') || '',
+      category: searchParams.get('department') || '',
+      surveyNotes: [searchParams.get('reason'), searchParams.get('evidence')].filter(Boolean).join('\nEvidence: '),
+      technicalScope: searchParams.get('recommendedAction') || '',
+    }
     return (
       <div className="space-y-6 pb-8">
         <PageHeader eyebrow={`${dept.code} · Planning & Proposals`} title="Development Proposal DPR Wizard" description="Prepare a traceable, sanction-ready Department Project Report on the live backend." action={<Button variant="outline" onClick={() => navigate('/linedept/planning')}>Cancel</Button>} />

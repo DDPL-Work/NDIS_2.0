@@ -12,7 +12,6 @@ import { Flame, Layers, SlidersHorizontal, MapPin } from 'lucide-react'
 import MapView from '../../components/map/MapView'
 import MapToolbar from '../../components/map/MapToolbar'
 import { DepartmentLegend, GapScoreLegend } from '../../components/map/MapLegend'
-import PageHeader from '../../components/ui/PageHeader'
 import Badge from '../../components/ui/Badge'
 import FacilityInfoPanel from '../../components/map/FacilityInfoPanel'
 import CitizenLayerPanel from '../citizen/CitizenLayerPanel'
@@ -28,6 +27,9 @@ import RouteSummary from '../../gis/components/RouteSummary'
 import { GISRepository } from '../../gis/repositories/GISRepository'
 import { useAuthStore } from '../../app/store/authStore'
 import { DEPARTMENTS, DISTRICTS } from '../../config/constants'
+import { distanceMeters } from '../../utils/geo'
+
+const DISTRICT_RENDER_RADIUS_M = 80000
 
 export default function SituationMatrix() {
   const user = useAuthStore((s) => s.user)
@@ -132,9 +134,12 @@ export default function SituationMatrix() {
   const filtered = useMemo(() => {
     if (!facilities) return []
     return facilities.filter(
-      (f) => Array.isArray(f.position) && f.position.length >= 2 && f.gapScore >= gapThreshold
+      (f) => Array.isArray(f.position)
+        && f.position.length >= 2
+        && distanceMeters(f.position, district.center) <= DISTRICT_RENDER_RADIUS_M
+        && f.gapScore >= gapThreshold
     )
-  }, [facilities, gapThreshold])
+  }, [facilities, gapThreshold, district.center])
 
   // Marker click → shared role-aware handler; admin roles open the right-side
   // FacilityInfoPanel (never the citizen Facility Detail page).
@@ -164,25 +169,16 @@ export default function SituationMatrix() {
   }, [layers])
 
   return (
-    <div className="flex flex-col h-full">
-      <PageHeader
-        eyebrow="Admin Portal · FR-AP-01"
-        title="Situation Matrix"
-        description={`Cross-department deficit view for ${district?.label}. Deficit radius: ${tools.radiusKm}km (configurable via map toolbar).`}
-        action={
-          <div className="w-full md:w-[340px]">
-            <GISSearchPanel user={user} allowedDepartments={activeIds} center={district?.center} onResults={setSpatialResults} onResultClick={(result) => mapRef.current?.showResult(result)} onShowRoute={routing.showRoute} onClearRoute={routing.clearRoute} routeActiveId={routeActiveId} routeLoading={routing.status === 'loading'} onRouteStart={routing.setRouteStart} onRouteDestination={routing.setRouteDestination} routeStartId={routing.routeStartId} routeDestinationId={routing.routeDestinationId} />
-          </div>
-        }
-      />
-      <div className="flex-1 px-3 sm:px-6 pb-6 min-h-0 flex flex-col lg:flex-row gap-3">
+    <div className="flex h-full min-h-[560px] flex-col p-3 sm:p-4 lg:p-6">
+      <div className="flex flex-1 min-h-[540px] flex-col gap-3 lg:flex-row">
         {/* Map area */}
-        <div className="relative flex-1 min-w-0">
+        <div className="relative min-h-[540px] flex-1 min-w-0 overflow-hidden rounded-xl2 border border-ink-100 bg-white shadow-card">
           <MapView
             ref={mapRef}
             center={district?.center}
             zoom={district?.zoom}
             facilities={filtered}
+            autoFit={false}
             colorBy={colorBy}
             departmentColors={departmentColors}
             showHeat={showHeat}
@@ -204,6 +200,10 @@ export default function SituationMatrix() {
             basemapUrl={tools.currentBasemap.url}
             route={routing.route}
           />
+
+          <div className="absolute right-3 top-3 z-20 w-[min(340px,calc(100%-1.5rem))] md:right-16">
+            <GISSearchPanel user={user} showSuggestions={false} allowedDepartments={activeIds} center={district?.center} onResults={setSpatialResults} onResultClick={(result) => mapRef.current?.showResult(result)} onShowRoute={routing.showRoute} onClearRoute={routing.clearRoute} routeActiveId={routeActiveId} routeLoading={routing.status === 'loading'} onRouteStart={routing.setRouteStart} onRouteDestination={routing.setRouteDestination} routeStartId={routing.routeStartId} routeDestinationId={routing.routeDestinationId} />
+          </div>
 
           {/* Route summary (floating, above the map but below panels) */}
           <div className="absolute bottom-4 left-4 z-[115]">
@@ -240,7 +240,7 @@ export default function SituationMatrix() {
           </div>
 
           {/* Top-right controls — collapsed behind a "Display" toggle on mobile */}
-          <div className="absolute top-4 right-3 md:right-16 flex flex-col items-end gap-2 z-10">
+          <div className="absolute top-[66px] right-3 md:right-16 flex flex-col items-end gap-2 z-10">
             <button
               onClick={() => setDisplayOpen((v) => !v)}
               className="md:hidden card px-2.5 py-1.5 text-[12px] font-medium flex items-center gap-1.5"

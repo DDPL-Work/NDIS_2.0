@@ -222,7 +222,7 @@ export default function DepartmentInspectionsWorkspace() {
                 <div className="h-32 w-full rounded-xl overflow-hidden bg-ink-100 relative">
                   <img src={selectedIns.geoTaggedPhotos[0]} className="h-full w-full object-cover" alt="Evidence" />
                   <span className="absolute bottom-2 left-2 bg-ink-950/70 text-white font-mono text-[9px] px-2 py-0.5 rounded-lg flex items-center gap-1">
-                    <MapPin size={10} /> GPS Geotag Verified
+                    <MapPin size={10} /> Geotag status unavailable
                   </span>
                 </div>
               </div>

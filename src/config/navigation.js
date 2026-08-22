@@ -15,14 +15,15 @@ export const CITIZEN_NAV = [
 ]
 
 export const ADMIN_NAV = [
-  { to: '/admin/collector-dashboard', label: 'District Command Center', icon: 'LayoutDashboard', end: true },
-  { to: '/admin/situation-matrix', label: 'District GIS', icon: 'Map' },
-  { to: '/admin/complaints-oversight', label: 'Complaints', icon: 'AlertTriangle' },
-  { to: '/admin/departments-overview', label: 'Departments', icon: 'Building2' },
-  { to: '/admin/analytics', label: 'Analytics', icon: 'BarChart2' },
-  { to: '/admin/reports', label: 'Reports', icon: 'FileDown' },
-  { to: '/admin/recommendations', label: 'AI Recommendations', icon: 'Sparkles' },
-  { to: '/admin/approvals', label: 'Approvals', icon: 'ClipboardCheck' },
+  { to: '/admin/collector-dashboard', label: 'Decision workspace', icon: 'LayoutDashboard', end: true },
+  { to: '/admin/gap-priority', label: 'Priority locations', icon: 'Target' },
+  { to: '/admin/situation-matrix', label: 'District map', icon: 'Map' },
+  { to: '/admin/spatial-analysis', label: 'Spatial analysis', icon: 'Filter' },
+  { to: '/admin/department/general', label: 'Department delivery', icon: 'Building2' },
+  { to: '/admin/feedback-analytics', label: 'Citizen insights', icon: 'BarChart2' },
+  { to: '/admin/approvals', label: 'Decisions & approvals', icon: 'ClipboardCheck' },
+  { to: '/admin/reports', label: 'District reports', icon: 'FileDown' },
+  { to: '/admin/complaints-oversight', label: 'Issue records', icon: 'AlertTriangle' },
   { to: '/admin/notifications', label: 'Notifications', icon: 'Bell' },
   { to: '/admin/state-rollup', label: 'Cross-District KPIs', icon: 'Globe2', roles: [ROLES.STATE_ADMIN] },
 ]

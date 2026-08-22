@@ -11,8 +11,12 @@ export function getFinalSanctionAmount(proposal = {}) {
   if (proposal?.approval_mode === 'NEGOTIATED' || proposal?.approvalMode === 'NEGOTIATED') {
     if (Number.isFinite(agreedAmount) && agreedAmount > 0) return agreedAmount
   }
-  const estimatedCost = Number(proposal?.estimated_cost ?? proposal?.estimatedCost)
-  return Number.isFinite(estimatedCost) ? estimatedCost : 0
+  // A DPR estimate is evidence, never an implicit sanction authority.
+  // Direct decisions must also carry a persisted final amount.
+  if (proposal?.approval_mode === 'DIRECT' || proposal?.approvalMode === 'DIRECT') {
+    if (Number.isFinite(agreedAmount) && agreedAmount > 0) return agreedAmount
+  }
+  return null
 }
 
 export const isNegotiatedAgreement = (proposal = {}) =>

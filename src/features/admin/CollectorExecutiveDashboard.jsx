@@ -297,6 +297,7 @@ export default function CollectorExecutiveDashboard() {
         open={!!selectedComplaintId}
         onClose={() => setSelectedComplaintId(null)}
         width="max-w-4xl"
+        scrollBody={false}
       >
         {selectedComplaintId && (
           <ComplaintDetailHub

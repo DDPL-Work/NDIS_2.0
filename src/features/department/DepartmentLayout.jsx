@@ -19,7 +19,7 @@ export default function DepartmentLayout() {
     portalIcon={dept.icon || 'Building2'}
     accentClassName="bg-saffron-500"
     title="Department Workspace"
-    subtitle={`${departmentLabel} · authenticated enterprise operations`}
+    subtitle={`${departmentLabel} · location-based service delivery`}
     showDistrict
     showDepartment
   ><Outlet /></AppShell>

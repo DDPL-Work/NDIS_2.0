@@ -240,9 +240,11 @@ export default function ReportIssue() {
       url: URL.createObjectURL(file),
       name: file.name,
       file,
-      geotagged: true,
-      coords: selectedPos,
-      distMeters: selectedPos ? 0 : null,
+      // Browser selection does not establish EXIF provenance. Verification is
+      // authoritative only when the upload service returns it.
+      geotagged: null,
+      coords: null,
+      distMeters: null,
       timestamp: new Date().toISOString(),
     })
     pushToast('Photo attached.', 'success')

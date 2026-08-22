@@ -16,6 +16,8 @@ export function useLeafletLayers(map, { defaults = DEFAULT_LAYERS } = {}) {
   const [loading, setLoading] = useState({})
   const [error, setError] = useState(null)
   const visibleRef = useRef(visible)
+  const toggleRef = useRef()
+  const defaultsRef = useRef(defaults)
 
   useEffect(() => {
     visibleRef.current = visible
@@ -29,14 +31,14 @@ export function useLeafletLayers(map, { defaults = DEFAULT_LAYERS } = {}) {
     if (!shouldShow) {
       const cached = cache.current.get(name)
       if (cached && map.hasLayer(cached)) map.removeLayer(cached)
-      setVisible((current) => ({ ...current, [name]: false }))
+      setVisible((current) => current[name] === false ? current : { ...current, [name]: false })
       return
     }
 
     if (cache.current.has(name)) {
       const cached = cache.current.get(name)
       if (!map.hasLayer(cached)) map.addLayer(cached)
-      setVisible((current) => ({ ...current, [name]: true }))
+      setVisible((current) => current[name] === true ? current : { ...current, [name]: true })
       return
     }
 
@@ -50,31 +52,39 @@ export function useLeafletLayers(map, { defaults = DEFAULT_LAYERS } = {}) {
       })
       cache.current.set(name, leafletLayer)
       map.addLayer(leafletLayer)
-      setVisible((current) => ({ ...current, [name]: true }))
+      setVisible((current) => current[name] === true ? current : { ...current, [name]: true })
     } catch (requestError) {
       setError(requestError)
-      setVisible((current) => ({ ...current, [name]: false }))
+      setVisible((current) => current[name] === false ? current : { ...current, [name]: false })
     } finally {
       setLoading((current) => ({ ...current, [name]: false }))
     }
   }, [map])
 
+  // Keep refs in sync without triggering effects. This must come after
+  // `toggle` is initialized; referring to a const callback before its
+  // declaration throws during render.
+  useEffect(() => { toggleRef.current = toggle }, [toggle])
+  useEffect(() => { defaultsRef.current = defaults }, [defaults])
+
   const clearAll = useCallback(() => {
     Object.keys(visibleRef.current).forEach((name) => {
-      if (visibleRef.current[name]) toggle(name, false)
+      if (visibleRef.current[name]) toggleRef.current(name, false)
     })
-  }, [toggle])
+  }, [])
 
   const showDefaults = useCallback(() => {
-    defaults.forEach((name) => toggle(name, true))
-  }, [defaults, toggle])
+    defaultsRef.current.forEach((name) => toggleRef.current(name, true))
+  }, [])
 
   // District + Block boundaries are ON by default: once the map is ready they
   // are fetched and added immediately (counter always equals visible layers).
+  // Uses refs to avoid dependency on toggle/defaults which would cause
+  // infinite update loops when setVisible triggers re-renders.
   useEffect(() => {
     if (!map) return
-    defaults.forEach((name) => toggle(name, true))
-  }, [map, toggle, defaults])
+    defaultsRef.current.forEach((name) => toggleRef.current(name, true))
+  }, [map])
 
   const activeCount = Object.values(visible).filter(Boolean).length
 

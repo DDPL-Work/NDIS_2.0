@@ -16,6 +16,7 @@ import Badge from '../../../components/ui/Badge'
 import Select from '../../../components/ui/Select'
 import EmptyState from '../../../components/ui/EmptyState'
 import MapView from '../../../components/map/MapView'
+import CoordinateIntegrityPanel from '../../../components/gis/CoordinateIntegrityPanel'
 import { useStateGisStore, ASSET_CATEGORIES } from '../store/stateGisStore'
 import { useStateProjectStore } from '../store/stateProjectStore'
 import { useStateMasterStore } from '../store/stateMasterStore'
@@ -23,6 +24,7 @@ import { backendFacilityApi } from '../../../api/facilityApi'
 import { useStatePermission, useStateActor } from '../hooks/useStatePermissions'
 import { useUiStore } from '../../../app/store/uiStore'
 import { Field, FilterStrip, SummaryPill } from '../components/StateUI'
+import { findPossibleDuplicates, validateWgs84Coordinates } from '../../../gis/validation/geoIntegrity'
 
 const STATE_CENTER = [85.46, 25.2]
 const ASSET_TONE = { active: 'positive', inactive: 'neutral' }
@@ -247,6 +249,8 @@ function AssetsView({ gis, master, assets, center, zoom }) {
   const [createOpen, setCreateOpen] = useState(false)
   const [viewFor, setViewFor] = useState(null)
   const [form, setForm] = useState({})
+  const coordinate = useMemo(() => validateWgs84Coordinates({ latitude: form.lat, longitude: form.lng }), [form.lat, form.lng])
+  const duplicateCandidates = useMemo(() => findPossibleDuplicates(coordinate.position, assets), [assets, coordinate.position])
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -262,13 +266,15 @@ function AssetsView({ gis, master, assets, center, zoom }) {
 
   const save = async () => {
     if (!form.name) throw new Error('Asset name is required.')
+    if (!coordinate.valid) throw new Error('Enter valid WGS84 coordinates before registering the asset.')
+    if (duplicateCandidates.length && !form.overrideDuplicate) throw new Error('Possible duplicate detected within 25 m. Review the existing record or explicitly override after review.')
     await gis.addAsset({
       actor,
       name: form.name.trim(),
       category: form.category || ASSET_CATEGORIES[0].value,
       departmentId: form.departmentId || null,
       districtId: form.districtId || null,
-      lat: Number(form.lat), lng: Number(form.lng),
+      lat: coordinate.position[1], lng: coordinate.position[0],
       valueCr: Number(form.valueCr || 0),
       installedYear: Number(form.installedYear) || null,
       condition: form.condition || 'fair',
@@ -359,8 +365,18 @@ function AssetsView({ gis, master, assets, center, zoom }) {
             <SelectFieldLite label="Category" value={form.category || ''} onChange={(v) => setForm((f) => ({ ...f, category: v }))} options={ASSET_CATEGORIES} />
             <SelectFieldLite label="Owner Department" value={form.departmentId || ''} onChange={(v) => setForm((f) => ({ ...f, departmentId: v }))} options={[{ value: '', label: 'General / State', }, ...master.departments.map((d) => ({ value: d.id, label: d.name }))]} />
             <SelectFieldLite label="District" value={form.districtId || ''} onChange={(v) => setForm((f) => ({ ...f, districtId: v }))} options={master.districts.map((d) => ({ value: d.id, label: d.name }))} />
-            <Field label="Latitude" type="number" step="0.0001" value={form.lat || ''} onChange={(e) => setForm((f) => ({ ...f, lat: e.target.value }))} placeholder="25.5" />
-            <Field label="Longitude" type="number" step="0.0001" value={form.lng || ''} onChange={(e) => setForm((f) => ({ ...f, lng: e.target.value }))} placeholder="85.1" />
+            <CoordinateIntegrityPanel
+              value={{ latitude: form.lat, longitude: form.lng }}
+              onChange={(next) => setForm((current) => ({ ...current, lat: next.latitude, lng: next.longitude }))}
+              records={assets}
+              onOpenExisting={setViewFor}
+            />
+            {duplicateCandidates.length > 0 && (
+              <label className="sm:col-span-2 flex items-start gap-2 rounded-lg border border-saffron-200 bg-saffron-50 px-3 py-2 text-[12px] text-saffron-900">
+                <input type="checkbox" checked={Boolean(form.overrideDuplicate)} onChange={(event) => setForm((current) => ({ ...current, overrideDuplicate: event.target.checked }))} className="mt-0.5" />
+                <span>I reviewed the possible duplicate(s) and request an override. Creation remains subject to backend validation.</span>
+              </label>
+            )}
             <Field label="Book Value (₹ Cr)" type="number" step="0.01" min="0" value={form.valueCr || ''} onChange={(e) => setForm((f) => ({ ...f, valueCr: e.target.value }))} />
             <Field label="Installed Year" type="number" value={form.installedYear || ''} onChange={(e) => setForm((f) => ({ ...f, installedYear: e.target.value }))} placeholder="2010" />
             <SelectFieldLite label="Condition" value={form.condition || ''} onChange={(v) => setForm((f) => ({ ...f, condition: v }))} options={[{ value: 'excellent', label: 'Excellent' }, { value: 'good', label: 'Good' }, { value: 'fair', label: 'Fair' }, { value: 'poor', label: 'Poor' }]} />
@@ -452,13 +468,27 @@ function BulkSyncCard() {
           Run Bulk Sync
         </Button>
         {result && (
-          <div className="rounded-lg bg-leaf-50 border border-leaf-200 px-3 py-2 text-[11.5px] text-leaf-900">
-            Backend accepted the sync.{result.updated != null && ` Updated: ${result.updated}.`}{result.created != null && ` Created: ${result.created}.`}{result.failed != null && ` Failed: ${result.failed}.`}
+          <div className="space-y-2 rounded-lg border border-leaf-200 bg-leaf-50 px-3 py-2 text-[11.5px] text-leaf-900">
+            <p>Backend processed the sync.{result.updated != null && ` Updated: ${result.updated}.`}{result.created != null && ` Created: ${result.created}.`}{result.failed != null && ` Failed: ${result.failed}.`}</p>
+            <BulkValidationSummary result={result} />
           </div>
         )}
       </CardBody>
     </Card>
   )
+}
+
+function BulkValidationSummary({ result }) {
+  const summary = result.validation_summary || result.validation || result.summary || {}
+  const fields = [
+    ['Valid records', summary.valid_records ?? summary.valid],
+    ['Invalid coordinates', summary.invalid_coordinates],
+    ['Outside boundary', summary.outside_boundary],
+    ['Duplicates', summary.duplicates],
+    ['Missing required fields', summary.missing_required_fields],
+  ].filter(([, value]) => value != null)
+  if (!fields.length) return <p className="text-ink-600">The backend did not return a row-level validation summary.</p>
+  return <div className="grid grid-cols-2 gap-1.5 border-t border-leaf-200 pt-2 text-ink-700">{fields.map(([label, value]) => <p key={label}><span className="text-ink-500">{label}:</span> <b>{value}</b></p>)}</div>
 }
 
 export { assetFacilities, projectFacilities }

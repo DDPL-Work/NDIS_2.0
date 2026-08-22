@@ -56,7 +56,8 @@ export default function FieldOps() {
       setExifGps({
         lat: 25.1384,
         lng: 85.4442,
-        verified: true,
+        // Local preview is not evidence; only a backend verifier may set true.
+        verified: false,
         distanceM: 42,
         timestamp: new Date().toISOString(),
       })

@@ -47,7 +47,7 @@ function formatDistance(row) {
 // One shared AI GIS search box.  Every portal (citizen, department, executive,
 // DM situation matrix, admin) renders this same component and therefore calls
 // the same backend /api/spatial-query/ service — no portal-local search logic.
-export default function GISSearchPanel({ user, onResults, onResultClick, onShowRoute, onClearRoute, routeActiveId, routeLoading = false, onRouteStart, onRouteDestination, routeStartId, routeDestinationId, bare = false }) {
+export default function GISSearchPanel({ user, onResults, onResultClick, onShowRoute, onClearRoute, routeActiveId, routeLoading = false, onRouteStart, onRouteDestination, routeStartId, routeDestinationId, bare = false, showSuggestions = true }) {
   const { results, loading, error, runSearch, clear } = useSpatialQuery({ user })
   const [query, setQuery] = useState('')
   const [radius, setRadius] = useState('10')
@@ -97,7 +97,7 @@ export default function GISSearchPanel({ user, onResults, onResultClick, onShowR
           />
           {loading && <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-saffron-600" />}
           {/* Category shortcuts while focused & empty — real searches only */}
-          {focused && !query.trim() && !loading && (
+          {showSuggestions && focused && !query.trim() && !loading && (
             <div className="ndisp-suggest absolute z-30 mt-1 w-full overflow-hidden rounded-xl border border-ink-100 bg-white py-1 shadow-popover">
               <p className="px-3 pt-1.5 pb-1 text-[10.5px] font-semibold uppercase tracking-wide text-ink-400">Try searching for</p>
               {SUGGESTION_SHORTCUTS.map((shortcut) => (
@@ -124,7 +124,7 @@ export default function GISSearchPanel({ user, onResults, onResultClick, onShowR
         </button>
       </div>
 
-      {!bare && (
+      {!bare && showSuggestions && (
         <div className="flex gap-1 flex-wrap">
           {suggestions.map((item) => (
             <button key={item} type="button" onClick={() => run(item)} disabled={loading} className="text-[11px] px-2 py-1 rounded-full bg-ink-100 text-ink-600 hover:bg-ink-200 disabled:opacity-50">

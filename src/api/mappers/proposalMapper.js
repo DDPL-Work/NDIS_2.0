@@ -35,6 +35,12 @@ export function mapProposal(dto = {}) {
     ward: dto.ward || '',
     populationImpact: amount(dto.population_impact),
     gapScore: amount(dto.gap_score),
+    sourcePriorityId: dto.source_priority_id ?? dto.priority_source_id ?? null,
+    sourcePriority: dto.source_priority ?? dto.priority_source ?? null,
+    gapEvidence: dto.gap_evidence ?? dto.evidence ?? dto.need_evidence ?? '',
+    facilityId: dto.facility ?? dto.facility_id ?? null,
+    facilityName: dto.facility_name || '',
+    recommendedAction: dto.recommended_action || '',
     linkedComplaint: dto.linked_complaint || null,
     linkedComplaintIds: Array.isArray(dto.linked_complaint_ids) ? dto.linked_complaint_ids : [],
     problemStatement: dto.problem_statement || '',
@@ -72,6 +78,10 @@ export function mapProposal(dto = {}) {
     approvedBy: dto.approved_by,
     approvedByName: dto.approved_by_name || '',
     approvedAt: dto.approved_at || null,
+    sanctionAmount: amount(dto.sanction_amount ?? dto.sanctioned_amount),
+    sanctionOrder: dto.sanction_order ?? dto.sanction_order_no ?? '',
+    budgetStatus: dto.budget_status ?? dto.budget_status_display ?? '',
+    approvalAuthority: dto.approval_authority ?? dto.approved_by_name ?? '',
     // Negotiation module (backend_next_guide §6.3) — the backend embeds the
     // full multi-round trajectory plus the agreed terms on the proposal.
     // estimated_cost is never overwritten; agreed terms and approval_mode are

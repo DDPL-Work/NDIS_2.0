@@ -364,7 +364,7 @@ $$\text{INVITED} \longrightarrow \text{PENDING} \longrightarrow \text{ACCEPTED} 
 ## 10. State Governance Budget & Finance Module
 
 Path Prefix: `/api/state-budget/`
-
+v
 ### 10.1 Master Governance Dashboard & Budget Flow
 Tracks the complete state financial workflow:
 $$\text{Budget Provision} \longrightarrow \text{Authorization} \longrightarrow \text{Allocation} \longrightarrow \text{Sanction} \longrightarrow \text{Release} \longrightarrow \text{Commitment} \longrightarrow \text{Utilization}$$

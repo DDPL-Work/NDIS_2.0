@@ -36,6 +36,7 @@ const MapView = forwardRef(function MapView({
   center = [85.4434, 25.1372],
   zoom = 10.4,
   facilities = [],
+  autoFit = true,
   colorBy = 'department', // 'department' | 'gap'
   onFacilityClick,
   onMapClick,          // propagated to parent for tool handling
@@ -190,7 +191,9 @@ const MapView = forwardRef(function MapView({
     const map = mapRef.current
     if (!map || !containerRef.current) return
     if (typeof ResizeObserver === 'undefined') return
-    const observer = new ResizeObserver(() => map.invalidateSize({ pan: false }))
+    const resize = () => requestAnimationFrame(() => map.invalidateSize({ pan: false }))
+    resize()
+    const observer = new ResizeObserver(resize)
     observer.observe(containerRef.current)
     return () => observer.disconnect()
   }, [])
@@ -296,11 +299,11 @@ const MapView = forwardRef(function MapView({
   useEffect(() => {
     const map = mapRef.current
     const valid = facilities.filter((item) => Array.isArray(item.position) && item.position.length >= 2)
-    if (!map || !ready || !valid.length) return
+    if (!autoFit || !map || !ready || !valid.length) return
     const bounds = L.latLngBounds(valid.map((item) => toLatLng(item.position)))
     map.fitBounds(bounds, { padding: [48, 48], maxZoom: 14 })
     if (import.meta.env.DEV) console.info('[GIS diagnostics] Leaflet map bounds', { visibleCount: valid.length })
-  }, [facilities, ready])
+  }, [facilities, ready, autoFit])
 
   // Road route overlay — the ONLY layer this effect manages.  Facility
   // markers, search-result pins, catalog layers and boundaries are untouched.

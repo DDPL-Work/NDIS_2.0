@@ -85,13 +85,23 @@ body.citizen-modal-open .ndisp-bottom-nav {
   display: none;
 }
 
+/* Feedback wizard modal slide-up */
+@keyframes ndisp-feedback-slide-up {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.ndisp-feedback-slide-up {
+  animation: ndisp-feedback-slide-up 0.3s ease-out both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ndisp-step-current,
   .ndisp-sheet-up,
   .ndisp-sheet-in,
   .ndisp-sheet-responsive,
   .ndisp-suggest,
-  .ndisp-notif-in {
+  .ndisp-notif-in,
+  .ndisp-feedback-slide-up {
     animation: none !important;
   }
 }

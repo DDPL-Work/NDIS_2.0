@@ -27,8 +27,13 @@ import CitizenProfile from './features/citizen/CitizenProfile'
 import CitizenMobileNav from './features/citizen/CitizenMobileNav'
 import './features/citizen/citizen.css'
 
+// Feedback Views
+const CitizenFeedbackPage = lazy(() => import('./features/citizen/CitizenFeedbackPage'))
+
 // Admin & Collector Views
 import DistrictCommandPlatform from './features/admin/platform/DistrictCommandPlatform'
+import DecisionDashboard from './features/admin/decisionDashboard/DecisionDashboard'
+import SpatialAnalysis from './features/spatialanalysis/SpatialAnalysis'
 import AdminDashboard from './features/admin/AdminDashboard'
 import SituationMatrix from './features/admin/SituationMatrix'
 import Approvals from './features/admin/Approvals'
@@ -40,6 +45,14 @@ import StateRollup from './features/admin/StateRollup'
 import Analytics from './features/admin/Analytics'
 import SystemHealth from './features/admin/SystemHealth'
 import AuditLogs from './features/admin/AuditLogs'
+import { AdminDepartmentSupport, LinedeptDepartmentSupport } from './features/departmentsupport/DepartmentSupportPages'
+
+// Gap & Priority Dashboard
+const GapPriorityDashboard = lazy(() => import('./features/admin/gapPriority/GapPriorityDashboard'))
+
+// Feedback Admin
+const FeedbackAnalyticsDashboard = lazy(() => import('./features/admin/feedback/FeedbackAnalyticsDashboard'))
+const FeedbackMap = lazy(() => import('./features/admin/feedback/FeedbackMap'))
 
 // Line Department Views
 import DepartmentOfficerQueue from './features/linedept/DepartmentOfficerQueue'
@@ -109,7 +122,7 @@ function CitizenShell() {
 
 function AdminShell() {
   const nav = useFilteredNav(ADMIN_NAV)
-  return <AppShell navItems={nav} portalLabel="Executive Admin" portalIcon="Gavel" accentClassName="bg-ink-900" title="Executive Command Center" subtitle="District Administration & GIS Oversight" showDistrict showDepartment={false} />
+  return <AppShell navItems={nav} portalLabel="Executive Admin" portalIcon="Gavel" accentClassName="bg-ink-900" title="Executive Command Center" subtitle="Location-based district decisions" showDistrict showDepartment={false} />
 }
 
 function DepartmentPage({ permission, children }) {
@@ -149,14 +162,22 @@ export default function App() {
               <Route path="notifications" element={<CitizenNotifications />} />
               <Route path="profile" element={<CitizenProfile />} />
               <Route path="reports" element={<CitizenReports />} />
+              <Route path="feedback" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><CitizenFeedbackPage /></Suspense>} />
             </Route>
           </Route>
 
           {/* Admin / Collector Routes */}
           <Route element={<RequireRole roles={[ROLES.DISTRICT_COLLECTOR, ROLES.DM, ROLES.ADM, ROLES.STATE_ADMIN, ROLES.SYSTEM_ADMIN]} />}>
             <Route path="/admin" element={<AdminShell />}>
-              <Route index element={<DistrictCommandPlatform />} />
-              <Route path="collector-dashboard" element={<DistrictCommandPlatform />} />
+              <Route index element={<DecisionDashboard />} />
+              <Route path="collector-dashboard" element={<DecisionDashboard />} />
+              <Route path="spatial-analysis" element={<SpatialAnalysis />} />
+              <Route path="gap-priority" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><GapPriorityDashboard /></Suspense>} />
+              <Route path="feedback-analytics" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><FeedbackAnalyticsDashboard /></Suspense>} />
+              <Route path="feedback-map" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><FeedbackMap /></Suspense>} />
+              <Route path="department/:departmentId" element={<AdminDepartmentSupport />} />
+              <Route path="department" element={<Navigate to="/admin/department/general" replace />} />
+              <Route path="command-platform" element={<DistrictCommandPlatform />} />
               <Route path="situation-matrix" element={<SituationMatrix />} />
               <Route path="gis-map" element={<CitizenHome />} />
               <Route path="complaints-oversight" element={<GrievanceOversight />} />
@@ -199,6 +220,7 @@ export default function App() {
                 <Route path="planning/funding" element={<DepartmentPage permission="projects.view"><DepartmentPlanningWorkspace view="dashboard" /></DepartmentPage>} />
                 <Route path="planning/analytics" element={<DepartmentPage permission="projects.view"><DepartmentPlanningWorkspace view="dashboard" /></DepartmentPage>} />
                 <Route path="data-upload" element={<DepartmentPage permission="projects.create"><DataUpload /></DepartmentPage>} />
+                <Route path="decision-support" element={<DepartmentPage permission="assets.view"><LinedeptDepartmentSupport /></DepartmentPage>} />
                 <Route path="projects" element={<DepartmentPage permission="projects.view"><DepartmentExecutionWorkspace /></DepartmentPage>} />
                 <Route path="projects/:id" element={<DepartmentPage permission="projects.view"><DepartmentProjectDetail /></DepartmentPage>} />
                 <Route path="inventory" element={<DepartmentPage permission="inventory.view"><DepartmentResourceWorkspace mode="inventory" /></DepartmentPage>} />

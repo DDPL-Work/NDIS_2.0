@@ -139,7 +139,7 @@ export default function CitizenHome() {
   // Backend data sources
   const { data: departmentsData } = useDepartments()
   const { data: catalog } = useGISCatalog()
-  const { data: facilities, loading } = useFacilities(district.id)
+  const { data: facilities, loading, error: facilitiesError, refetch: refetchFacilities } = useFacilities(district.id)
   const layers = useLeafletLayers(leafletMap)
   const { data: facilityGrievances } = useAsync(
     () => selectedFacility ? GISRepository.complaints({ facility_id: selectedFacility.id }) : Promise.resolve([]),
@@ -376,7 +376,11 @@ export default function CitizenHome() {
 
           <div className="flex items-center justify-between px-4 py-2 border-b border-ink-100 bg-ink-50/50">
             <span className="text-[11.5px] text-ink-500 font-medium">
-              {loading ? 'Searching…' : `${filtered.length} facilities near ${userGps ? 'your GPS' : district.label}`}
+              {loading
+                ? 'Searching…'
+                : facilitiesError
+                  ? 'Facility data unavailable'
+                  : `${filtered.length} facilities near ${userGps ? 'your GPS' : district.label}`}
             </span>
             <Button
               size="sm"
@@ -397,7 +401,16 @@ export default function CitizenHome() {
                   <SkeletonCard />
                 </div>
               ))}
-            {!loading && filtered.length === 0 && (
+            {!loading && facilitiesError && (
+              <div className="p-4">
+                <div className="rounded-xl border border-alert-200 bg-alert-50 p-3.5 text-[12.5px] text-alert-700">
+                  <p className="font-semibold">Facilities could not be loaded from the backend.</p>
+                  <p className="text-[11.5px] text-alert-600 mt-0.5">{facilitiesError.message || 'Please try again.'}</p>
+                  <Button size="sm" variant="outline" className="mt-2.5" onClick={refetchFacilities}>Retry</Button>
+                </div>
+              </div>
+            )}
+            {!loading && !facilitiesError && filtered.length === 0 && (
               <EmptyState
                 icon={Search}
                 title={t('common.noResults')}
@@ -603,7 +616,7 @@ export default function CitizenHome() {
 
       {/* Mobile search results bottom sheet */}
       {mobileResults && (
-        <div className="ndisp-sheet-up fixed inset-x-0 bottom-16 lg:hidden z-[150] max-h-[45dvh] overflow-hidden rounded-t-2xl border-t border-ink-100 bg-white shadow-2xl">
+        <div className="ndisp-sheet-up fixed inset-x-0 bottom-[calc(var(--citizen-bottom-nav-height,64px)+var(--safe-bottom,0px))] lg:hidden z-[150] max-h-[45dvh] overflow-hidden rounded-t-2xl border-t border-ink-100 bg-white shadow-2xl">
           <div className="flex items-center justify-between gap-2 border-b border-ink-100 px-4 py-2.5">
             <span className="text-[12px] font-semibold text-ink-800">
               {mobileResults.length} result{mobileResults.length === 1 ? '' : 's'} for “{gisResults.query}”
@@ -645,7 +658,7 @@ export default function CitizenHome() {
             role="dialog"
             aria-modal="true"
             aria-label="GIS Layers"
-            className="ndisp-sheet-up fixed inset-x-0 bottom-16 z-[150] flex max-h-[75dvh] flex-col overflow-hidden rounded-t-2xl border-t border-ink-100 bg-white shadow-2xl"
+            className="ndisp-sheet-up fixed inset-x-0 bottom-[calc(var(--citizen-bottom-nav-height,64px)+var(--safe-bottom,0px))] z-[150] flex max-h-[75dvh] flex-col overflow-hidden rounded-t-2xl border-t border-ink-100 bg-white shadow-2xl"
           >
             <div className="flex shrink-0 justify-center pt-2.5 pb-1">
               <span className="h-1 w-10 rounded-full bg-ink-200" />

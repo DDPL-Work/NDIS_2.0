@@ -68,7 +68,7 @@ export default function CitizenFacilitySheet({ facility, deptMap = {}, walkMin, 
     <div
       role="dialog"
       aria-label={facility.name}
-      className="ndisp-sheet-responsive fixed inset-x-0 bottom-16 lg:bottom-auto lg:inset-y-0 lg:right-0 z-[150] flex max-h-[70dvh] lg:max-h-none flex-col overflow-hidden rounded-t-2xl lg:rounded-none border-t lg:border-l border-ink-100 bg-white shadow-2xl lg:w-[380px]"
+      className="ndisp-sheet-responsive fixed inset-x-0 bottom-[calc(var(--citizen-bottom-nav-height,64px)+var(--safe-bottom,0px))] lg:bottom-auto lg:inset-y-0 lg:right-0 z-[150] flex max-h-[70dvh] lg:max-h-none flex-col overflow-hidden rounded-t-2xl lg:rounded-none border-t lg:border-l border-ink-100 bg-white shadow-2xl lg:w-[380px]"
     >
       <div className="flex items-start justify-between gap-2 border-b border-ink-100 px-4 py-3">
         <div className="min-w-0">

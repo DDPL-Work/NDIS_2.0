@@ -14,6 +14,7 @@ import { ComplaintRepository } from '../../gis/repositories/ComplaintRepository'
 import { DepartmentRepository } from '../../gis/repositories/DepartmentRepository'
 import { DEPARTMENT_MAP, COMPLAINT_STATE_LABELS, PRIORITY_CONFIG } from '../../config/constants'
 import { formatDate, formatDateTime } from '../../utils/format'
+import EvidenceVerificationDetails from '../../components/gis/EvidenceVerificationDetails'
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
@@ -100,11 +101,11 @@ export default function ComplaintDetailHub({ complaintId, onClose }) {
   }, [complaintId, refreshComplaint])
 
   if (detailRequest.loading) {
-    return <div className="card p-6 text-sm text-ink-500">Loading complaint details from the backend…</div>
+    return <div className="card m-4 sm:m-6 p-6 text-sm text-ink-500">Loading complaint details from the backend…</div>
   }
   if (detailRequest.error || !complaint) {
     return (
-      <div className="card p-6 text-sm text-alert-700 flex justify-between gap-3">
+      <div className="card m-4 sm:m-6 p-6 text-sm text-alert-700 flex justify-between gap-3">
         <span>{detailRequest.error?.message || 'Complaint not found.'}</span>
         <Button size="sm" variant="outline" icon={RefreshCw} onClick={detailRequest.refetch}>Retry</Button>
       </div>
@@ -154,7 +155,7 @@ export default function ComplaintDetailHub({ complaintId, onClose }) {
   const actionLabel = (key) => ({ assign: 'Assign', accept: 'Accept', inspection: 'Start Inspection', resolve: 'Resolve', transfer: 'Transfer', escalate: 'Escalate', reject: 'Reject' }[key])
 
   return (
-    <div className="card shadow-popover bg-white border border-ink-200 rounded-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="card shadow-popover bg-white border border-ink-200 rounded-2xl overflow-hidden flex flex-col h-full max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh]">
       {/* Header Bar */}
       <div className="p-4 border-b border-ink-100 bg-ink-950 text-white flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3 min-w-0">
@@ -193,8 +194,10 @@ export default function ComplaintDetailHub({ complaintId, onClose }) {
         ))}
       </div>
 
-      {/* Main Tab Contents */}
-      <div className="p-5 overflow-y-auto flex-1 space-y-4">
+      {/* Main Tab Contents — the ONLY scroll region of the hub; header, tabs
+          and the role action bar stay pinned. Safe-area padding keeps the last
+          row reachable above the device home indicator. */}
+      <div className="p-4 sm:p-5 overflow-y-auto flex-1 min-h-0 space-y-4 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))]">
         {/* TAB 1: OVERVIEW */}
         {activeTab === 'overview' && (
           <div className="space-y-4 animate-fade-in">
@@ -427,6 +430,7 @@ export default function ComplaintDetailHub({ complaintId, onClose }) {
                       <span>{evidence.uploadedByName ? `Uploaded by ${evidence.uploadedByName}` : 'Uploaded'}</span>
                       {evidence.createdAt && <span className="font-mono">{formatDate(evidence.createdAt)}</span>}
                     </div>
+                    <EvidenceVerificationDetails evidence={evidence} submittedPin={complaint.location?.position} />
                   </div>
                 ))}
               </div>
@@ -482,7 +486,7 @@ export default function ComplaintDetailHub({ complaintId, onClose }) {
       {/* Role Action Bar — every action posts to the backend and then refreshes
           the detail modal, the queue list and the dashboard counters. */}
       {(isHead || isOfficer) && (
-        <div className="p-4 border-t border-ink-100 bg-ink-50/80 flex flex-wrap items-center justify-between gap-2 shrink-0">
+        <div className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] border-t border-ink-100 bg-ink-50/80 flex flex-wrap items-center justify-between gap-2 shrink-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-[11.5px] font-semibold text-ink-700">{isHead ? 'Department Head Actions:' : 'Officer Actions:'}</span>
 

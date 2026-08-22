@@ -1,8 +1,10 @@
 // Facility Detail — Sector Telemetry Cards & Schema Attribute Viewer (Vol 3 Ch 16).
 import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useState } from 'react'
 import {
   ArrowLeft, MapPin, Phone, Clock, ShieldCheck, AlertTriangle, Navigation2,
   HeartPulse, Droplets, GraduationCap, Landmark, Sun, Building2,
+  MessageSquare,
 } from 'lucide-react'
 import { useFacilityDetail } from '../../hooks/useFacilityDetail'
 import { Card, CardBody, CardHeader } from '../../components/ui/Card'
@@ -14,6 +16,7 @@ import Icon from '../../components/ui/Icon'
 import { DEPARTMENT_MAP } from '../../config/constants'
 import { formatCoord } from '../../utils/geo'
 import { formatDate, formatNumber, titleCase } from '../../utils/format'
+import CitizenFeedbackModal from './CitizenFeedbackModal'
 
 function TelemetryCard({ departmentId, attributes }) {
   if (!attributes) return null
@@ -210,6 +213,7 @@ export default function FacilityDetail() {
   const { slug } = useParams()
   const navigate = useNavigate()
   const { data: facility, loading, error, refetch } = useFacilityDetail(slug)
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
 
   if (loading) return <div className="p-6 text-[13px] text-ink-400">Loading facility…</div>
   if (error) {
@@ -233,7 +237,7 @@ export default function FacilityDetail() {
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-5">
+    <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-5">
       <button
         onClick={() => navigate(-1)}
         className="flex items-center gap-1.5 text-[12.5px] font-medium text-ink-500 hover:text-ink-800"
@@ -315,14 +319,15 @@ export default function FacilityDetail() {
             </CardBody>
           </Card>
 
-          <div className="flex gap-2.5">
-            <Button variant="saffron" icon={AlertTriangle} onClick={() => navigate(`/citizen/report/${facility.id}`)}>
-              Report an issue
+          <div className="flex flex-wrap gap-2.5">
+            <Button icon={MessageSquare} className="flex-1 min-w-[150px]" onClick={() => setFeedbackOpen(true)}>
+              Give Feedback
             </Button>
-            <Button variant="outline" as={Link} to="/citizen/grievance/track">
-              Track a grievance
+            <Button variant="outline" icon={AlertTriangle} className="flex-1 min-w-[150px]" onClick={() => navigate(`/citizen/report/${facility.id}`)}>
+              Report an Issue
             </Button>
           </div>
+          <Link to="/citizen/grievance/track" className="inline-flex text-[12px] font-medium text-ink-500 underline-offset-2 hover:text-ink-800 hover:underline">Track a grievance</Link>
         </div>
 
         {/* Right column map & gap ring */}
@@ -345,6 +350,7 @@ export default function FacilityDetail() {
           </Card>
         </div>
       </div>
+      <CitizenFeedbackModal facility={facility} open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
     </div>
   )
 }
