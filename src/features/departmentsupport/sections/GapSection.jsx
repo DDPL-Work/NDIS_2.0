@@ -73,11 +73,11 @@ export default function GapSection({ plan, loadedAt }) {
         {gaps.length === 0 && <p className="text-[12.5px] text-ink-500">No gap dimensions configured for this department.</p>}
 
         <div className="mt-3 pt-3 border-t border-ink-100">
-          <Provenance
+          {/* <Provenance
             source="GET /api/facilities/ · GET /api/gis/layers/ (population, roads) · department telemetry endpoints"
             definition="Coverage = census blocks within the configured service distance. Accessibility = census block distance to nearest road (Good ≤1 km, Moderate ≤3 km, Poor >3 km). Indicator dimensions report real attribute presence or their required endpoint."
             updatedAt={loadedAt ? formatDateTime(loadedAt) : undefined}
-          />
+          /> */}
         </div>
       </CardBody>
     </Card>

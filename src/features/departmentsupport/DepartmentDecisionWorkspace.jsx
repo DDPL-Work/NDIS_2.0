@@ -4,13 +4,15 @@
 // priority is computed.  Adding a department never adds a component.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { LayoutDashboard, Map, Target, BarChart3, Boxes, MessageSquare, FolderKanban, ListChecks, Lock, RefreshCw } from 'lucide-react'
+import { LayoutDashboard, Map, Target, BarChart3, Boxes, MessageSquare, FolderKanban, ListChecks, Lock, RefreshCw, Database } from 'lucide-react'
 import { useAuthStore } from '../../app/store/authStore'
 import { useComplaintEngine } from '../../app/store/complaintEngine'
 import { useProjectEngine } from '../../app/store/projectEngine'
 import { getDepartmentConfig, canAccessDepartment, accessibleDepartmentConfigs } from './departmentConfigs'
 import { buildRenderPlan } from './departmentModel'
+import { mergeBackendIndicators } from '../../api/indicatorApi'
 import { loadDepartmentData } from '../../api/departmentSupportApi'
+import { useDepartmentIndicators } from '../../hooks/useDepartmentIndicators'
 import PageHeader from '../../components/ui/PageHeader'
 import Tabs from '../../components/ui/Tabs'
 import Button from '../../components/ui/Button'
@@ -50,6 +52,9 @@ export default function DepartmentDecisionWorkspace({ departmentId, adminView = 
   const workOrders = useProjectEngine((s) => s.workOrders)
   const maintenanceTasks = useProjectEngine((s) => s.maintenanceTasks)
 
+  // Backend indicator data — each dept calls ONLY its own API
+  const backendIndicators = useDepartmentIndicators(departmentId)
+
   const [state, setState] = useState({ plan: null, loadedAt: null, loading: true, error: null })
   const [activeTab, setActiveTab] = useState(config.sections?.[0] || 'situation')
   const [selectedEntity, setSelectedEntity] = useState(null)
@@ -75,6 +80,20 @@ export default function DepartmentDecisionWorkspace({ departmentId, adminView = 
       setState({ plan: null, loadedAt: null, loading: false, error: error?.message || 'Failed to load department data' })
     }
   }, [config])
+
+  // Merge backend indicators into the plan when they arrive (separate from data load)
+  useEffect(() => {
+    if (!state.plan) return
+    if (backendIndicators.status === 'loaded' || backendIndicators.status === 'empty') {
+      setState((s) => {
+        if (!s.plan) return s
+        const updated = { ...s.plan }
+        updated.kpis = mergeBackendIndicators(updated.kpis, backendIndicators)
+        updated.backendIndicators = backendIndicators
+        return { ...s, plan: updated }
+      })
+    }
+  }, [backendIndicators.status, backendIndicators.groups])
 
   useEffect(() => { load() }, [load])
   useEffect(() => { setActiveTab(config.sections?.[0] || 'situation') }, [config])
@@ -138,6 +157,33 @@ export default function DepartmentDecisionWorkspace({ departmentId, adminView = 
       {state.error && (
         <div className="rounded-lg border border-alert-200 bg-alert-50 p-4 text-[13px] text-alert-700">
           Failed to load department data: {state.error}. The workspace renders from the real backend — retry or check the backend.
+        </div>
+      )}
+
+      {/* Backend indicator status banner */}
+      {backendIndicators.loading && (
+        <div className="flex items-center gap-2 rounded-xl border border-sky-200 bg-sky-50/70 px-4 py-2.5 text-[12.5px] text-sky-800">
+          <span className="h-3 w-3 animate-spin rounded-full border-2 border-sky-300 border-t-sky-700" />
+          Loading backend indicators from {backendIndicators.source || 'department API'}…
+        </div>
+      )}
+      {!backendIndicators.loading && backendIndicators.status === 'loaded' && (
+        <div className="flex items-center gap-2 rounded-xl border border-leaf-200 bg-leaf-50/70 px-4 py-2.5 text-[12.5px] text-leaf-800">
+          <Database size={14} className="shrink-0" />
+          Backend indicators loaded from <strong>{backendIndicators.source}</strong> — {backendIndicators.groups.filter((g) => g.status === 'loaded').length} of {backendIndicators.groups.length} endpoints returned data.
+          {backendIndicators.updatedAt && <span className="text-leaf-600 ml-1">Updated {new Date(backendIndicators.updatedAt).toLocaleTimeString()}</span>}
+        </div>
+      )}
+      {!backendIndicators.loading && backendIndicators.status === 'empty' && (
+        <div className="flex items-center gap-2 rounded-xl border border-saffron-200 bg-saffron-50/70 px-4 py-2.5 text-[12.5px] text-saffron-800">
+          <Database size={14} className="shrink-0" />
+          Backend indicator APIs returned no data for this department ({backendIndicators.source || 'not configured'}). KPIs derived from entity attributes are shown; backend-specific indicators show "No data available".
+        </div>
+      )}
+      {!backendIndicators.loading && backendIndicators.status === 'error' && (
+        <div className="flex items-center gap-2 rounded-xl border border-alert-200 bg-alert-50/70 px-4 py-2.5 text-[12.5px] text-alert-800">
+          <Database size={14} className="shrink-0" />
+          Backend indicator fetch failed: {backendIndicators.error}. Workspace continues with entity-derived data only.
         </div>
       )}
 

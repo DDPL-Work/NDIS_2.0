@@ -56,14 +56,14 @@ export const DASHBOARD_CONFIG = {
     scope: 'state',
     sections: ['kpis', 'situationMap', 'priorityAreas', 'health', 'signals', 'pipeline', 'actions'],
   },
-  system_administrator: {
+  system_admin: {
     title: 'System Administration Overview',
     scope: 'state',
     sections: ['kpis', 'actions'],
   },
 }
 
-export const DEPARTMENT_ROLES = ['department_head', 'department_officer', 'supervisor', 'engineer', 'field_inspector']
+export const DEPARTMENT_ROLES = ['dept_head', 'dept_officer', 'supervisor', 'engineer', 'field_inspector']
 
 export function dashboardConfigForRole(role = '') {
   const normalized = String(role || '').toLowerCase()

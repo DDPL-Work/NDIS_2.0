@@ -1,4 +1,4 @@
-import { apiRequest } from '../services/httpClient'
+import { apiRequest } from './apiClient'
 import { mapFacilityList } from './mappers/facilityMapper'
 import { createFacilityCache } from './facilityCacheCore'
 

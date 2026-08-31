@@ -55,7 +55,7 @@ export default function PersonnelTab({ officers, fieldStaff }) {
             <CardBody className="!p-2">
               <div className="h-[clamp(200px,28vh,288px)] rounded-xl overflow-hidden relative">
                 <MapView
-                  center={[85.4211, 25.0294]}
+                  center={mapPoints.length > 0 ? mapPoints[0].position : undefined}
                   zoom={12}
                   facilities={mapPoints}
                   className="h-full"

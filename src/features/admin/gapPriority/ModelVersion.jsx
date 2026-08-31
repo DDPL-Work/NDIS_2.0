@@ -7,7 +7,7 @@ export function ModelVersion({ metadata }) {
     return (
       <div className="rounded-xl border border-ink-100 bg-ink-50/50 p-4 text-center">
         <AlertTriangle className="mx-auto text-ink-300 mb-2" size={24} />
-        <p className="text-[12px] text-ink-500">Model metadata unavailable.</p>
+        <p className="text-[12px] text-ink-500">Model metadata unavailable</p>
         <p className="text-[10.5px] text-ink-400 mt-1">The backend did not return model version information.</p>
       </div>
     )
@@ -57,56 +57,39 @@ export function ModelVersion({ metadata }) {
           </div>
         </details>
       )}
-
-      {metadata.assumptions && metadata.assumptions.length > 0 && (
-        <details className="mt-4">
-          <summary className="flex items-center gap-1.5 text-[10.5px] text-ink-500 cursor-pointer">
-            <Info size={12} /> Key assumptions
-          </summary>
-          <ul className="mt-2 space-y-1 text-[10.5px] text-ink-600">
-            {metadata.assumptions.map((a, i) => (
-              <li key={i} className="flex items-start gap-1.5">
-                <span className="text-ink-300 mt-0.5">•</span>
-                <span>{a}</span>
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
     </div>
   )
 }
 
 // WeightsDisplay — renders dimension weights from backend (never invented by frontend)
-export function WeightsDisplay({ weights, onWeightChange }) {
+export function WeightsDisplay({ weights }) {
   if (!weights || Object.keys(weights).length === 0) {
     return (
       <div className="rounded-xl border border-ink-100 bg-ink-50/50 p-6 text-center">
         <Weight className="mx-auto text-ink-300 mb-2" size={28} />
-        <p className="text-[12px] text-ink-500">Dimension weights not provided.</p>
-        <p className="text-[10.5px] text-ink-400 mt-1">The backend did not return weight configuration. Frontend never invents weights.</p>
+        <p className="text-[12px] text-ink-500">Dimension weights not provided</p>
+        <p className="text-[10.5px] text-ink-400 mt-1">The backend did not return weight configuration.</p>
       </div>
     )
   }
 
   const DIMENSION_META = {
-    demand: { label: 'Demand Gap', icon: '👥' },
-    capacity: { label: 'Capacity Gap', icon: '🏗️' },
-    accessibility: { label: 'Accessibility Gap', icon: '🛣️' },
-    infrastructure: { label: 'Infrastructure Gap', icon: '🏢' },
-    hr: { label: 'HR Gap', icon: '👨‍⚕️' },
-    medicine: { label: 'Medicine Gap', icon: '💊' },
-    coverage: { label: 'Coverage Gap', icon: '📍' },
-    citizen_feedback: { label: 'Citizen Feedback Gap', icon: '📝' },
+    demand_gap: { label: 'Demand Gap', icon: '👥' },
+    capacity_gap: { label: 'Capacity Gap', icon: '🏗️' },
+    accessibility_gap: { label: 'Accessibility Gap', icon: '🛣️' },
+    infrastructure_gap: { label: 'Infrastructure Gap', icon: '🏢' },
+    hr_gap: { label: 'HR Gap', icon: '👨‍⚕️' },
+    medicine_gap: { label: 'Medicine Gap', icon: '💊' },
+    coverage_gap: { label: 'Coverage Gap', icon: '📍' },
+    citizen_feedback_gap: { label: 'Citizen Feedback Gap', icon: '📝' },
   }
 
   const entries = Object.entries(weights).map(([key, weight]) => ({
     key,
     weight: Number(weight),
-    meta: DIMENSION_META[key] || { label: key, icon: '' },
+    meta: DIMENSION_META[key] || { label: key.replace(/_/g, ' '), icon: '' },
   }))
 
-  // Sort by weight descending
   entries.sort((a, b) => b.weight - a.weight)
 
   return (
@@ -135,7 +118,6 @@ export function WeightsDisplay({ weights, onWeightChange }) {
           </div>
         ))}
 
-        {/* Sum validation */}
         <div className="mt-3 pt-3 border-t border-ink-100 flex items-center justify-between text-[10.5px]">
           <span className="text-ink-500">Sum of weights</span>
           <span className={`font-mono font-semibold ${Math.abs(entries.reduce((s, e) => s + e.weight, 0) - 1) < 0.001 ? 'text-sky-700' : 'text-alert-600'}`}>
@@ -143,29 +125,6 @@ export function WeightsDisplay({ weights, onWeightChange }) {
           </span>
         </div>
       </div>
-
-      {onWeightChange && (
-        <div className="mt-4 pt-4 border-t border-ink-100">
-          <p className="text-[10.5px] text-ink-500 mb-2">Adjust weights (for scenario modelling only — does not persist):</p>
-          <div className="space-y-2">
-            {entries.map(({ key, weight, meta }) => (
-              <div key={key} className="flex items-center gap-2">
-                <span className="w-24 text-[11px] text-ink-600 truncate">{meta.label}</span>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value={weight}
-                  onChange={(e) => onWeightChange(key, Number(e.target.value))}
-                  className="flex-1 h-1.5 appearance-none bg-ink-100 rounded-full accent-sky-500"
-                />
-                <span className="w-12 text-right font-mono text-[11px] text-sky-700">{(weight * 100).toFixed(1)}%</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   )
 }

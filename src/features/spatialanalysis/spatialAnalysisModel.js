@@ -182,6 +182,10 @@ export function validateQuery(query = {}) {
     const point = reference.point
     if (!Array.isArray(point) || point.length < 2 || !point.every(Number.isFinite)) {
       errors.push({ field: 'spatial.reference', message: 'The reference point is invalid — pick it on the map or enter valid coordinates.' })
+    } else {
+      const [lng, lat] = point
+      if (lat < -90 || lat > 90) errors.push({ field: 'spatial.reference', message: 'Latitude must be between -90 and 90 degrees.' })
+      if (lng < -180 || lng > 180) errors.push({ field: 'spatial.reference', message: 'Longitude must be between -180 and 180 degrees.' })
     }
   } else if (!reference?.id) {
     errors.push({ field: 'spatial.reference', message: 'Select a reference layer or geometry for the spatial condition.' })

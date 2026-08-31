@@ -1,4 +1,4 @@
-import { apiRequest } from './apiClient'
+import { apiRequest, withQuery, normalizeRows } from './apiClient'
 import { mapComplaint } from './mappers/complaintMapper'
 import { DEPARTMENTS } from '../config/constants'
 
@@ -30,7 +30,6 @@ const colorFor = (id, name = '') => {
   let hash = 0; for (const char of String(id)) hash = ((hash << 5) - hash) + char.charCodeAt(0)
   return `hsl(${FALLBACK_HUES[Math.abs(hash) % FALLBACK_HUES.length]} 58% 42%)`
 }
-const rows = (response) => Array.isArray(response) ? response : response.users || response.results || response.data || []
 export const mapDepartment = (dto = {}) => ({ id: String(dto.id), name: dto.name, description: dto.description || '', color: colorFor(dto.id, dto.name), raw: dto })
 export const mapDepartmentUser = (dto = {}) => {
   const user = typeof dto.user === 'object' ? dto.user : {}
@@ -49,12 +48,6 @@ export const mapDepartmentUser = (dto = {}) => {
     raw: dto,
   }
 }
-const toQuery = (params) => {
-  const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value != null && value !== '')).toString()
-  return query ? `?${query}` : ''
-}
-// GET /api/department/{id}/complain/ (backend_guide2.0.md §5.5) — department
-// complaint rollup: totals, per-status summary, SLA breach count and the rows.
 export const mapDepartmentComplaintRollup = (dto = {}) => ({
   departmentId: String(dto.department_id ?? dto.id ?? ''),
   departmentName: dto.department_name || '',
@@ -65,10 +58,10 @@ export const mapDepartmentComplaintRollup = (dto = {}) => ({
   raw: dto,
 })
 export const backendDepartmentApi = {
-  list: async (params = {}) => rows(await apiRequest(`/departments/${toQuery(params)}`)).map(mapDepartment),
+  list: async (params = {}) => normalizeRows(await apiRequest(withQuery('/departments/', params))).map(mapDepartment),
   // Department roster used by the assign / start-inspection pickers.
   // The backend exposes the department-scoped user list at
   // /api/department/{id}/users/ (id = department primary key).
-  users: async (departmentId, params = {}) => rows(await apiRequest(`/department/${departmentId}/users/${toQuery(params)}`)).map(mapDepartmentUser),
+  users: async (departmentId, params = {}) => normalizeRows(await apiRequest(withQuery(`/department/${departmentId}/users/`, params))).map(mapDepartmentUser),
   complaints: async (departmentId) => mapDepartmentComplaintRollup(await apiRequest(`/department/${departmentId}/complain/`)),
 }

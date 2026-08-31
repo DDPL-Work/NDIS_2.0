@@ -311,7 +311,7 @@ export const useStateFinanceStore = create((set, get) => ({
   // the local journal current for screens until the next hydration.
   postLedger({ type, fy = get().fy, amount, sign = -1, balanceAfter = 0, referenceType, referenceNo, actor = {}, remarks = '', departmentId = null, districtId = null, schemeId = null, budgetHeadId = null, projectId = null }) {
     const entry = {
-      id: `LEDGER-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+      id: `LEDGER-${Date.now().toString(36)}-${String(get().ledger.length + 1).padStart(4, '0')}`,
       txId: `TX-${fy.replace('/', '')}-${String(get().ledger.length + 1).padStart(6, '0')}`,
       type, typeLabel: LEDGER_TYPE_LABELS[type] || type,
       fy, departmentId, districtId, schemeId, budgetHeadId, projectId,

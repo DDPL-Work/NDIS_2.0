@@ -110,7 +110,7 @@ export default function DecisionDashboard() {
   const primaryError = [sources.dashboard, sources.proposals, sources.facilities, sources.projectSummary].find((s) => s.status === 'error')
 
   return (
-    <div className="min-h-full p-3 sm:p-6 space-y-5">
+    <div className="p-3 sm:p-6 space-y-5 pb-4">
       <PageHeader
         eyebrow={`Admin Portal · ${String(role).toUpperCase()}`}
         title={config.title}
@@ -187,7 +187,7 @@ export default function DecisionDashboard() {
         )}
 
         {(hasSection('budget') || hasSection('actions')) && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
             {hasSection('budget') && (
               <div className="lg:col-span-1">
                 <BudgetCard budget={budget} status={sources.budget.status} error={sources.budget.error} onRetry={refetch} loadedAt={sources.budget.loadedAt} />
@@ -198,7 +198,8 @@ export default function DecisionDashboard() {
                 <ActionQueue actions={derived.actions} onAction={handleAction} loadedAt={sources.dashboard.loadedAt} />
               </div>
             )}
-          </div>
+            
+                      </div>
         )}
       </div>
 

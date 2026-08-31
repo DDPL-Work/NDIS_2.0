@@ -1,14 +1,5 @@
-import { apiRequest } from './apiClient'
+import { apiRequest, withQuery, normalizeRows } from './apiClient'
 import { invalidateData, DATA_SCOPES } from '../app/store/dataVersionStore'
-
-const rows = (value) => (Array.isArray(value) ? value : value?.results || value?.data || [])
-
-const query = (params = {}) => {
-  const value = new URLSearchParams(Object.entries(params)
-    .filter(([, item]) => item !== undefined && item !== null && item !== '')
-    .map(([key, item]) => [key, String(item)]))
-  return value.toString() ? `?${value}` : ''
-}
 
 const mapUser = (dto = {}) => ({
   id: dto.id,
@@ -39,7 +30,7 @@ const touched = () => invalidateData(DATA_SCOPES.EMPLOYEES)
 // User administration (GET/POST/PATCH/DELETE /api/users/) — used by the state
 // administration user registry.  Role fields stay backend-authoritative.
 export const backendUserApi = {
-  async list(params = {}) { return rows(await apiRequest(`/users/${query(params)}`)).map(mapUser) },
+  async list(params = {}) { return normalizeRows(await apiRequest(withQuery('/users/', params))).map(mapUser) },
   async get(id) { return mapUser(await apiRequest(`/users/${id}/`)) },
   async create(payload) { const user = mapUser(await apiRequest('/users/', { method: 'POST', body: payload })); touched(); return user },
   async update(id, payload) { const user = mapUser(await apiRequest(`/users/${id}/`, { method: 'PATCH', body: payload })); touched(); return user },

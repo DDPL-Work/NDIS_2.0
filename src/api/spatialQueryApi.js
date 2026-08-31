@@ -1,4 +1,4 @@
-import { apiRequest } from './apiClient'
+import { apiRequest, buildQueryString } from './apiClient'
 import { mapSpatialQueryResponse } from './mappers/spatialQueryMapper'
 
 // Smart Natural Language & Excel Spatial Query Engine (backend_next_guide §10).
@@ -22,14 +22,14 @@ export const backendSpatialQueryApi = {
     const cached = cache.get(key)
     if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.data
 
-    const params = new URLSearchParams()
-    params.set('q', q)
-    if (lat != null && Number.isFinite(Number(lat))) params.set('lat', String(lat))
-    if (lng != null && Number.isFinite(Number(lng))) params.set('lng', String(lng))
-    params.set('radius', String(radius ?? 10))
-    params.set('limit', String(limit ?? 10))
+    const params = {}
+    params.q = q
+    if (lat != null && Number.isFinite(Number(lat))) params.lat = String(lat)
+    if (lng != null && Number.isFinite(Number(lng))) params.lng = String(lng)
+    params.radius = String(radius ?? 10)
+    params.limit = String(limit ?? 10)
 
-    const response = await apiRequest(`/spatial-query/?${params.toString()}`, { authenticated: false, timeout: 30000 })
+    const response = await apiRequest(`/spatial-query/?${buildQueryString(params)}`, { authenticated: false, timeout: 30000 })
     const data = mapSpatialQueryResponse(response || {})
     cache.set(key, { at: Date.now(), data })
     return data

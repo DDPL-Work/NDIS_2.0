@@ -4,6 +4,7 @@ import { ComplaintService } from '../../gis/services/ComplaintService'
 import { backendNotificationApi } from '../../api/notificationApi'
 import { useAuthStore } from './authStore'
 import { useUiStore } from './uiStore'
+import { ROLES } from '../../config/constants'
 
 // Flatten complaint timelines (mapped entries) into the legacy audit-log
 // shape consumed by the Timeline / Audit Trail tabs and Governance tab.
@@ -124,7 +125,7 @@ export const useComplaintEngine = create((set, get) => ({
 
   async submitCitizenVerification(complaintId, actorUser, feedback) {
     const complaint = get().complaints.find((item) => String(item.id) === String(complaintId))
-    if (!complaint || !['verification_pending', 'resolved'].includes(complaint.state) || actorUser?.role !== 'citizen') return false
+    if (!complaint || !['verification_pending', 'resolved'].includes(complaint.state) || actorUser?.role !== ROLES.CITIZEN) return false
     try {
       if (feedback.satisfied) {
         await ComplaintService.submitCitizenFeedback(complaintId, {
@@ -168,7 +169,7 @@ export const useComplaintEngine = create((set, get) => ({
   async escalateCitizenComplaint(complaintId, actorUser, reason) {
     const complaint = get().complaints.find((item) => String(item.id) === String(complaintId))
     const allowed = complaint && (new Date(complaint.slaDueAt) < new Date() || ['verification_pending', 'resolved', 'reopened'].includes(complaint.state))
-    if (!allowed || actorUser?.role !== 'citizen' || !reason) return false
+    if (!allowed || actorUser?.role !== ROLES.CITIZEN || !reason) return false
     try {
       await ComplaintService.escalate(complaintId, reason)
       await get().ingestComplaint(complaintId)

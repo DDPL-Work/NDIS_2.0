@@ -1,5 +1,21 @@
-// Compatibility façade for legacy views.  It only delegates to repository/API
-// modules; deliberately no local collections, seeded records, or fake latency.
+// COMPATIBILITY FAÇADE — DEPRECATED
+// ============================================================
+// This module is a legacy compatibility layer for older views.
+// NEW CODE SHOULD IMPORT DIRECTLY FROM src/api/* modules.
+// 
+// Migration status:
+// - masterDataApi          → Use backendMasterApi from '../api/masterApi'
+// - gisApi                 → Use backendGisApi from '../api/gisApi'
+// - workflowApi            → Use backendComplaintApi from '../api/complaintApi'
+// - analyticsApi           → Use backendDashboardApi from '../api/dashboardApi'
+// - schemeApi              → Use backendBudgetApi.schemes from '../api/budgetApi'
+// - notificationApi        → Use backendNotificationApi from '../api/notificationApi'
+// - directoryApi           → Use backendUserApi / backendEmployeeApi from '../api/userApi', '../api/employeeApi'
+// - indicatorApi           → Use backend*IndicatorsApi from '../api/indicatorApi'
+// - ingestionApi           → Backend capability not available (unsupported)
+//
+// Do not add new exports here. Migrate consumers incrementally.
+// ============================================================
 import { backendGisApi } from '../api/gisApi'
 import { backendNotificationApi } from '../api/notificationApi'
 import { backendDashboardApi } from '../api/dashboardApi'
@@ -9,6 +25,7 @@ import { backendBudgetApi } from '../api/budgetApi'
 import { backendUserApi } from '../api/userApi'
 import { ComplaintRepository } from '../gis/repositories/ComplaintRepository'
 import { unsupported } from '../api/apiClient'
+import { backendIndicatorApis } from '../api/indicatorApi'
 
 export const masterDataApi = {
   listDistricts: () => unsupported('district master data'),
@@ -83,4 +100,12 @@ export const directoryApi = {
   getEmployee: (id) => backendEmployeeApi.get(id),
   inviteEmployee: (payload) => backendEmployeeApi.invite(payload),
   listFieldEngineers: (params) => backendEmployeeApi.list({ ...params, role: 'FIELD_INSPECTOR' }),
+}
+
+export const indicatorApi = {
+  education: backendIndicatorApis.education,
+  health: backendIndicatorApis.health,
+  water: backendIndicatorApis.water,
+  pwd: backendIndicatorApis.pwd,
+  urban: backendIndicatorApis.urban,
 }

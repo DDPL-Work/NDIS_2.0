@@ -1,9 +1,9 @@
-import { apiRequest } from '../services/httpClient'
+import { apiRequest, withQuery } from './apiClient'
 import { mapFacility } from './mappers/facilityMapper'
 import { registerReferenceCatalog } from './mappers/complaintMapper'
 import { mapGeoJson, mapGisCatalog, mapGisLayer, mapSpatialFeature, mapSpatialFeatureList } from './mappers/gisMapper'
 import { cachedFacilities } from './facilityCache'
-const query = (params = {}) => { const value = new URLSearchParams(Object.entries(params).filter(([, item]) => item !== undefined && item !== null && item !== '').map(([key, item]) => [key, String(item)])); return value.toString() ? `?${value}` : '' }
+
 export const backendGisApi = {
   async facilities(params) {
     // The production collection (~8.3k rows, ~43 MB) exceeds the default 15s
@@ -39,13 +39,34 @@ export const backendGisApi = {
   async catalog() { return mapGisCatalog(await apiRequest('/gis/catalog/', { authenticated: false })) },
   async layer(name) { return mapGeoJson(await apiRequest(`/gis/layers/${encodeURIComponent(name)}/`, { authenticated: false })) },
   async uploadLayer({ file, layerName, category } = {}) { const body = new FormData(); body.append('file', file); if (layerName) body.append('layer_name', layerName); if (category) body.append('category', category); return apiRequest('/gis/upload-layer/', { method: 'POST', body }) },
-  async catalogEntries(params = {}) { const response = await apiRequest(`/gis/catalog-crud/${query(params)}`); const entries = Array.isArray(response) ? response : response.results || response.data || []; return entries.map(mapGisLayer) },
+  async catalogEntries(params = {}) { const response = await apiRequest(withQuery('/gis/catalog-crud/', params)); const entries = Array.isArray(response) ? response : response.results || response.data || []; return entries.map(mapGisLayer) },
   async createCatalogEntry(payload) { return mapGisLayer(await apiRequest('/gis/catalog-crud/', { method: 'POST', body: payload })) },
   async updateCatalogEntry(id, payload) { return mapGisLayer(await apiRequest(`/gis/catalog-crud/${id}/`, { method: 'PATCH', body: payload })) },
   async removeCatalogEntry(id) { return apiRequest(`/gis/catalog-crud/${id}/`, { method: 'DELETE' }) },
-  async features(params = {}) { return mapSpatialFeatureList(await apiRequest(`/gis/features/${query(params)}`)) },
+  async features(params = {}) { return mapSpatialFeatureList(await apiRequest(withQuery('/gis/features/', params))) },
   async createFeature(payload) { return mapSpatialFeature(await apiRequest('/gis/features/', { method: 'POST', body: payload })) },
   async updateFeature(id, payload) { return mapSpatialFeature(await apiRequest(`/gis/features/${id}/`, { method: 'PATCH', body: payload })) },
   async removeFeature(id) { return apiRequest(`/gis/features/${id}/`, { method: 'DELETE' }) },
-  async facilitiesGeojson(params = {}) { return mapGeoJson(await apiRequest(`/facilities/geojson/${query(params)}`, { authenticated: false, timeout: 120000 })) },
+  async facilitiesGeojson(params = {}) { return mapGeoJson(await apiRequest(withQuery('/facilities/geojson/', params), { authenticated: false, timeout: 120000 })) },
+
+  async validateCoordinate({ latitude, longitude } = {}) {
+    return apiRequest('/gis/validate-coordinate/', {
+      method: 'POST',
+      body: { latitude: Number(latitude), longitude: Number(longitude) },
+    })
+  },
+
+  async checkDuplicate({ latitude, longitude } = {}) {
+    return apiRequest('/gis/check-duplicate/', {
+      method: 'POST',
+      body: { latitude: Number(latitude), longitude: Number(longitude) },
+    })
+  },
+
+  async verifyGeotag({ latitude, longitude } = {}) {
+    return apiRequest('/evidence/verify-geotag/', {
+      method: 'POST',
+      body: { latitude: Number(latitude), longitude: Number(longitude) },
+    })
+  },
 }

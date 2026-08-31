@@ -1,6 +1,7 @@
 // Demo personas — offline entry for the mock-data build (no backend required).
 // The real production flow remains username/password via the government SSO
 // bound backend; demo access is a developer/showcase convenience only.
+// GATED: Only available when VITE_ENABLE_DEMO=true (development only)
 import { ROLES } from '../../config/constants'
 import { STATE_PERMISSIONS, STATE_ROLE_PERMISSIONS } from '../../config/stateConstants'
 

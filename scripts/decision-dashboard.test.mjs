@@ -205,4 +205,4 @@ check('role-aware dashboard config', () => {
   assert.ok(!DASHBOARD_CONFIG.department_head, 'department roles are NOT admin-dashboard keys — they resolve via the department registry')
 })
 
-console.log(`\n${passed} assertions passed`)
+// console.log(`\n${passed} assertions passed`)

@@ -449,8 +449,20 @@ export function kpiValues({ config = {}, entities = [], coverage = {}, ranked = 
         }
       }
       case 'telemetry':
-      default:
-        return { ...kpi, value: null, status: 'unavailable', displayValue: 'Data not available', detail: kpi.source || 'No backend data contract configured' }
+      default: {
+        // If backend provided a value for this telemetry KPI, show it
+        if (kpi.backendStatus === 'loaded' && kpi.backendValue != null) {
+          return {
+            ...kpi,
+            value: kpi.backendValue,
+            status: 'loaded',
+            displayValue: String(kpi.backendValue),
+            detail: `Backend indicator: ${kpi.backendSource || kpi.source || 'department API'}`,
+            backendUpdatedAt: kpi.backendUpdatedAt,
+          }
+        }
+        return { ...kpi, value: null, status: 'unavailable', displayValue: 'No data available', detail: kpi.source || 'No backend data contract configured' }
+      }
     }
   })
 }

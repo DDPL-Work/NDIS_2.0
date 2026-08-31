@@ -412,11 +412,10 @@ export function computeKpis({ facilities = [], complaints = [], proposals = [], 
 }
 
 // ---------------------------------------------------------------------------
-// Health snapshot (section D) — rendered ONLY when the backend supplies the
-// underlying telemetry.  With the health module in config-only mode there is
-// no telemetry to show, so every metric reports an honest unavailable state.
+// Health snapshot (section D) — rendered when the backend supplies the
+// underlying telemetry OR when indicator endpoints provide data.
 // ---------------------------------------------------------------------------
-export function healthSnapshot(facilities = []) {
+export function healthSnapshot(facilities = [], indicators = { metrics: [] }) {
   const health = facilities.filter((facility) => {
     const category = String(facility.categoryLabel || '').toLowerCase()
     const department = String(facility.departmentName || '').toLowerCase()
@@ -430,6 +429,36 @@ export function healthSnapshot(facilities = []) {
     ? Math.round((telemetry.filter((f) => Number(f.attributes?.staff_count) > 0 && Number(f.attributes?.bed_count) > 0).length / telemetry.length) * 100)
     : null
 
+  // Map backend indicator keys to our metric keys
+  const indicatorMap = {}
+  const backendIndicators = indicators.metrics || []
+  backendIndicators.forEach((ind) => {
+    const key = String(ind.key || ind.id || '').toLowerCase()
+    if (key) indicatorMap[key] = ind
+  })
+
+  const getIndicator = (keys) => {
+    for (const key of keys) {
+      if (indicatorMap[key]) return indicatorMap[key]
+    }
+    return null
+  }
+
+  // HR gaps indicator
+  const hrGaps = getIndicator(['hr_gaps', 'hr_gap', 'staff_gap', 'teacher_vacancy_percentage', 'doctor_vacancy_percentage', 'nurse_vacancy_percentage'], 'HR gaps')
+  
+  // Infrastructure readiness - use facility readiness if no backend indicator
+  const infraReadiness = getIndicator(['infrastructure_readiness', 'readiness', 'facility_readiness'], 'Infrastructure readiness')
+  
+  // Medicine risk
+  const medicineRisk = getIndicator(['medicine_risk', 'medicine_stock', 'stockout', 'medicine_stockout'], 'Medicine supply risk')
+  
+  // Vaccination
+  const vaccination = getIndicator(['vaccination', 'vaccination_coverage', 'immunization'], 'Vaccination coverage')
+  
+  // High risk indicators
+  const highRisk = getIndicator(['high_risk_indicators', 'high_risk', 'risk_score', 'epidemic_risk'], 'High-risk indicators')
+
   return {
     totalHealthFacilities: health.length,
     telemetryFacilities: telemetry.length,
@@ -437,39 +466,37 @@ export function healthSnapshot(facilities = []) {
       {
         key: 'hr_gaps',
         label: 'HR gaps',
-        status: 'unavailable',
-        detail: 'No health staff telemetry endpoint is deployed yet.',
-        source: '—',
+        status: hrGaps ? 'available' : 'unavailable',
+        detail: hrGaps?.value !== undefined ? String(hrGaps.value) : (hrGaps?.detail || 'No health staff telemetry endpoint is deployed yet.'),
+        source: hrGaps ? `GET /api/health/staffing/` : '—',
       },
       {
         key: 'infrastructure_readiness',
         label: 'Infrastructure readiness',
-        status: readiness === null ? 'unavailable' : 'available',
-        detail: readiness === null
-          ? 'No bed/staff counts returned for health facilities.'
-          : `${readiness}% of health facilities report staff + beds available`,
-        source: 'GET /api/facilities/ (attributes)',
+        status: (infraReadiness || readiness !== null) ? 'available' : 'unavailable',
+        detail: infraReadiness?.value !== undefined ? String(infraReadiness.value) : (readiness === null ? 'No bed/staff counts returned for health facilities.' : `${readiness}% of health facilities report staff + beds available`),
+        source: infraReadiness ? `GET /api/health/staffing/` : 'GET /api/facilities/ (attributes)',
       },
       {
         key: 'medicine_risk',
         label: 'Medicine supply risk',
-        status: 'unavailable',
-        detail: 'No medicine stock telemetry endpoint is deployed yet.',
-        source: '—',
+        status: medicineRisk ? 'available' : 'unavailable',
+        detail: medicineRisk?.value !== undefined ? String(medicineRisk.value) : (medicineRisk?.detail || 'No medicine stock telemetry endpoint is deployed yet.'),
+        source: medicineRisk ? `GET /api/health/staffing/` : '—',
       },
       {
         key: 'vaccination',
         label: 'Vaccination coverage',
-        status: 'unavailable',
-        detail: 'No vaccination telemetry endpoint is deployed yet.',
-        source: '—',
+        status: vaccination ? 'available' : 'unavailable',
+        detail: vaccination?.value !== undefined ? String(vaccination.value) : (vaccination?.detail || 'No vaccination telemetry endpoint is deployed yet.'),
+        source: vaccination ? `GET /api/health/staffing/` : '—',
       },
       {
         key: 'high_risk_indicators',
         label: 'High-risk indicators',
-        status: 'unavailable',
-        detail: 'No epidemic / high-risk indicator telemetry endpoint is deployed yet.',
-        source: '—',
+        status: highRisk ? 'available' : 'unavailable',
+        detail: highRisk?.value !== undefined ? String(highRisk.value) : (highRisk?.detail || 'No epidemic / high-risk indicator telemetry endpoint is deployed yet.'),
+        source: highRisk ? `GET /api/health/staffing/` : '—',
       },
     ],
   }

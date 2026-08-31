@@ -61,6 +61,8 @@ const MapView = forwardRef(function MapView({
   route = null,          // { coordinates, origin, destination, mode } | null — exactly two endpoints
   onFacilityRouteTo,     // "Route to here" from a facility marker popup
   routeOriginKey = null, // route key of the current origin (popup "Start point" chip)
+  // Reference point picking
+  pickPoint = null,      // { lat, lng } | null — the picked reference point
 }, ref) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)              // Leaflet map instance
@@ -74,6 +76,7 @@ const MapView = forwardRef(function MapView({
   const locMarkerRef = useRef(null)
   const searchLayerRef = useRef(null)
   const routeLayerRef = useRef(null)
+  const pickPointMarkerRef = useRef(null)
   const [ready, setReady] = useState(false)
   // Live values for the catalog/facility layer closures — reading through refs
   // keeps "Start point"/"Route to here" fresh without recreating any Leaflet
@@ -402,6 +405,23 @@ const MapView = forwardRef(function MapView({
       }).addTo(map)
     }
   }, [radiusCenter, radiusKm, ready])
+
+  // Pick point overlay — shows a marker at the selected reference point
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !ready) return
+    if (pickPointMarkerRef.current) { map.removeLayer(pickPointMarkerRef.current); pickPointMarkerRef.current = null }
+    if (pickPoint && typeof pickPoint.lat === 'number' && typeof pickPoint.lng === 'number') {
+      const el = document.createElement('div')
+      el.style.cssText = 'width:28px;height:28px;border-radius:50%;background:#0b3558;border:3px solid white;box-shadow:0 2px 8px rgba(11,53,88,0.4);display:flex;align-items:center;justify-content:center;'
+      el.innerHTML = '<span style="width:10px;height:10px;border-radius:50%;background:white;"></span>'
+      pickPointMarkerRef.current = L.marker([pickPoint.lat, pickPoint.lng], {
+        icon: L.divIcon({ className: '', html: el, iconSize: [28, 28], iconAnchor: [14, 14] }),
+        interactive: false,
+        keyboard: false,
+      }).addTo(map)
+    }
+  }, [pickPoint, ready])
 
   // Measure overlay — multi-point Google-Maps-style path: dashed polyline
   // through every vertex, a dot per vertex, and a distance pill above the last

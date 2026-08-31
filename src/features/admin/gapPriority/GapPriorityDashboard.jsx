@@ -1,10 +1,8 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { RefreshCw, LayoutDashboard, BarChart2, MapPin } from 'lucide-react'
 import PageHeader from '../../../components/ui/PageHeader'
 import Button from '../../../components/ui/Button'
-import Badge from '../../../components/ui/Badge'
-import Modal from '../../../components/ui/Modal'
 import Tabs from '../../../components/ui/Tabs'
 import GapDetail from './GapDetail'
 import ScoreExplanation from './ScoreExplanation'
@@ -14,8 +12,7 @@ import Ranking from './Ranking'
 import { ModelVersion, WeightsDisplay } from './ModelVersion'
 import { backendGapApi } from '../../../api/gapApi'
 import { useAuthStore } from '../../../app/store/authStore'
-import { DISTRICTS } from '../../../config/constants'
-import { formatDateTime } from '../../../utils/format'
+import { useDistricts } from '../../../hooks/useMasterData'
 
 const SECTIONS = [
   { id: 'overview', label: 'Priority overview', icon: LayoutDashboard },
@@ -28,7 +25,8 @@ export default function GapPriorityDashboard() {
   const user = useAuthStore((s) => s.user)
   const role = user?.role || user?.roles?.[0] || 'dm'
   const districtId = user?.districtId || 'nalanda'
-  const district = DISTRICTS.find((d) => d.id === districtId) || DISTRICTS[0]
+  const { data: districts } = useDistricts()
+  const district = (districts || []).find((d) => String(d.id) === String(districtId))
 
   const [activeSection, setActiveSection] = useState('overview')
   const [selectedEntity, setSelectedEntity] = useState(null)
@@ -36,87 +34,109 @@ export default function GapPriorityDashboard() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  // Data states
-  const [districtSummary, setDistrictSummary] = useState(null)
+  // Data states — all from backend
+  const [overview, setOverview] = useState(null)
+  const [rankings, setRankings] = useState([])
   const [modelMetadata, setModelMetadata] = useState(null)
+  const [filters, setFilters] = useState({ department: '', priority: '' })
 
-  // Load district-level data
+  // Load all gap-priority data from single primary endpoint
   const loadData = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const [summary, metadata] = await Promise.allSettled([
-        backendGapApi.districtSummary(districtId),
-        backendGapApi.modelMetadata(districtId),
-      ])
+      const params = {}
+      if (filters.department) params.department = filters.department
+      if (filters.priority) params.priority = filters.priority
 
-      if (summary.status === 'fulfilled') setDistrictSummary(summary.value)
-      if (metadata.status === 'fulfilled') setModelMetadata(metadata.value)
+      // Primary call: GET /gap-priority/ — returns overview + results
+      const data = await backendGapApi.list(params)
+
+      setOverview(data.overview)
+      setRankings(data.results)
+
+      // Also load model metadata
+      const meta = await backendGapApi.modelMetadata(districtId)
+      if (meta) setModelMetadata(meta)
     } catch (err) {
-      setError(err.message)
+      setError(err.message || 'Failed to load gap priority data')
     } finally {
       setLoading(false)
     }
-  }, [districtId])
+  }, [districtId, filters])
 
   useEffect(() => {
     loadData()
   }, [loadData])
 
-  const handleEntitySelect = useCallback((entity) => {
-    setSelectedEntity(entity)
-    // Also fetch detailed gap data for this entity if not already present
-    if (entity.id && !entity.gapData) {
-      // Determine endpoint based on entity type
-      const fetchDetail = async () => {
-        try {
-          let detail
-          if (entity.type === 'facility') {
-            detail = await backendGapApi.facilityDetail(entity.id)
-          } else if (entity.type === 'village') {
-            detail = await backendGapApi.villageDetail(entity.id)
-          } else if (entity.type === 'block') {
-            detail = await backendGapApi.blockDetail(entity.id)
-          }
-          if (detail) {
-            setSelectedEntity((prev) => prev?.id === entity.id ? { ...prev, gapData: detail } : prev)
-          }
-        } catch (e) {
-          console.warn('Failed to load entity detail:', e)
+  // Click ranked location → open detail modal
+  const handleEntitySelect = useCallback(async (entity) => {
+    setSelectedEntity({ ...entity, detailTab: 'detail' })
+    // Fetch full detail from backend
+    if (entity.id) {
+      try {
+        const detail = await backendGapApi.facilityDetail(entity.id)
+        if (detail) {
+          setSelectedEntity((prev) => prev?.id === entity.id
+            ? { ...prev, gapData: detail, detailTab: prev.detailTab }
+            : prev
+          )
         }
+      } catch (e) {
+        console.warn('Failed to load entity detail:', e)
       }
-      fetchDetail()
     }
   }, [])
 
+  // Click "explain" → open score explanation
   const handleExplain = useCallback((entity) => {
     setExplanationEntity(entity)
   }, [])
 
+  // Click "create intervention" → navigate to planning wizard
   const handleAction = useCallback((entity) => {
-    // Carry analytical context forward into the existing DPR wizard. The
-    // wizard remains the single proposal-authoring workflow; this only
-    // eliminates duplicate entry of the DDST decision evidence.
     const gap = entity.gapData || entity
     const evidence = [
       ...(Array.isArray(gap.sources) ? gap.sources : []),
       ...(Array.isArray(entity.evidence) ? entity.evidence.map((item) => typeof item === 'string' ? item : item.description || item.title || '') : []),
     ].filter(Boolean).join('; ')
-    const reasons = entity.reason || entity.reasonSummary || entity.explanation?.summary || ''
+    const reasons = entity.reason || entity.reasonCodes?.join(', ') || ''
     const params = new URLSearchParams({
-      title: `Intervention: ${entity.name || entity.title || 'priority location'}`,
-      village: entity.village || gap.village || '',
-      block: entity.block || gap.block || '',
-      gapScore: String(gap.overallScore ?? gap.score ?? entity.score ?? ''),
-      department: entity.departmentName || gap.departmentName || '',
-      facility: entity.facilityName || entity.name || '',
+      title: `Intervention: ${entity.name || 'priority location'}`,
+      gapScore: String(entity.gapScore ?? ''),
+      department: entity.departmentCode || '',
       reason: reasons,
       evidence,
-      recommendedAction: entity.recommendedAction || entity.action || '',
-      priority: entity.priority || entity.priorityLevel || '',
+      priority: entity.priority || '',
     })
     navigate(`/linedept/planning/new?${params.toString()}`)
   }, [navigate])
+
+  // Build explanation data from backend components
+  const buildExplanation = (entity) => {
+    const gap = entity.gapData || entity
+    const components = gap.components || entity.components || {}
+    const weightsUsed = gap.weightsUsed || entity.weightsUsed || {}
+    const componentList = Object.entries(components).map(([key, value]) => ({
+      label: key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+      rawValue: value,
+      normalizedValue: typeof value === 'number' ? value / 100 : null,
+      weight: weightsUsed[key] ?? null,
+      contribution: typeof value === 'number' && weightsUsed[key] != null
+        ? (value / 100) * weightsUsed[key]
+        : null,
+      source: gap.modelVersion || 'Backend',
+    }))
+    return {
+      components: componentList,
+      overall: {
+        normalizedValue: entity.gapScore != null ? entity.gapScore / 100 : null,
+        modelVersion: gap.modelVersion || entity.modelVersion || null,
+        calculatedAt: gap.calculatedAt || null,
+      },
+      methodology: gap.modelDescription || gap.methodology || null,
+    }
+  }
 
   const renderSection = () => {
     switch (activeSection) {
@@ -127,32 +147,33 @@ export default function GapPriorityDashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
               <div className="lg:col-span-2">
                 <GapDetail
-                  gapData={districtSummary}
+                  gapData={overview}
                   onExplain={handleExplain}
                 />
               </div>
               <div className="space-y-5">
                 <ModelVersion metadata={modelMetadata} />
-                <WeightsDisplay weights={districtSummary?.weights} />
+                <WeightsDisplay weights={overview?.weights} />
               </div>
             </div>
 
-            {/* Priority Overview */}
-            {districtSummary?.priorityBreakdown && (
+            {/* Priority Breakdown from backend */}
+            {overview && (overview.criticalCount > 0 || overview.highCount > 0) && (
               <div className="rounded-xl border border-ink-100 bg-white p-5">
                 <h3 className="text-[13px] font-semibold text-ink-950 mb-4">Priority Breakdown</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {['P1', 'P2', 'P3', 'P4'].map((p) => {
-                    const count = districtSummary.priorityBreakdown[p] || 0
-                    const meta = { P1: { tone: 'alert' }, P2: { tone: 'saffron' }, P3: { tone: 'sky' }, P4: { tone: 'leaf' } }[p]
-                    return (
-                      <div key={p} className="rounded-xl border border-ink-100 p-4 text-center">
-                        <Badge tone={meta.tone} className="mb-2 text-[10px]">{p}</Badge>
-                        <p className="text-[28px] font-bold text-ink-950 tabular-nums">{count}</p>
-                        <p className="text-[10.5px] text-ink-500 mt-1">{meta.tone === 'alert' ? 'Critical' : meta.tone === 'saffron' ? 'High' : meta.tone === 'sky' ? 'Medium' : 'Low'}</p>
-                      </div>
-                    )
-                  })}
+                  {[
+                    { key: 'P1', count: overview.criticalCount, tone: 'alert', label: 'Critical' },
+                    { key: 'P2', count: overview.highCount, tone: 'saffron', label: 'High' },
+                    { key: 'P3', count: overview.mediumCount, tone: 'sky', label: 'Medium' },
+                    { key: 'P4', count: overview.lowCount, tone: 'leaf', label: 'Low' },
+                  ].map(({ key, count, tone, label }) => (
+                    <div key={key} className="rounded-xl border border-ink-100 p-4 text-center">
+                      <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-${tone}-50 text-${tone}-700 mb-2`}>{key}</span>
+                      <p className="text-[28px] font-bold text-ink-950 tabular-nums">{count}</p>
+                      <p className="text-[10.5px] text-ink-500 mt-1">{label}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -164,7 +185,7 @@ export default function GapPriorityDashboard() {
           <GapMap
             districtId={districtId}
             onFeatureClick={handleEntitySelect}
-            filters={{}}
+            filters={filters}
           />
         )
 
@@ -173,6 +194,8 @@ export default function GapPriorityDashboard() {
           <Ranking
             districtId={districtId}
             onSelect={handleEntitySelect}
+            filters={filters}
+            onFilterChange={setFilters}
           />
         )
 
@@ -186,7 +209,7 @@ export default function GapPriorityDashboard() {
       <PageHeader
         eyebrow={`Admin Portal · ${String(role).toUpperCase()}`}
         title="Gap & Priority Dashboard"
-        description={`${district?.label || districtId} — find priority locations, understand why they need attention, and move evidence into an intervention. Scores and sources are shown for every decision.`}
+        description={`${district?.name || districtId} — find priority locations, understand why they need attention, and move evidence into an intervention. Scores and sources are shown for every decision.`}
         action={
           <div className="flex items-center gap-2">
             <Button size="sm" variant="outline" onClick={loadData} disabled={loading}>
@@ -203,8 +226,6 @@ export default function GapPriorityDashboard() {
         </div>
       )}
 
-      {/* Keep only the three core decision tasks. Detailed evidence opens from
-          a selected location instead of creating another permanent tab. */}
       <Tabs
         tabs={SECTIONS}
         activeTab={activeSection}
@@ -212,68 +233,56 @@ export default function GapPriorityDashboard() {
         className="mb-5"
       />
 
-      {/* Section Content */}
       <div className="space-y-5">
-        {renderSection()}
+        {loading && !overview ? (
+          <div className="rounded-xl border border-ink-100 bg-white p-12 text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-sky-500 border-t-transparent mx-auto mb-3" />
+            <p className="text-ink-500 text-[13px]">Loading gap priority data…</p>
+          </div>
+        ) : renderSection()}
       </div>
 
       {/* Entity Detail Modal */}
       {selectedEntity && (
-        <Modal
-          open={true}
-          onClose={() => setSelectedEntity(null)}
-          title={selectedEntity.name || selectedEntity.title || 'Entity Detail'}
-          size="lg"
-        >
-          <div className="space-y-5">
-            {/* Tabs for detail view */}
-            <Tabs
-              tabs={[
-                { id: 'detail', label: 'Gap Detail' },
-                { id: 'explanation', label: 'Score Explanation' },
-                { id: 'priority', label: 'Priority & Action' },
-              ]}
-              activeTab={selectedEntity.detailTab || 'detail'}
-              onChange={(tab) => setSelectedEntity((prev) => ({ ...prev, detailTab: tab }))}
-            />
-
-            {selectedEntity.detailTab === 'detail' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setSelectedEntity(null)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 bg-white border-b border-ink-100 px-5 py-4 flex items-center justify-between z-10">
+              <h2 className="text-[15px] font-semibold text-ink-950">{selectedEntity.name || 'Location Detail'}</h2>
+              <button onClick={() => setSelectedEntity(null)} className="text-ink-400 hover:text-ink-700 text-[13px]">✕</button>
+            </div>
+            <div className="p-5 space-y-5">
               <GapDetail
                 gapData={selectedEntity.gapData || selectedEntity}
                 onExplain={handleExplain}
               />
-            )}
-
-            {selectedEntity.detailTab === 'explanation' && (
               <ScoreExplanation
-                explanationData={selectedEntity.gapData?.explanation || selectedEntity.explanation}
-                onClose={() => setSelectedEntity((prev) => ({ ...prev, detailTab: 'detail' }))}
+                explanationData={buildExplanation(selectedEntity)}
               />
-            )}
-
-            {selectedEntity.detailTab === 'priority' && (
               <PriorityDisplay
                 priorityData={selectedEntity}
-                onAction={handleAction}
+                onAction={() => handleAction(selectedEntity)}
               />
-            )}
+            </div>
           </div>
-        </Modal>
+        </div>
       )}
 
       {/* Explanation Modal */}
       {explanationEntity && (
-        <Modal
-          open={true}
-          onClose={() => setExplanationEntity(null)}
-          title="Score Explanation"
-          size="lg"
-        >
-          <ScoreExplanation
-            explanationData={explanationEntity.gapData?.explanation || explanationEntity.explanation || explanationEntity}
-            onClose={() => setExplanationEntity(null)}
-          />
-        </Modal>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setExplanationEntity(null)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 bg-white border-b border-ink-100 px-5 py-4 flex items-center justify-between z-10">
+              <h2 className="text-[15px] font-semibold text-ink-950">Score Explanation</h2>
+              <button onClick={() => setExplanationEntity(null)} className="text-ink-400 hover:text-ink-700 text-[13px]">✕</button>
+            </div>
+            <div className="p-5">
+              <ScoreExplanation
+                explanationData={buildExplanation(explanationEntity)}
+                onClose={() => setExplanationEntity(null)}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { AuthService } from '../../services/auth/AuthService'
 import { getDefaultRoute } from '../../app/authRoutes'
+import { useIdentityStore } from '../../features/department/identity/identityStore'
 
 // Demo-access marker.  Demo personas have no gateway tokens, so a full page
 // reload would otherwise wipe the persisted user during session restore
@@ -13,7 +14,7 @@ let restoreInFlight = null
 
 export const useAuthStore = create(persist((set, get) => ({
   user: null,
-  status: 'restoring', // restoring | loading | authenticated | idle | error
+  status: 'restoring', // restoring | loading | authenticated | unauthorized | idle | error
   error: null,
   async signIn(credentials) {
     set({ status: 'loading', error: null })
@@ -25,6 +26,9 @@ export const useAuthStore = create(persist((set, get) => ({
   // production SSO flow. Role/permissions are still fed through the same
   // permission checks as a real session.
   demoSignIn(persona) {
+    if (!import.meta.env.VITE_ENABLE_DEMO) {
+      throw new Error('Demo access disabled in production')
+    }
     localStorage.setItem(DEMO_MARKER, '1')
     set({ user: persona.user, status: 'authenticated', error: null })
     return getDefaultRoute(persona.user.role)
@@ -49,8 +53,16 @@ export const useAuthStore = create(persist((set, get) => ({
     })()
     return restoreInFlight
   },
-  signOut() { AuthService.logout(); localStorage.removeItem(DEMO_MARKER); set({ user: null, status: 'idle', error: null }) },
-  hasPermission(permission) { const user = get().user; return Boolean(user?.permissions?.includes(permission) || user?.permissions?.includes('ALL_READ') || user?.permissions?.includes('SYSADMIN')) },
+  signOut() { 
+    AuthService.logout(); 
+    localStorage.removeItem(DEMO_MARKER); 
+    // Clear identity store to prevent stale data on role change
+    try { useIdentityStore.getState().clearIdentity() } catch (e) { /* ignore */ }
+    set({ user: null, status: 'idle', error: null }) 
+  },
+  hasPermission(permission) { const user = get().user; return Boolean(user?.permissions?.includes(permission) || user?.permissions?.includes('ALL_READ') || user?.permissions?.includes('SYSADMIN') || user?.permissions?.includes('ALL_WRITE')) },
   setDistrict(districtId) { set((s) => ({ user: s.user ? { ...s.user, districtId } : null })) },
   setDepartment(departmentId) { set((s) => ({ user: s.user ? { ...s.user, departmentId } : null })) },
+  // Clear any stale user data on role change
+  clearUser() { set({ user: null, status: 'idle', error: null }) },
 }), { name: 'ndisp-auth-profile', partialize: (state) => ({ user: state.user }) }))

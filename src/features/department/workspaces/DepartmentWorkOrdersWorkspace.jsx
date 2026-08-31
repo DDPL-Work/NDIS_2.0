@@ -55,10 +55,10 @@ export default function DepartmentWorkOrdersWorkspace() {
       scheduleWork: formData.scheduleWork || new Date().toISOString().split('T')[0],
       deadline: formData.deadline || new Date(Date.now() + 15 * 24 * 3600 * 1000).toISOString().split('T')[0],
       remarks: 'Work order successfully generated in system.',
-      gisLocation: {
-        position: [Number(formData.longitude || 85.4211), Number(formData.latitude || 25.0294)],
+      gisLocation: formData.latitude && formData.longitude ? {
+        position: [Number(formData.longitude), Number(formData.latitude)],
         address: formData.address || 'District construction area'
-      }
+      } : undefined
     }
 
     createWorkOrder(payload)

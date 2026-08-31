@@ -1,17 +1,17 @@
 // Public Reports & Download Center — FR-CP-08 / FR-XC-03 / Vol 4 API contracts.
-import { useState, useMemo } from 'react'
-import { FileDown, FileSpreadsheet, FileText, Map, Search, Calendar, CheckCircle2, RefreshCw } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { FileDown, FileSpreadsheet, FileText, Map, Search, Loader2, RefreshCw, AlertCircle } from 'lucide-react'
 import PageHeader from '../../components/ui/PageHeader'
 import { Card, CardBody, CardHeader } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Select from '../../components/ui/Select'
 import Badge from '../../components/ui/Badge'
-import Icon from '../../components/ui/Icon'
 import { useAuthStore } from '../../app/store/authStore'
 import { useUiStore } from '../../app/store/uiStore'
 import { gisApi } from '../../services/api'
-import { DEPARTMENTS, DEPARTMENT_MAP, DISTRICTS } from '../../config/constants'
-import { formatDate } from '../../utils/format'
+import { DEPARTMENTS, DISTRICTS } from '../../config/constants'
+import { useAsync } from '../../hooks/useAsync'
+import { backendReportApi } from '../../api/reportApi'
 
 function toCsv(rows) {
   const headers = ['id', 'name', 'categoryLabel', 'departmentId', 'village', 'block', 'status', 'gapScore', 'latitude', 'longitude']
@@ -25,45 +25,6 @@ function toCsv(rows) {
   return lines.join('\n')
 }
 
-const PREBUILT_REPORTS = [
-  {
-    id: 'RPT-01',
-    title: 'District Facility Master Index',
-    category: 'facility',
-    description: 'Complete directory of all registered public infrastructure assets with GPS coordinates and coverage gap scores.',
-    format: 'CSV / GeoJSON',
-    freq: 'Daily snapshot',
-    size: '1.2 MB',
-  },
-  {
-    id: 'RPT-02',
-    title: 'Grievance Resolution & SLA Audit',
-    category: 'grievance',
-    description: 'Quarterly breakdown of citizen complaints, resolution SLA percentages, and departmental escalation rates.',
-    format: 'PDF / CSV',
-    freq: 'Monthly rollup',
-    size: '840 KB',
-  },
-  {
-    id: 'RPT-03',
-    title: 'Spatial Deficit & Coverage Matrix',
-    category: 'analytics',
-    description: 'GIS deficit score breakdown per village catchment area vs. the standard 3km service radius target.',
-    format: 'GeoJSON / PDF',
-    freq: 'Weekly compute',
-    size: '2.4 MB',
-  },
-  {
-    id: 'RPT-04',
-    title: 'Scheme Beneficiary Target vs. Achievement',
-    category: 'schemes',
-    description: 'Department-wise beneficiary coverage for state and national development schemes.',
-    format: 'Excel / CSV',
-    freq: 'Monthly rollup',
-    size: '650 KB',
-  },
-]
-
 export default function Reports() {
   const user = useAuthStore((s) => s.user)
   const pushToast = useUiStore((s) => s.pushToast)
@@ -71,68 +32,110 @@ export default function Reports() {
   const [departmentId, setDepartmentId] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [downloading, setDownloading] = useState(null)
+  const [generating, setGenerating] = useState(null)
+  const [downloadId, setDownloadId] = useState(null)
 
   const district = DISTRICTS.find((d) => d.id === user?.districtId) || DISTRICTS[0]
 
-  const filteredCatalog = useMemo(() => {
-    return PREBUILT_REPORTS.filter((r) => {
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase()
-        if (!r.title.toLowerCase().includes(q) && !r.description.toLowerCase().includes(q)) return false
-      }
-      return true
-    })
-  }, [searchQuery])
+  const listFetcher = useMemo(() => () => backendReportApi.list(), [])
+  const { data: reports, loading: listLoading, error: listError, refetch } = useAsync(listFetcher, [])
+
+  const filteredReports = useMemo(() => {
+    if (!reports) return []
+    if (!searchQuery.trim()) return reports
+    const q = searchQuery.toLowerCase()
+    return reports.filter((r) => r.title.toLowerCase().includes(q) || r.category.toLowerCase().includes(q) || r.code.toLowerCase().includes(q))
+  }, [reports, searchQuery])
 
   async function handleCsvDownload() {
     setDownloading('csv')
-    const facilities = await gisApi.searchFacilities({
-      districtId: district.id,
-      departmentId: departmentId !== 'all' ? departmentId : undefined,
-    })
-    const blob = new Blob([toCsv(facilities)], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `ndisp-facilities-${district.id}-${departmentId}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
-    setDownloading(null)
-    pushToast(`CSV facility listing for ${district.label} downloaded (${facilities.length} rows).`, 'success')
+    try {
+      const facilities = await gisApi.searchFacilities({
+        districtId: district.id,
+        departmentId: departmentId !== 'all' ? departmentId : undefined,
+      })
+      const blob = new Blob([toCsv(facilities)], { type: 'text/csv' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `ndisp-facilities-${district.id}-${departmentId}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+      pushToast(`CSV facility listing for ${district.label} downloaded (${facilities.length} rows).`, 'success')
+    } catch (e) {
+      pushToast(`CSV export failed: ${e.message}`, 'error')
+    } finally {
+      setDownloading(null)
+    }
   }
 
   async function handleGeoJsonDownload() {
     setDownloading('geojson')
-    const facilities = await gisApi.searchFacilities({
-      districtId: district.id,
-      departmentId: departmentId !== 'all' ? departmentId : undefined,
-    })
-    const geojson = {
-      type: 'FeatureCollection',
-      district: district.label,
-      exportedAt: new Date().toISOString(),
-      features: facilities.map((f) => ({
-        type: 'Feature',
-        geometry: { type: 'Point', coordinates: f.position },
-        properties: { id: f.id, name: f.name, departmentId: f.departmentId, gapScore: f.gapScore, status: f.status },
-      })),
+    try {
+      const facilities = await gisApi.searchFacilities({
+        districtId: district.id,
+        departmentId: departmentId !== 'all' ? departmentId : undefined,
+      })
+      const geojson = {
+        type: 'FeatureCollection',
+        district: district.label,
+        exportedAt: new Date().toISOString(),
+        features: facilities.map((f) => ({
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: f.position },
+          properties: { id: f.id, name: f.name, departmentId: f.departmentId, gapScore: f.gapScore, status: f.status },
+        })),
+      }
+      const blob = new Blob([JSON.stringify(geojson, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `ndisp-gis-${district.id}-${departmentId}.geojson`
+      a.click()
+      URL.revokeObjectURL(url)
+      pushToast(`GeoJSON spatial dataset downloaded (${geojson.features.length} features).`, 'success')
+    } catch (e) {
+      pushToast(`GeoJSON export failed: ${e.message}`, 'error')
+    } finally {
+      setDownloading(null)
     }
-    const blob = new Blob([JSON.stringify(geojson, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `ndisp-gis-${district.id}-${departmentId}.geojson`
-    a.click()
-    URL.revokeObjectURL(url)
-    setDownloading(null)
-    pushToast(`GeoJSON spatial dataset downloaded (${geojson.features.length} features).`, 'success')
   }
 
-  async function handleMockExport(kind, title = 'Report') {
-    setDownloading(kind + title)
-    await new Promise((r) => setTimeout(r, 900))
-    setDownloading(null)
-    pushToast(`${kind.toUpperCase()} export job queued for "${title}" — svc-reporting will notify you when ready.`, 'info')
+  async function handleGenerate(reportType, title) {
+    setGenerating(reportType)
+    try {
+      const result = await backendReportApi.generate({ type: reportType, department: user?.departmentId || 1 })
+      pushToast(`Report ${result.report.code} generated — ${result.message || 'success'}.`, 'success')
+      refetch()
+    } catch (e) {
+      const msg = e?.message || 'Generation failed'
+      if (e?.status === 404) pushToast(`Report type not available: ${msg}`, 'warning')
+      else pushToast(`Generation failed: ${msg}`, 'error')
+    } finally {
+      setGenerating(null)
+    }
+  }
+
+  async function handleDownload(report) {
+    setDownloadId(report.id)
+    try {
+      const { blob, filename } = await backendReportApi.download(report.id)
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = filename || `${report.code}.${(report.format || 'pdf').toLowerCase()}`
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      URL.revokeObjectURL(url)
+      pushToast(`Report ${report.code} downloaded.`, 'success')
+    } catch (e) {
+      const msg = e?.message || 'Download failed'
+      if (e?.status === 404) pushToast(`File not available: ${msg}. The report may still be generating.`, 'warning')
+      else pushToast(`Download failed: ${msg}`, 'error')
+    } finally {
+      setDownloadId(null)
+    }
   }
 
   return (
@@ -192,52 +195,70 @@ export default function Reports() {
                 <h3 className="text-[13.5px] font-semibold text-ink-950">PDF District Brief</h3>
                 <p className="text-[12px] text-ink-500 mt-0.5">Formatted publication document with maps & charts.</p>
               </div>
-              <Button size="sm" variant="outline" icon={FileDown} loading={downloading === 'pdfDistrict Brief'} onClick={() => handleMockExport('pdf', 'District Brief')}>
-                Request PDF
+              <Button size="sm" variant="outline" icon={generating === 'grievance' ? Loader2 : FileDown} loading={generating === 'grievance'} onClick={() => handleGenerate('grievance', 'District Brief')}>
+                Generate PDF
               </Button>
             </CardBody>
           </Card>
         </div>
 
-        {/* Pre-built Reports Catalog */}
+        {/* Backend Reports Catalog */}
         <Card>
           <CardHeader
-            title="Standard Publication Catalog"
-            subtitle="Scheduled public disclosures and analytical audit summaries"
+            title="Report catalog"
+            subtitle={reports ? `${reports.length} report(s) available` : 'Loading…'}
             action={
-              <div className="relative w-64">
-                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-400" />
-                <input
-                  type="text"
-                  placeholder="Search catalog…"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full rounded-lg border border-ink-200 bg-ink-50 pl-8 pr-3 py-1.5 text-[12px] focus:bg-white"
-                />
+              <div className="flex items-center gap-2">
+                <div className="relative w-64">
+                  <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-400" />
+                  <input
+                    type="text"
+                    placeholder="Search catalog…"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full rounded-lg border border-ink-200 bg-ink-50 pl-8 pr-3 py-1.5 text-[12px] focus:bg-white"
+                  />
+                </div>
+                <Button size="sm" variant="outline" icon={RefreshCw} onClick={refetch}>Refresh</Button>
               </div>
             }
           />
-          <CardBody className="!p-0 divide-y divide-ink-50">
-            {filteredCatalog.map((rpt) => (
-              <div key={rpt.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-ink-50/50 transition-colors">
+          <CardBody className="!p-0">
+            {listLoading && (
+              <div className="flex items-center gap-2 p-6 text-[12.5px] text-ink-500">
+                <Loader2 size={14} className="animate-spin" /> Loading report catalog…
+              </div>
+            )}
+            {listError && (
+              <div className="flex items-center gap-2 p-6 text-[12.5px] text-alert-600">
+                <AlertCircle size={14} /> Failed to load reports: {listError.message}
+              </div>
+            )}
+            {!listLoading && !listError && filteredReports.length === 0 && (
+              <div className="flex items-center gap-2 p-6 text-[12.5px] text-ink-500">
+                {reports && reports.length === 0 ? 'No reports generated yet.' : 'No reports match your search.'}
+              </div>
+            )}
+            {filteredReports.map((rpt) => (
+              <div key={rpt.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-ink-50/50 transition-colors">
                 <div className="space-y-1 min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="kbd-mono text-[11px] text-ink-400">{rpt.id}</span>
-                    <h4 className="text-[13.5px] font-semibold text-ink-950">{rpt.title}</h4>
+                    <span className="kbd-mono text-[11px] text-ink-400">{rpt.code}</span>
+                    <h4 className="text-[13px] font-semibold text-ink-950">{rpt.title}</h4>
                     <Badge tone="neutral">{rpt.format}</Badge>
                   </div>
-                  <p className="text-[12px] text-ink-600 leading-snug">{rpt.description}</p>
-                  <div className="flex items-center gap-4 text-[11px] text-ink-400 pt-1">
-                    <span className="flex items-center gap-1"><RefreshCw size={11} /> {rpt.freq}</span>
-                    <span>Approx. size: {rpt.size}</span>
+                  <div className="flex items-center gap-4 text-[11px] text-ink-400">
+                    <span>{rpt.category}</span>
+                    <span>{rpt.departmentName}</span>
+                    {rpt.districtName && <span>{rpt.districtName}</span>}
+                    <span>{rpt.fileSize}</span>
+                    {rpt.generatedAt && <span>{new Date(rpt.generatedAt).toLocaleDateString()}</span>}
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
-                  <Button size="sm" variant="outline" icon={FileDown} onClick={() => handleMockExport('export', rpt.title)}>
-                    Download Report
-                  </Button>
-                </div>
+                <Button size="sm" variant="outline" icon={downloadId === rpt.id ? Loader2 : FileDown} loading={downloadId === rpt.id} onClick={() => handleDownload(rpt)}>
+                  Download
+                </Button>
               </div>
             ))}
           </CardBody>

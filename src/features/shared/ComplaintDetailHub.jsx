@@ -8,6 +8,7 @@ import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
 import { useAuthStore } from '../../app/store/authStore'
 import { useComplaintEngine } from '../../app/store/complaintEngine'
+import { ROLES } from '../../config/constants'
 import { useUiStore } from '../../app/store/uiStore'
 import { useAsync } from '../../hooks/useAsync'
 import { ComplaintRepository } from '../../gis/repositories/ComplaintRepository'
@@ -70,7 +71,7 @@ export default function ComplaintDetailHub({ complaintId, onClose }) {
     const loggedInId = String(user?.id ?? '')
     // Only roles that can never take a complaint assignment are excluded.
     // DEPARTMENT_OFFICER / FIELD_INSPECTOR / DEPARTMENT_HEAD all remain.
-    const UNSUPPORTED_ASSIGNEE_ROLES = new Set(['citizen', 'admin', 'superuser', 'super_admin', 'state_admin'])
+    const UNSUPPORTED_ASSIGNEE_ROLES = new Set([ROLES.CITIZEN, ROLES.STATE_ADMIN, ROLES.STATE_SUPER_ADMIN])
     const filtered = rows.filter((item) => {
       if (!item.id) return false
       if (String(item.id) === loggedInId) return false
@@ -114,8 +115,8 @@ export default function ComplaintDetailHub({ complaintId, onClose }) {
 
   const dept = DEPARTMENT_MAP[complaint.departmentSlug] || {}
   const priorityInfo = PRIORITY_CONFIG[complaint.priority] || PRIORITY_CONFIG.medium
-  const isHead = user?.role === 'dept_head'
-  const isOfficer = ['dept_officer', 'engineer', 'field_inspector'].includes(user?.role)
+  const isHead = user?.role === ROLES.DEPT_HEAD
+  const isOfficer = [ROLES.DEPT_OFFICER, ROLES.ENGINEER, ROLES.FIELD_INSPECTOR].includes(user?.role)
 
   async function dispatch(nextState, remarks) {
     const extraData = actionModal === 'assign' || actionModal === 'inspection'

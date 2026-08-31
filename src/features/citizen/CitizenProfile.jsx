@@ -1,10 +1,12 @@
 import { useNavigate } from 'react-router-dom'
-import { Globe, LogOut, MapPin, User as UserIcon, Languages } from 'lucide-react'
+import { useState } from 'react'
+import { Globe, LogOut, MapPin, User as UserIcon, Languages, Lock } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Select from '../../components/ui/Select'
 import { useAuthStore } from '../../app/store/authStore'
 import { useI18n } from '../../i18n/i18n'
 import { DISTRICTS } from '../../config/constants'
+import ChangePasswordModal from './ChangePasswordModal'
 
 // Citizen profile.  The profile API exposes read-only identity data (no
 // update-profile endpoint exists), so editing stays honest: district and
@@ -16,6 +18,7 @@ export default function CitizenProfile() {
   const signOut = useAuthStore((state) => state.signOut)
   const navigate = useNavigate()
   const { locale, setLocale } = useI18n()
+  const [showChangePassword, setShowChangePassword] = useState(false)
 
   const currentDistrictId = user?.districtId || DISTRICTS[0]?.id
 
@@ -69,6 +72,17 @@ export default function CitizenProfile() {
         </p>
       </section>
 
+      {/* Security */}
+      <section className="card border p-4 sm:p-5" aria-label="Security">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Lock size={15} className="text-ink-400" />
+            <p className="text-[12.5px] text-ink-500">Change your account password.</p>
+          </div>
+          <Button variant="outline" icon={Lock} onClick={() => setShowChangePassword(true)}>Change Password</Button>
+        </div>
+      </section>
+
       {/* Preferences */}
       <section className="card border p-4 sm:p-5" aria-label="Preferences">
         <h2 className="flex items-center gap-2 text-[14.5px] font-semibold text-ink-950"><MapPin size={15} className="text-leaf-600" /> Location preferences</h2>
@@ -112,6 +126,13 @@ export default function CitizenProfile() {
           <Button variant="danger" icon={LogOut} onClick={handleLogout}>Logout</Button>
         </div>
       </section>
+
+      <ChangePasswordModal open={showChangePassword} onClose={() => setShowChangePassword(false)} />
     </div>
   )
+}
+
+function handleLogout() {
+  signOut()
+  navigate('/')
 }

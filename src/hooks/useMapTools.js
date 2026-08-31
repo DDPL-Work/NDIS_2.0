@@ -9,6 +9,7 @@ export const MAP_TOOLS = {
   RADIUS: 'radius',      // Draw deficit radius circle (3km default, Vol 3 §16)
   MEASURE: 'measure',    // Google-Maps-style: click to add vertices, double-click finishes
   CLUSTER: 'cluster',    // Toggle facility point clustering
+  PICK_POINT: 'pick-point', // Pick a reference point on the map
 }
 
 export const BASEMAPS = [

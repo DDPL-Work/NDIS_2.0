@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
@@ -8,7 +8,7 @@ export default function AppShell({ navItems, sections, portalLabel, portalIcon, 
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   return (
-    <div className="flex h-screen w-full bg-ink-50 overflow-hidden" style={{ height: '100dvh' }}>
+    <div data-appshell-root className="flex h-full w-full bg-ink-50 overflow-hidden">
       <Sidebar
         items={navItems}
         sections={sections}
@@ -20,7 +20,7 @@ export default function AppShell({ navItems, sections, portalLabel, portalIcon, 
       />
       <div className="flex flex-1 flex-col min-w-0">
         <Topbar title={title} subtitle={subtitle} showDistrict={showDistrict} showDepartment={showDepartment} onMenuClick={() => setMobileNavOpen(true)} />
-        <main className={bottomNav ? 'flex-1 overflow-y-auto pb-[calc(var(--citizen-bottom-nav-height,64px)+var(--safe-bottom,0px))] lg:pb-0' : 'flex-1 overflow-y-auto'}>
+        <main data-main-scroll className={bottomNav ? 'flex-1 min-h-0 overflow-y-auto pb-[calc(var(--citizen-bottom-nav-height,64px)+var(--safe-bottom,0px))] lg:pb-0' : 'flex-1 min-h-0 overflow-y-auto'}>
           <Outlet />
         </main>
       </div>

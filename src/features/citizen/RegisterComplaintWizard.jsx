@@ -25,10 +25,9 @@ const WIZARD_STEPS = [
   { id: 5, label: 'Review & Submit' },
 ]
 
-const CITIZEN_DEPARTMENTS = [
-  ['water', 'Water & Sanitation (JJM)', 'Handpumps, pipelines, tanks and drinking water'], ['electricity', 'Electricity', 'Street lights, transformers and power supply'], ['health', 'Health & Family Welfare', 'Hospitals, ambulances and public health services'], ['education', 'School Education', 'Schools, classrooms and learning facilities'], ['pwd', 'Roads & Public Works', 'Roads, bridges and public buildings'], ['solar', 'Solar & Renewable Energy', 'Solar panels, batteries and renewable systems'], ['tourism', 'Tourism & Heritage', 'Visitor facilities, heritage sites and signs'], ['urban', 'Urban Local Body', 'Sanitation, drains and public spaces'],
-]
 const ISSUE_CATEGORIES = { water: ['Broken Handpump', 'Pipe Leakage', 'Motor Burnt', 'Water Contamination', 'Low Water Pressure', 'Pipeline Damage', 'Water Tank Overflow', 'Other'], electricity: ['Street Light', 'Transformer', 'Power Failure', 'Electric Pole', 'Electric Wire', 'Meter', 'Other'], health: ['Hospital Cleanliness', 'Medicine Shortage', 'Doctor Absent', 'Oxygen', 'Ambulance', 'Other'], education: ['School Toilet', 'Classroom Damage', 'Furniture', 'Teacher Absent', 'Drinking Water', 'Other'], pwd: ['Pothole', 'Bridge Damage', 'Road Blocked', 'Public Building Damage', 'Other'], solar: ['Solar Panel', 'Battery', 'Controller', 'Power Generation', 'Other'], tourism: ['Tourism Signboard', 'Lighting', 'Visitor Facility', 'Heritage Site', 'Other'], urban: ['Garbage', 'Drain Blockage', 'Sanitation', 'Street Cleaning', 'Other'] }
+
+// Minimal fallback only when backend hierarchy endpoints are not deployed
 const FALLBACK_BLOCKS = [
   { value: 'silao', label: 'Silao Block' },
   { value: 'biharsharif', label: 'Bihar Sharif Block' },
@@ -53,14 +52,14 @@ export default function RegisterComplaintWizard() {
 
   // Step 1 State
   const [categoryId, setCategoryId] = useState(CATEGORY_ROUTING_RULES[0].categoryId)
-  const [selectedCategoryKey, setSelectedCategoryKey] = useState(() => `${CATEGORY_ROUTING_RULES[0].categoryId}::${ISSUE_CATEGORIES[CATEGORY_ROUTING_RULES[0].departmentId][0]}`)
-  const [selectedDepartmentId, setSelectedDepartmentId] = useState('water')
+  const [selectedCategoryKey, setSelectedCategoryKey] = useState('')
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState('')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [priority, setPriority] = useState('high')
 
   // Step 2 Location State
-  const [selectedPos, setSelectedPos] = useState([85.4211, 25.0294]) // Rajgir default
+  const [selectedPos, setSelectedPos] = useState(null)
   const [districtId] = useState('nalanda')
   const [blockId, setBlockId] = useState('silao')
   const [villageName, setVillageName] = useState('Rajgir')
@@ -159,16 +158,15 @@ export default function RegisterComplaintWizard() {
   // in the create payload comes straight from the API.
   const deptCards = useMemo(() => {
     if (!departments.length) {
-      return CITIZEN_DEPARTMENTS.map(([id, label, summary]) => ({ id, slug: id, name: label, summary, api: false }))
+      return []
     }
     return departments.map((d) => {
       const slug = departmentSlugFromName(d.name)
-      const known = CITIZEN_DEPARTMENTS.find(([id]) => id === slug)
       return {
         id: String(d.id),
         slug,
-        name: known ? known[1] : d.name,
-        summary: known ? known[2] : (d.description || 'Line department'),
+        name: d.name,
+        summary: d.description || 'Line department',
         api: true,
       }
     })
@@ -226,9 +224,9 @@ export default function RegisterComplaintWizard() {
       url: URL.createObjectURL(file),
       name: file.name,
       file, // kept for the evidence upload call after the complaint is created
-      geotagged: true,
-      coords: selectedPos,
-      distMeters: selectedPos ? 0 : null,
+      geotagged: null,
+      coords: null,
+      distMeters: null,
       timestamp: new Date().toISOString(),
     }
     setAttachments((prev) => [...prev, newAtt])
@@ -527,8 +525,8 @@ export default function RegisterComplaintWizard() {
                 <img src={att.url} alt={att.name} className="h-16 w-16 rounded-lg object-cover border border-ink-200 shrink-0" />
                 <div className="min-w-0 flex-1 text-[12px]">
                   <p className="font-semibold text-ink-900 truncate">{att.name}</p>
-                  <div className="flex items-center gap-1.5 text-leaf-700 font-medium text-[11px] mt-0.5">
-                    <ShieldCheck size={13} /> Geo-Tagged (Valid distance {att.distMeters ?? '—'}m)
+                  <div className="flex items-center gap-1.5 text-ink-600 text-[11px] mt-0.5">
+                    <Camera size={13} /> Photo attached — EXIF verification pending backend
                   </div>
                   <p className="text-[10.5px] text-ink-400 font-mono mt-1">{new Date(att.timestamp).toLocaleTimeString()}</p>
                 </div>

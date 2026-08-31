@@ -3,14 +3,18 @@ import { persist } from 'zustand/middleware'
 import { DEFAULT_ROLE_PERMISSIONS } from './permissions/permissionCatalog'
 
 const id = (prefix, count) => `${prefix}-2026-${String(count + 101).padStart(5, '0')}`
-const audit = (actor, action, module, entityId, previousValue, newValue) => ({ id: `AUD-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, actor: actor?.name || 'System', userId: actor?.id || actor?.sub || 'system', action, module, entityId, previousValue, newValue, ip: '127.0.0.1', timestamp: new Date().toISOString() })
+const audit = (actor, action, module, entityId, previousValue, newValue) => ({ id: `AUD-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`, actor: actor?.name || 'System', userId: actor?.id || actor?.sub || 'system', action, module, entityId, previousValue, newValue, ip: 'client-side', timestamp: new Date().toISOString() })
 
 // Employee records are backend-authoritative (GET /api/employees/); this
 // store starts EMPTY and only holds records the local identity actions create.
 const INITIAL_EMPLOYEES = []
 
+// System roles derived from constants - not persisted
+const SYSTEM_ROLES = Object.entries(DEFAULT_ROLE_PERMISSIONS).map(([key, permissions]) => ({ id: key, name: key.replace(/_/g, ' '), permissions, system: true }))
+
 export const useIdentityStore = create(persist((set, get) => ({
-  employees: INITIAL_EMPLOYEES, roles: Object.entries(DEFAULT_ROLE_PERMISSIONS).map(([key, permissions]) => ({ id: key, name: key.replace(/_/g, ' '), permissions, system: true })),
+  employees: INITIAL_EMPLOYEES, 
+  roles: SYSTEM_ROLES,
   attendance: [], leaves: [], tasks: [], auditLogs: [], temporaryPermissions: [], sessions: [], invitations: [],
   log: (actor, action, module, entityId, previousValue = null, newValue = null) => set((s) => ({ auditLogs: [audit(actor, action, module, entityId, previousValue, newValue), ...s.auditLogs] })),
   onboardEmployee: (actor, payload) => {
@@ -26,4 +30,6 @@ export const useIdentityStore = create(persist((set, get) => ({
   decideLeave: (actor, leaveId, status) => set((s) => ({ leaves: s.leaves.map((leave) => leave.id === leaveId ? { ...leave, status, decidedAt: new Date().toISOString() } : leave), auditLogs: [audit(actor, `LEAVE_${status.toUpperCase()}`, 'leave', leaveId), ...s.auditLogs] })),
   assignTask: (actor, payload) => set((s) => ({ tasks: [{ id: id('TSK', s.tasks.length), status: 'assigned', createdAt: new Date().toISOString(), ...payload }, ...s.tasks], auditLogs: [audit(actor, 'TASK_ASSIGNED', 'workforce', payload.assigneeId, null, payload), ...s.auditLogs] })),
   grantTemporaryPermission: (actor, payload) => set((s) => ({ temporaryPermissions: [...s.temporaryPermissions, { id: id('TMP', s.temporaryPermissions.length), grantedAt: new Date().toISOString(), ...payload }], auditLogs: [audit(actor, 'TEMPORARY_PERMISSION_GRANTED', 'authorization', payload.employeeId, null, payload), ...s.auditLogs] })),
+  // Clear all identity data (call on logout to prevent stale data)
+  clearIdentity: () => set({ employees: INITIAL_EMPLOYEES, roles: SYSTEM_ROLES, attendance: [], leaves: [], tasks: [], auditLogs: [], temporaryPermissions: [], sessions: [], invitations: [] }),
 }), { name: 'ndisp-department-identity-v2' }))

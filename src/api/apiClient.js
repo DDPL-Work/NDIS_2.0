@@ -1,6 +1,15 @@
 // The one HTTP boundary for application repositories.  Backend DTOs are mapped
 // by the API module that owns them; views must never import this client.
-export { apiRequest, ApiError } from '../services/httpClient'
+export {
+  apiRequest,
+  ApiError,
+  buildQueryString,
+  withQuery,
+  normalizeRows,
+  normalizePagination,
+  downloadFile,
+  logout,
+} from '../services/httpClient'
 
 export class BackendCapabilityError extends Error {
   constructor(capability) {

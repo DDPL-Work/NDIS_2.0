@@ -34,7 +34,7 @@ export default function SectionCard({ id, title, subtitle, action, foot, childre
         children
       )}
 
-      {foot && <footer className="mt-4 border-t border-ink-100 pt-3">{foot}</footer>}
+      {foot && <footer>{foot}</footer>}
     </section>
   )
 }

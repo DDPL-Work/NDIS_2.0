@@ -1,4 +1,4 @@
-import { apiRequest } from '../services/httpClient'
+import { apiRequest, normalizeRows } from './apiClient'
 import { backendGisApi } from './gisApi'
 import { mapFacility } from './mappers/facilityMapper'
 import { invalidateData, DATA_SCOPES } from '../app/store/dataVersionStore'
@@ -10,7 +10,6 @@ import { cachedFacilities } from './facilityCache'
 // directly, return the mapped record for local state updates, bump the
 // FACILITIES/GIS invalidation scopes and evict the matching shared-cache
 // entries so no view can present a stale facility as live data.
-const rows = (response) => (Array.isArray(response) ? response : response?.results || response?.data || [])
 
 const touched = (departmentId) => {
   invalidateData(DATA_SCOPES.FACILITIES)
@@ -31,13 +30,13 @@ export const backendFacilityApi = {
     touched(payload?.department ?? facility.departmentId)
     return facility
   },
-  async history(id) { return rows(await apiRequest(`/facilities/${id}/history/`)) },
+  async history(id) { return normalizeRows(await apiRequest(`/facilities/${id}/history/`)) },
   // Asset categories carry the JSON field_schema; the endpoint is optional on
   // some deployments, so the call degrades to [] — the registry itself never
   // falls back to fabricated categories.
   async categories(departmentId) {
     try {
-      return rows(await apiRequest(`/asset-categories/${departmentId ? `?department=${departmentId}` : ''}`)).map((dto) => ({
+      return normalizeRows(await apiRequest(`/asset-categories/${departmentId ? `?department=${departmentId}` : ''}`)).map((dto) => ({
         id: String(dto.id),
         name: dto.name || 'Unnamed category',
         departmentId: String(dto.department ?? dto.department_id ?? ''),

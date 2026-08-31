@@ -1,4 +1,4 @@
-import { apiRequest } from '../services/httpClient'
+import { apiRequest, withQuery, normalizeRows } from './apiClient'
 
 // Master-data reference endpoints (verified against the production backend:
 // /api/complaint-categories/ and /api/districts/ are public).  Complaint
@@ -11,15 +11,11 @@ import { apiRequest } from '../services/httpClient'
 // are read opportunistically: they are optional on the backend, so every
 // collection call degrades to [] on 404 and the wizard falls back to its
 // hardcoded slug options — nothing breaks until those viewsets ship.
-const rows = (response) => Array.isArray(response) ? response : response.results || response.data || []
 
 async function masterCollection(url, params = {}, normalize = () => ({})) {
-  const query = new URLSearchParams(
-    Object.entries(params || {}).filter(([, value]) => value != null && value !== '').map(([key, value]) => [key, String(value)])
-  ).toString()
   let data
-  try { data = await apiRequest(`${url}${query ? `?${query}` : ''}`, { authenticated: false }) } catch (error) { data = [] }
-  return rows(data).map((dto) => normalize(dto))
+  try { data = await apiRequest(withQuery(url, params), { authenticated: false }) } catch (error) { data = [] }
+  return normalizeRows(data).map((dto) => normalize(dto))
 }
 
 export const backendMasterApi = {
@@ -36,6 +32,17 @@ export const backendMasterApi = {
   },
   async districts() {
     return masterCollection('/districts/', {}, (dto) => ({ id: String(dto.id), name: dto.name, state: dto.state_name || '', raw: dto }))
+  },
+  async departments() {
+    return masterCollection('/departments/', {}, (dto) => ({
+      id: String(dto.id),
+      name: dto.name,
+      code: dto.code || '',
+      description: dto.description || '',
+      color: dto.color || '',
+      icon: dto.icon || '',
+      raw: dto,
+    }))
   },
   async subdivisions(params = {}) {
     return masterCollection('/subdivisions/', params, (dto) => ({

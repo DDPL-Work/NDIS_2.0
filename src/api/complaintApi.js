@@ -1,4 +1,4 @@
-import { apiRequest } from '../services/httpClient'
+import { apiRequest, withQuery } from './apiClient'
 import { mapComplaint, mapComplaintList, registerComplaintReference, toComplaintDto } from './mappers/complaintMapper'
 
 // App state vocabulary (lowercase, used by badges/steppers/tabs) -> backend
@@ -33,9 +33,9 @@ const toBackendFilters = (params = {}) => {
   })
   return filters
 }
-const query = (params = {}) => { const value = new URLSearchParams(Object.entries(params).filter(([, item]) => item !== undefined && item !== null && item !== '').map(([key, item]) => [key, String(item)])); return value.toString() ? `?${value}` : '' }
+
 export const backendComplaintApi = {
-  async list(params) { const mapped = mapComplaintList(await apiRequest(`/complaints/${query(toBackendFilters(params))}`)); registerComplaintReference(mapped); return mapped },
+  async list(params) { const mapped = mapComplaintList(await apiRequest(withQuery('/complaints/', toBackendFilters(params)))); registerComplaintReference(mapped); return mapped },
   async create(payload) { return mapComplaint(await apiRequest('/complaints/', { method: 'POST', body: toComplaintDto(payload) })) },
   async byId(id) { const mapped = mapComplaint(await apiRequest(`/complaints/${id}/`)); registerComplaintReference([mapped]); return mapped },
   async timeline(id) { return apiRequest(`/complaints/${id}/timeline/`) },
@@ -50,8 +50,8 @@ export const backendComplaintApi = {
   async escalate(id, payload) { return mapComplaint(await apiRequest(`/complaints/${id}/escalate/`, { method: 'POST', body: payload })) },
   async reject(id, payload) { return mapComplaint(await apiRequest(`/complaints/${id}/reject/`, { method: 'POST', body: payload })) },
   async uploadEvidence(id, files) { const body = new FormData(); Array.from(files || []).forEach((file) => body.append('files', file)); return apiRequest(`/complaints/${id}/upload-evidence/`, { method: 'POST', body }) },
-  geojson: (params = {}) => apiRequest(`/complaints/geojson/${query(params)}`, { authenticated: false }),
-  heatmap: (params = {}) => apiRequest(`/complaints/heatmap/${query(params)}`, { authenticated: false }),
-  nearby: (params = {}) => apiRequest(`/complaints/nearby/${query(params)}`, { authenticated: false }),
-  nearestFacility: (params = {}) => apiRequest(`/complaints/nearest-facility/${query(params)}`, { authenticated: false }),
+  geojson: (params = {}) => apiRequest(withQuery('/complaints/geojson/', params), { authenticated: false }),
+  heatmap: (params = {}) => apiRequest(withQuery('/complaints/heatmap/', params), { authenticated: false }),
+  nearby: (params = {}) => apiRequest(withQuery('/complaints/nearby/', params), { authenticated: false }),
+  nearestFacility: (params = {}) => apiRequest(withQuery('/complaints/nearest-facility/', params), { authenticated: false }),
 }

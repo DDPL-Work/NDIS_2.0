@@ -1,4 +1,4 @@
-import { apiRequest } from './apiClient'
+import { apiRequest, withQuery } from './apiClient'
 import { mapProposal, mapProposalList } from './mappers/proposalMapper'
 import { mapNegotiationList, mapReleaseList, NEGOTIATION_MAPPER_BUILD } from './mappers/negotiationMapper'
 import { invalidateData, DATA_SCOPES } from '../app/store/dataVersionStore'
@@ -33,15 +33,10 @@ const toBackendFilters = (params = {}) => {
   return filters
 }
 
-const toQuery = (params = {}) => {
-  const value = new URLSearchParams(Object.entries(params).filter(([, item]) => item !== undefined && item !== null && item !== '').map(([key, item]) => [key, String(item)]))
-  return value.toString() ? `?${value}` : ''
-}
-
 const touched = (scopes) => () => scopes.forEach((scope) => invalidateData(scope))
 
 export const backendProposalApi = {
-  async list(params = {}) { return mapProposalList(await apiRequest(`/proposals/${toQuery(toBackendFilters(params))}`)) },
+  async list(params = {}) { return mapProposalList(await apiRequest(withQuery('/proposals/', toBackendFilters(params)))) },
   async get(id) { return mapProposal(await apiRequest(`/proposals/${id}/`)) },
   async create(payload) { const proposal = mapProposal(await apiRequest('/proposals/', { method: 'POST', body: payload })); touched([DATA_SCOPES.PROPOSALS, DATA_SCOPES.PLANNING])(); return proposal },
   async update(id, payload) { const proposal = mapProposal(await apiRequest(`/proposals/${id}/`, { method: 'PATCH', body: payload })); touched([DATA_SCOPES.PROPOSALS])(); return proposal },
@@ -75,7 +70,7 @@ export const backendProposalApi = {
   // test in one synchronous chain (before the component's SET STATE log).
   async negotiations(id, params = {}) {
     console.log('[NEGOTIATION MODULE BUILD]', NEGOTIATION_MAPPER_BUILD)
-    const raw = await apiRequest(`/proposals/${id}/negotiations/${toQuery(params)}`)
+    const raw = await apiRequest(withQuery(`/proposals/${id}/negotiations/`, params))
     console.log('[NEGOTIATION RAW RESPONSE]', JSON.stringify(raw, null, 2))
     console.log('[NEGOTIATION RAW TYPE]', typeof raw, Array.isArray(raw), raw && typeof raw === 'object' ? Object.keys(raw) : null)
     const normalized = mapNegotiationList(raw)
@@ -87,9 +82,9 @@ export const backendProposalApi = {
     if (Array.isArray(normalized) && normalized.length === 0 && Array.isArray(directTest) && directTest.length > 0) console.log('[NEGOTIATION STALE MAPPER] direct test wraps the raw body but mapNegotiationList returned [] — the executed mapper module predates the bare-record fix')
     return normalized
   },
-  async proposalNegotiations(params = {}) { return mapNegotiationList(await apiRequest(`/proposal-negotiations/${toQuery(toBackendFilters(params))}`)) },
+  async proposalNegotiations(params = {}) { return mapNegotiationList(await apiRequest(withQuery('/proposal-negotiations/', toBackendFilters(params)))) },
   // Budget release — FULL | INSTALLMENT modes; balances stay backend-authoritative.
   async release(id, payload) { const response = await apiRequest(`/proposals/${id}/release/`, { method: 'POST', body: payload }); touched([DATA_SCOPES.PROPOSALS, DATA_SCOPES.DASHBOARD, DATA_SCOPES.PROJECTS])(); return response },
-  async releases(id, params = {}) { return mapReleaseList(await apiRequest(`/proposals/${id}/releases/${toQuery(params)}`)) },
-  async proposalReleases(params = {}) { return mapReleaseList(await apiRequest(`/proposal-releases/${toQuery(toBackendFilters(params))}`)) },
+  async releases(id, params = {}) { return mapReleaseList(await apiRequest(withQuery(`/proposals/${id}/releases/`, params))) },
+  async proposalReleases(params = {}) { return mapReleaseList(await apiRequest(withQuery('/proposal-releases/', toBackendFilters(params)))) },
 }

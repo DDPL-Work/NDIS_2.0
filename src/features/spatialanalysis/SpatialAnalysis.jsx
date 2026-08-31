@@ -6,7 +6,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import {
-  executeSpatialAnalysis, spatialAnalysisCapability, savedQueriesCapability,
+  executeSpatialAnalysis, spatialAnalysisCapability, spatialAnalysisBugMessage, savedQueriesCapability,
   loadCatalog, loadFacilities, loadLayerFeatures, toFeatureRows, facilityCategoriesFrom,
   resultsToCsv, resultsToGeoJson,
 } from '../../api/spatialAnalysisApi'
@@ -33,7 +33,7 @@ function downloadBlob(content, filename, mimeType) {
 export default function SpatialAnalysis() {
   const [searchParams] = useSearchParams()
   const [query, setQuery] = useState(() => JSON.parse(JSON.stringify(DEMO_QUERY)))
-  const [capability, setCapability] = useState(null) // null | 'backend' | 'client-engine' | 'backend-payload-mismatch'
+  const [capability, setCapability] = useState(null) // null | 'backend' | 'client-engine'
   const [savedQueriesCap, setSavedQueriesCap] = useState('unverified')
   const [catalog, setCatalog] = useState(null)
   const [facilities, setFacilities] = useState([])
@@ -63,11 +63,13 @@ export default function SpatialAnalysis() {
         setSavedQueriesCap(savedCap)
         setCatalog(catalogData)
         setFacilities(facilityData)
-        const [other, state, national] = await Promise.all(
-          ROAD_LAYER_NAMES.map((name) => loadLayerFeatures(name))
-        )
-        if (cancelled) return
-        setRoads([...(other.features || []), ...(state.features || []), ...(national.features || [])])
+        // Road layers are optional — load in background, don't block bootstrap
+        Promise.all(ROAD_LAYER_NAMES.map((name) => loadLayerFeatures(name).catch(() => null)))
+          .then((results) => {
+            if (cancelled) return
+            const allRoads = results.filter(Boolean).flatMap((data) => data.features || [])
+            setRoads(allRoads)
+          })
       } catch (error) {
         if (!cancelled) {
           setDataError(error?.message || 'The GIS catalog or facilities collection could not be loaded.')
@@ -252,20 +254,16 @@ export default function SpatialAnalysis() {
         {/* Mode banner — where the query actually runs */}
         <div className={clsx('flex flex-wrap items-center gap-2 rounded-xl border px-4 py-2.5 text-[12.5px]', capability === 'client-engine' ? 'border-sky-200 bg-sky-50/70 text-sky-800' : capability === 'backend' ? 'border-leaf-200 bg-leaf-50/70 text-leaf-800' : 'border-ink-200 bg-ink-50/70 text-ink-700')}>
           {capability === 'backend' ? <Server size={14} className="shrink-0" /> : <Database size={14} className="shrink-0" />}
-          {capability === 'backend'
-            ? <>Backend endpoint detected — POST /api/spatial-analysis/query/ will execute the typed payload.</>
-            : capability === 'backend-payload-mismatch'
-              ? <>The backend exposes a spatial-analysis endpoint but rejected the typed payload — the frontend contract and backend schema must be aligned. Query execution is disabled rather than silently falling back.</>
-              : <>Capability probe result: <strong>POST /api/spatial-analysis/query/ is not deployed</strong> — the client engine executes the same typed contract over the real collections (facilities + GIS catalog). Every derived field is documented in the result provenance.</>}
+         
           {dataLoading && <Badge tone="info" dot>Loading real data…</Badge>}
           {!dataLoading && <Badge tone="neutral">{facilityCategories.length} facility categories · {gisLayers.length} GIS layers · {roads.length} road features</Badge>}
         </div>
 
         {/* Honest data-granularity note */}
-        <div className="flex items-start gap-2 rounded-xl border border-saffron-200 bg-saffron-50/60 px-4 py-2.5 text-[12.5px] text-saffron-800">
+        {/* <div className="flex items-start gap-2 rounded-xl border border-saffron-200 bg-saffron-50/60 px-4 py-2.5 text-[12.5px] text-saffron-800">
           <Info size={14} className="shrink-0 mt-0.5" />
           <span>Data note: the backend serves population at <strong>CD-block census level (20 blocks)</strong>, not village level, so the demo target layer is Rural_population blocks. Road accessibility is <strong>derived</strong> from the distance to the nearest road layer feature (Other Roads / State Highway / National Highway) — the catalog has no accessibility attribute.</span>
-        </div>
+        </div> */}
 
         {dataError && (
           <div className="rounded-xl border border-alert-200 bg-alert-50/60 px-4 py-3 text-[12.5px] text-alert-800">

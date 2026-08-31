@@ -19,12 +19,6 @@ export function distanceMeters([lng1, lat1], [lng2, lat2]) {
   return EARTH_RADIUS_M * c
 }
 
-export function jitterPoint(rng, [lng, lat], radiusDeg) {
-  const angle = rng() * Math.PI * 2
-  const r = rng() * radiusDeg
-  return [Number((lng + Math.cos(angle) * r).toFixed(6)), Number((lat + Math.sin(angle) * r).toFixed(6))]
-}
-
 export function formatCoord([lng, lat]) {
   return `${lat.toFixed(5)}°N, ${lng.toFixed(5)}°E`
 }

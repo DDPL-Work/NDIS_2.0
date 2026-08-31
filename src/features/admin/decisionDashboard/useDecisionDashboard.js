@@ -16,6 +16,8 @@ import {
   computeKpis,
   healthSnapshot,
 } from './priorityScoring'
+import { backendIndicatorApis } from '../../../api/indicatorApi'
+import { ROLES } from '../../../config/constants'
 
 // Performance contract (requirement §5): the dashboard issues a bounded set of
 // parallel requests (dashboard envelope, proposals, project summary, district
@@ -37,8 +39,8 @@ export function useDecisionDashboard() {
   const complaints = useComplaintEngine((s) => s.complaints)
   const hydrationStatus = useComplaintEngine((s) => s.hydrationStatus)
 
-  const role = user?.role || user?.roles?.[0] || 'dm'
-  const districtId = user?.districtId || 'nalanda'
+  const role = user?.role || user?.roles?.[0] || null
+  const districtId = user?.districtId || null
   const district = DISTRICTS.find((d) => d.id === districtId) || DISTRICTS[0]
   const config = useMemo(() => dashboardConfigForRole(role), [role])
 
@@ -49,19 +51,46 @@ export function useDecisionDashboard() {
     budget: initial,
     facilities: initial,
     heatmap: initial,
+    indicators: initial,
   })
 
   const load = useCallback(async () => {
     setSources((current) => Object.fromEntries(
       Object.entries(current).map(([key, value]) => [key, { ...value, status: 'loading' }])
     ))
-    const dashboardRequest = role === 'district_collector'
+    const dashboardRequest = role === ROLES.DISTRICT_COLLECTOR
       ? backendDashboardApi.districtCollector({ district: districtId })
-      : role === 'adm'
+      : role === ROLES.ADM
         ? backendDashboardApi.adm({ district: districtId })
-        : role === 'state_admin'
+        : role === ROLES.STATE_ADMIN
           ? backendDashboardApi.state()
           : backendDashboardApi.dm({ district: districtId })
+    
+    // Determine which indicators to fetch based on user's department
+    const departmentId = user?.departmentId
+    let indicatorPromise = Promise.resolve({ metrics: [] })
+    
+    if (departmentId && backendIndicatorApis[departmentId]) {
+      indicatorPromise = backendIndicatorApis[departmentId].get({ district: districtId })
+    } else if (role === ROLES.DISTRICT_COLLECTOR || role === ROLES.DM || role === ROLES.ADM || role === ROLES.STATE_ADMIN) {
+      // For admin roles, fetch all available indicators
+      indicatorPromise = Promise.allSettled([
+        backendIndicatorApis.education?.get({ district: districtId }),
+        backendIndicatorApis.health?.get({ district: districtId }),
+        backendIndicatorApis.water?.get({ district: districtId }),
+        backendIndicatorApis.pwd?.get({ district: districtId }),
+        backendIndicatorApis.urban?.get({ district: districtId }),
+      ]).then((results) => {
+        const combined = { metrics: [] }
+        results.forEach((result) => {
+          if (result.status === 'fulfilled' && result.value?.metrics) {
+            combined.metrics.push(...result.value.metrics)
+          }
+        })
+        return combined
+      })
+    }
+
     const results = await Promise.allSettled([
       dashboardRequest,
       backendProposalApi.list({ districtId }),
@@ -69,6 +98,7 @@ export function useDecisionDashboard() {
       backendBudgetApi.districtAllocations.list({ district: districtId }),
       GISRepository.facilities({ districtId }),
       GISRepository.complaintHeatmap({ districtId }),
+      indicatorPromise,
     ])
     setSources({
       dashboard: settle(results[0]),
@@ -77,8 +107,9 @@ export function useDecisionDashboard() {
       budget: settle(results[3]),
       facilities: settle(results[4]),
       heatmap: settle(results[5]),
+      indicators: settle(results[6]),
     })
-  }, [role, districtId])
+  }, [role, districtId, user?.departmentId])
 
   useEffect(() => { load() }, [load])
 
@@ -86,16 +117,17 @@ export function useDecisionDashboard() {
     const facilities = sources.facilities.data || []
     const proposals = sources.proposals.data || []
     const projectSummary = sources.projectSummary.data || {}
+    const indicators = sources.indicators.data || { metrics: [] }
     return {
       areas: computePriorityAreas({ facilities, complaints, proposals }),
       kpis: computeKpis({ facilities, complaints, proposals, projectSummary }),
       pipeline: pipelineBuckets(proposals),
       signals: citizenSignals(complaints),
       actions: buildActionQueue({ complaints, proposals, projectSummary }),
-      health: healthSnapshot(facilities),
+      health: healthSnapshot(facilities, indicators),
       complaintsReady: hydrationStatus === 'ready',
     }
-  }, [sources.facilities.data, sources.proposals.data, sources.projectSummary.data, complaints, hydrationStatus])
+  }, [sources.facilities.data, sources.proposals.data, sources.projectSummary.data, sources.indicators.data, complaints, hydrationStatus])
 
   const budget = useMemo(() => {
     const records = sources.budget.data || []

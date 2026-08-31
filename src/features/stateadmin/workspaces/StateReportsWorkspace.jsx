@@ -3,7 +3,7 @@
 // finance/governance/project stores and exports to CSV or JSON.
 // Export requires report.export; viewing requires report.view.
 import { useMemo, useState } from 'react'
-import { FileText, FileDown, FileJson } from 'lucide-react'
+import { FileText, FileDown, FileJson, Loader2 } from 'lucide-react'
 import PageHeader from '../../../components/ui/PageHeader'
 import { Card, CardHeader, CardBody } from '../../../components/ui/Card'
 import DataTable from '../../../components/ui/DataTable'
@@ -21,6 +21,7 @@ import { useUiStore } from '../../../app/store/uiStore'
 import { FINANCIAL_YEARS, DOCUMENT_TYPE_LABELS, PROJECT_STATUS_LABELS } from '../../../config/stateConstants'
 import { formatAmount } from '../components/StateUI'
 import Icon from '../../../components/ui/Icon'
+import { backendReportApi } from '../../../api/reportApi'
 
 const REPORT_DEFS = [
   { id: 'budget', title: 'Budget Position Report', icon: 'Landmark', description: 'Department-wise provision, authorization, sanction, release and available balance.' },
@@ -159,11 +160,14 @@ function ReportPreview({ def }) {
   const pushToast = useUiStore((s) => s.pushToast)
   const canExport = useStatePermission('report.export')
   const [fy, setFy] = useState('2026-27')
+  const [generatingPdf, setGeneratingPdf] = useState(false)
 
   const { rows, columns } = useMemo(() => ({
     rows: run({ id: def.id, fy, store, master, projects, proposals, orders }),
     columns: COLUMNS[def.id],
   }), [def.id, fy, store, master, projects, proposals, orders])
+
+  const REPORT_TYPE_MAP = { budget: 'sla_audit', sanctions: 'workflow', releases: 'workflow', ledger: 'workflow', utilization: 'sla_audit', districts: 'sla_audit', projects: 'asset_audit', proposals: 'workflow', orders: 'workflow', audit: 'workflow' }
 
   const downloadCSV = () => {
     const header = columns.map((c) => c.label).join(',')
@@ -182,6 +186,30 @@ function ReportPreview({ def }) {
     pushToast(`${def.title} exported as JSON.`, 'success')
   }
 
+  const generatePdf = async () => {
+    setGeneratingPdf(true)
+    try {
+      const type = REPORT_TYPE_MAP[def.id] || 'sla_audit'
+      const result = await backendReportApi.generate({ type })
+      const { blob, filename } = await backendReportApi.download(result.report.id)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename || `${result.report.code}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      pushToast(`Report ${result.report.code} generated and downloaded.`, 'success')
+    } catch (e) {
+      const msg = e?.message || 'PDF generation failed'
+      if (e?.status === 404) pushToast(`Report type not available on backend: ${msg}`, 'warning')
+      else pushToast(`PDF generation failed: ${msg}`, 'error')
+    } finally {
+      setGeneratingPdf(false)
+    }
+  }
+
   return (
     <Card>
       <CardHeader
@@ -195,6 +223,7 @@ function ReportPreview({ def }) {
               <>
                 <Button size="sm" variant="outline" icon={FileDown} onClick={downloadCSV}>CSV</Button>
                 <Button size="sm" variant="outline" icon={FileJson} onClick={downloadJSON}>JSON</Button>
+                <Button size="sm" variant="outline" icon={generatingPdf ? Loader2 : FileText} loading={generatingPdf} onClick={generatePdf}>Generate PDF</Button>
               </>
             )}
           </div>

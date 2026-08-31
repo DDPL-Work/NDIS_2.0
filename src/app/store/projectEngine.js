@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { ROLES } from '../../config/constants'
+import { useAuthStore } from './authStore'
 
 const today = () => new Date().toISOString().split('T')[0]
 const event = (entityType, entityId, type, details = '') => ({
@@ -66,7 +68,7 @@ export const useProjectEngine = create(
           auditTrail: [{
             timestamp: new Date().toISOString(),
             actorName: payload.creatorName || 'Officer',
-            actorRole: 'dept_head',
+            actorRole: useAuthStore.getState().user?.role || ROLES.DEPT_HEAD,
             action: 'DRAFT_CREATED',
             remarks: 'Proposal created in system.'
           }],
@@ -125,7 +127,7 @@ export const useProjectEngine = create(
 
           // Only a district-level sanction may promote a DPR into execution.
           // Department review can forward to DM, but can never create a project.
-          if (nextState === 'approved' && ['district_collector', 'dm', 'adm', 'system_admin'].includes(actorUser.role)) {
+          if (nextState === 'approved' && [ROLES.DISTRICT_COLLECTOR, ROLES.DM, ROLES.ADM, ROLES.SYSTEM_ADMIN].includes(actorUser.role)) {
             const projects = get().projects
             const projectExists = projects.some(pr => pr.proposalId === p.id)
             if (!projectExists) {
@@ -137,7 +139,7 @@ export const useProjectEngine = create(
                 departmentId: p.departmentId,
                 scheme: p.schemeMapping || 'District Capital Works',
                 village: p.gisLocation?.address || 'District Site',
-                gps: p.gisLocation?.position || [85.4211, 25.0294],
+                gps: p.gisLocation?.position || null,
                 timeline: p.timeline || '90 Days',
                 priority: p.priority || 'medium',
                 beneficiaries: p.population || 0,
@@ -174,14 +176,14 @@ export const useProjectEngine = create(
                 title: `Mobilization and site deployment: ${p.title}`,
                 departmentId: p.departmentId,
                 assignedOfficer: { name: actorUser.name, role: actorUser.role, dept: p.departmentId },
-                assignedEngineer: { name: 'Amit Jha', role: 'engineer', dept: p.departmentId },
+                assignedEngineer: { name: 'Unassigned', role: ROLES.ENGINEER, dept: p.departmentId },
                 scheduleWork: now.split('T')[0],
                 priority: p.priority || 'medium',
                 deadline: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString().split('T')[0],
                 state: 'assigned',
                 completionDate: null,
                 remarks: 'Initial mobilization work order automatically scheduled.',
-                gisLocation: p.gisLocation || { position: [85.4211, 25.0294], address: 'District Site' },
+                gisLocation: p.gisLocation || undefined,
                 history: [{ timestamp: now, event: 'WORK_ORDER_ASSIGNED', note: 'Created upon proposal approval.' }]
               }
               newProject.workOrderIds.push(woId)
@@ -189,7 +191,7 @@ export const useProjectEngine = create(
               const asset = {
                 id: assetId, name: p.title, type: 'project_asset', typeLabel: 'Project Asset',
                 departmentId: p.departmentId, village: p.gisLocation?.address || 'District Site', block: 'Nalanda',
-                position: p.gisLocation?.position || [85.4211, 25.0294], status: 'planned', health: 100,
+                position: p.gisLocation?.position || null, status: 'planned', health: 100,
                 lifecycleState: 'planned', projectId: prjId, attributes: { scheme: p.schemeMapping || 'Capital Works' },
                 lastInspected: null,
               }

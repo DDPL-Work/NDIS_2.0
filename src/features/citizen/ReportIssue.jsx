@@ -4,7 +4,7 @@
 // backend DTO as the 5-step wizard (auto-routing + SLA rules).
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { CheckCircle2, Camera, ArrowLeft, ArrowRight, Navigation, ShieldCheck, MapPin } from 'lucide-react'
+import { CheckCircle2, Camera, ArrowLeft, ArrowRight, Navigation, MapPin } from 'lucide-react'
 import { useAsync } from '../../hooks/useAsync'
 import { gisApi, workflowApi } from '../../services/api'
 import { Card, CardBody, CardHeader } from '../../components/ui/Card'
@@ -21,9 +21,8 @@ import { backendMasterApi } from '../../api/masterApi'
 import { useDepartmentStore } from '../../store/departments'
 
 const ISSUE_CATEGORIES = { water: ['Broken Handpump', 'Pipe Leakage', 'Motor Burnt', 'Water Contamination', 'Low Water Pressure', 'Pipeline Damage', 'Water Tank Overflow', 'Other'], electricity: ['Street Light', 'Transformer', 'Power Failure', 'Electric Pole', 'Electric Wire', 'Meter', 'Other'], health: ['Hospital Cleanliness', 'Medicine Shortage', 'Doctor Absent', 'Oxygen', 'Ambulance', 'Other'], education: ['School Toilet', 'Classroom Damage', 'Furniture', 'Teacher Absent', 'Drinking Water', 'Other'], pwd: ['Pothole', 'Bridge Damage', 'Road Blocked', 'Public Building Damage', 'Other'], solar: ['Solar Panel', 'Battery', 'Controller', 'Power Generation', 'Other'], tourism: ['Tourism Signboard', 'Lighting', 'Visitor Facility', 'Heritage Site', 'Other'], urban: ['Garbage', 'Drain Blockage', 'Sanitation', 'Street Cleaning', 'Other'] }
-const FALLBACK_DEPARTMENTS = [
-  ['water', 'Water & Sanitation (JJM)', 'Handpumps, pipelines, tanks and drinking water'], ['electricity', 'Electricity', 'Street lights, transformers and power supply'], ['health', 'Health & Family Welfare', 'Hospitals, ambulances and public health services'], ['education', 'School Education', 'Schools, classrooms and learning facilities'], ['pwd', 'Roads & Public Works', 'Roads, bridges and public buildings'], ['solar', 'Solar & Renewable Energy', 'Solar panels, batteries and renewable systems'], ['tourism', 'Tourism & Heritage', 'Visitor facilities, heritage sites and signs'], ['urban', 'Urban Local Body', 'Sanitation, drains and public spaces'],
-]
+
+// Minimal fallback only when backend hierarchy endpoints are not deployed
 const FALLBACK_BLOCKS = [
   { value: 'silao', label: 'Silao Block' },
   { value: 'biharsharif', label: 'Bihar Sharif Block' },
@@ -57,23 +56,22 @@ export default function ReportIssue() {
 
   const deptCards = useMemo(() => {
     if (!departments.length) {
-      return FALLBACK_DEPARTMENTS.map(([id, label, summary]) => ({ id, slug: id, name: label, summary, api: false }))
+      return []
     }
     return departments.map((d) => {
       const slug = departmentSlugFromName(d.name)
-      const known = FALLBACK_DEPARTMENTS.find(([id]) => id === slug)
       return {
         id: String(d.id),
         slug,
-        name: known ? known[1] : d.name,
-        summary: known ? known[2] : (d.description || 'Line department'),
+        name: d.name,
+        summary: d.description || 'Line department',
         api: true,
       }
     })
   }, [departments])
 
   // Issue details
-  const [selectedDepartmentId, setSelectedDepartmentId] = useState('water')
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState('')
   const [categoryId, setCategoryId] = useState(CATEGORY_ROUTING_RULES[0].categoryId)
   const [selectedCategoryKey, setSelectedCategoryKey] = useState('')
   const [title, setTitle] = useState('')
@@ -539,8 +537,8 @@ export default function ReportIssue() {
                   <img src={attachment.url} alt={attachment.name} className="h-16 w-16 rounded-lg object-cover border border-ink-200 shrink-0" />
                   <div className="min-w-0 flex-1 text-[12px]">
                     <p className="font-semibold text-ink-900 truncate">{attachment.name}</p>
-                    <div className="flex items-center gap-1.5 text-leaf-700 font-medium text-[11px] mt-0.5">
-                      <ShieldCheck size={13} /> Geo-Tagged (valid distance {attachment.distMeters ?? '—'}m)
+                    <div className="flex items-center gap-1.5 text-ink-600 text-[11px] mt-0.5">
+                      <Camera size={13} /> Photo attached — EXIF verification pending backend
                     </div>
                     <button type="button" onClick={() => setAttachment(null)} className="text-[11px] text-alert-600 font-medium mt-1 hover:underline">
                       Remove photo
@@ -558,7 +556,7 @@ export default function ReportIssue() {
               )}
               <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileSelected} />
               <p className="text-[11.5px] text-ink-400 leading-relaxed mt-2">
-                Photo EXIF location is validated against the asset location (200m tolerance) to detect mis-tagged uploads before reaching the department.
+                Photo EXIF location is verified by the backend against the submitted pin. Verification status will be available after submission.
               </p>
             </div>
             )}

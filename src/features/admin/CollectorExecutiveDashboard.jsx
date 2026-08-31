@@ -18,7 +18,9 @@ import Modal from '../../components/ui/Modal'
 import ComplaintDetailHub from '../shared/ComplaintDetailHub'
 import { useAuthStore } from '../../app/store/authStore'
 import { useComplaintEngine } from '../../app/store/complaintEngine'
-import { DEPARTMENTS, DEPARTMENT_MAP, DISTRICTS } from '../../config/constants'
+import { useAsync } from '../../hooks/useAsync'
+import { backendDashboardApi } from '../../api/dashboardApi'
+import { useDepartments } from '../../hooks/useMasterData'
 import { formatNumber, formatPercent, formatCurrencyINR, formatDateTime } from '../../utils/format'
 
 const COLORS = ['#c0392b', '#1d7ab5', '#1f7a54', '#e07a2c', '#8a4fc0', '#546882']
@@ -26,9 +28,22 @@ const COLORS = ['#c0392b', '#1d7ab5', '#1f7a54', '#e07a2c', '#8a4fc0', '#546882'
 export default function CollectorExecutiveDashboard() {
   const user = useAuthStore((s) => s.user)
   const districtId = user?.districtId || 'nalanda'
-  const district = DISTRICTS.find((d) => d.id === districtId) || DISTRICTS[0]
 
   const complaints = useComplaintEngine((s) => s.complaints)
+  const { data: departments } = useDepartments()
+
+  // Backend dashboard envelope — provides authoritative KPIs, department
+  // breakdowns, SLA compliance, and activity data when available.
+  const { data: dashboard, loading: dashboardLoading } = useAsync(
+    () => backendDashboardApi.districtCollector({ district: districtId }),
+    [districtId]
+  )
+  const backendKpis = dashboard?.kpis || null
+  const backendComplaints = dashboard?.complaints || null
+  const backendDeptBreakdown = dashboard?.departmentBreakdown || null
+  const backendStatusBreakdown = dashboard?.statusBreakdown || null
+  const sourceEndpoint = 'GET /api/dashboards/district-collector/'
+  const updatedAt = dashboard?.updatedAt || null
 
   const [selectedComplaintId, setSelectedComplaintId] = useState(null)
   const [activeTab, setActiveTab] = useState('critical') // 'critical' | 'rankings' | 'analytics'
@@ -40,52 +55,69 @@ export default function CollectorExecutiveDashboard() {
       .slice(0, 10)
   }, [complaints])
 
-  // Department Breakdown
+  // Department Breakdown — prefer backend data, fall back to local computation
   const deptBreakdown = useMemo(() => {
-    return DEPARTMENTS.map((d) => {
-      const list = complaints.filter((c) => c.departmentSlug === d.id)
+    if (backendDeptBreakdown?.length) {
+      return backendDeptBreakdown.map((d) => ({
+        id: String(d.department_id || d.id),
+        label: d.department_name || d.name || 'Department',
+        color: d.color || '#546882',
+        icon: d.icon || 'Building2',
+        total: Number(d.total ?? d.total_complaints ?? 0),
+        pending: Number(d.pending ?? d.open ?? 0),
+        resolved: Number(d.resolved ?? 0),
+        slaPct: Number(d.sla_compliance ?? d.slaPct ?? 0),
+      }))
+    }
+    // Fallback: derive from complaint engine store + backend departments
+    const deptList = departments || []
+    return deptList.map((d) => {
+      const list = complaints.filter((c) => String(c.departmentId || c.departmentSlug) === String(d.id))
       const resolved = list.filter((c) => ['resolved', 'closed'].includes(c.state)).length
       const slaMet = list.filter((c) => c.slaDueAt && new Date(c.slaDueAt).getTime() > new Date(c.createdAt).getTime()).length
       return {
-        id: d.id,
-        label: d.label,
-        color: d.color,
-        icon: d.icon,
+        id: String(d.id),
+        label: d.name,
+        color: d.color || '#546882',
+        icon: d.icon || 'Building2',
         total: list.length,
         pending: list.length - resolved,
         resolved,
         slaPct: list.length ? Math.round((slaMet / list.length) * 100) : 100,
       }
     })
-  }, [complaints])
+  }, [backendDeptBreakdown, departments, complaints])
 
   // Block Breakdown Chart Data
   const blockData = useMemo(() => {
     const map = {}
     complaints.forEach((c) => {
-      const block = c.location?.block || 'Silao'
+      const block = c.location?.block || 'Unknown'
       map[block] = (map[block] || 0) + 1
     })
     return Object.entries(map).map(([name, value]) => ({ name, count: value }))
   }, [complaints])
 
-  // Overall Metrics
+  // Overall Metrics — prefer backend KPIs, fall back to local computation
   const metrics = useMemo(() => {
+    if (backendKpis) {
+      return {
+        total: Number(backendKpis.total ?? backendComplaints?.total ?? 0),
+        pending: Number(backendKpis.pending ?? backendComplaints?.open ?? 0),
+        resolved: Number(backendKpis.completed ?? backendComplaints?.resolved ?? 0),
+        escalated: Number(backendKpis.escalated ?? backendComplaints?.escalated ?? 0),
+        slaCompliance: Number(backendKpis.slaCompliance ?? backendKpis.within_sla ?? 0),
+        totalEstCost: Number(backendKpis.totalEstCost ?? 0),
+      }
+    }
+    // Fallback: derive from complaint engine store
     const total = complaints.length
     const resolved = complaints.filter((c) => ['resolved', 'closed'].includes(c.state)).length
     const escalated = complaints.filter((c) => c.state === 'escalated').length
     const slaCompliance = total ? Math.round(((total - escalated) / total) * 100) : 100
     const totalEstCost = complaints.reduce((sum, c) => sum + (c.inspectionDetails?.estimatedCost || 0), 0)
-
-    return {
-      total,
-      pending: total - resolved,
-      resolved,
-      escalated,
-      slaCompliance,
-      totalEstCost,
-    }
-  }, [complaints])
+    return { total, pending: total - resolved, resolved, escalated, slaCompliance, totalEstCost }
+  }, [backendKpis, backendComplaints, complaints])
 
   // Map points
   const mapFacilities = useMemo(() => {
@@ -116,17 +148,19 @@ export default function CollectorExecutiveDashboard() {
   }, [complaints, deptBreakdown])
 
   return (
-    <div className="space-y-6 pb-8">
+    <div className="space-y-6">
       <PageHeader
         eyebrow="District Collector Command Center · LLD Vol 3 §18"
-        title={`${district.label} District — Executive Operations Dashboard`}
+        title={`District Executive Operations Dashboard`}
         description="Real-time district oversight, SLA compliance leaderboards, critical complaint tracking, and AI-driven decision support."
+        source={sourceEndpoint}
+        updatedAt={updatedAt}
       />
 
       {/* KPI Strip */}
       <div className="px-6 grid grid-cols-2 sm:grid-cols-4 gap-3.5">
         <StatCard label="Total Complaints" value={formatNumber(metrics.total)} icon={Gavel} tone="ink" sub={`${metrics.pending} pending action`} />
-        <StatCard label="SLA Compliance Rate" value={`${metrics.slaCompliance}%`} icon={CheckCircle2} tone="leaf" delta={4.2} sub="Target ≥ 85%" />
+        <StatCard label="SLA Compliance Rate" value={`${metrics.slaCompliance}%`} icon={CheckCircle2} tone="leaf" sub="Target ≥ 85%" />
         <StatCard label="Critical / Escalated" value={metrics.escalated} icon={AlertTriangle} tone="alert" sub="Requires DM Intervention" />
         <StatCard label="Repair Budget Impact" value={formatCurrencyINR(metrics.totalEstCost)} icon={Calculator} tone="saffron" sub="Inspected Field Works" />
       </div>
@@ -169,7 +203,7 @@ export default function CollectorExecutiveDashboard() {
               <CardBody className="!p-0">
                 <div className="divide-y divide-ink-100">
                   {criticalComplaints.map((c) => {
-                    const dept = DEPARTMENT_MAP[c.departmentSlug] || {} 
+                    const dept = deptBreakdown.find((d) => String(d.id) === String(c.departmentId || c.departmentSlug)) || {}
                     return (
                       <div key={c.id} className="p-4 flex items-center justify-between gap-3 hover:bg-ink-50/50 transition-colors">
                         <div className="min-w-0 flex-1">

@@ -8,7 +8,8 @@ import { useAuthStore } from '../../app/store/authStore'
 import { useI18n } from '../../i18n/i18n'
 import { useAsync } from '../../hooks/useAsync'
 import { notificationApi } from '../../services/api'
-import { DISTRICTS, DEPARTMENTS, ROLE_LABELS, ROLES } from '../../config/constants'
+import { useDepartments, useDistricts } from '../../hooks/useMasterData'
+import { ROLE_LABELS, ROLES } from '../../config/constants'
 import { useNavigate } from 'react-router-dom'
 import { useTourStore } from '../tour/tourStore'
 import { markReadLocal } from '../../utils/notificationRead'
@@ -69,6 +70,9 @@ export default function Topbar({ title, subtitle, showDistrict = true, showDepar
   const setDepartment = useAuthStore((s) => s.setDepartment)
   const { locale, setLocale } = useI18n()
 
+  const { data: departments } = useDepartments()
+  const { data: districts } = useDistricts()
+
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [cmdOpen, setCmdOpen] = useState(false)
 
@@ -89,19 +93,22 @@ export default function Topbar({ title, subtitle, showDistrict = true, showDepar
 
   const unreadCount = localNotifs.filter((n) => !n.read).length
   const canSwitchDepartment = [ROLES.DISTRICT_COLLECTOR, ROLES.DM, ROLES.ADM, ROLES.STATE_ADMIN, ROLES.SYSTEM_ADMIN].includes(user?.role)
-  const currentDepartment = DEPARTMENTS.find((department) => department.id === user?.departmentId)
 
-  // District options come from the configured hierarchy (slug ids); when the
-  // authenticated profile carries the numeric backend district pk, its label
-  // is resolved from the profile itself so the selector never renders an
-  // undefined pair ("Nalanda (undefined)").
+  // Build department options from backend data; fall back to empty if not loaded
+  const departmentOptions = useMemo(() => {
+    if (!departments?.length) return []
+    return departments.map((d) => ({ value: String(d.id), label: d.name }))
+  }, [departments])
+
+  // Build district options from backend data; fall back to empty if not loaded
   const districtOptions = useMemo(() => {
-    const base = DISTRICTS.map((d) => ({ value: d.id, label: d.phase ? `${d.label} (${d.phase})` : d.label }))
-    if (user?.districtId && !base.some((option) => option.value === user.districtId) && user?.district?.label) {
-      return [...base, { value: user.districtId, label: user.district.label }]
+    const base = (districts || []).map((d) => ({ value: String(d.id), label: d.name }))
+    // If user's district is not in the list (numeric backend pk), add it from profile
+    if (user?.districtId && !base.some((option) => option.value === String(user.districtId)) && user?.district?.label) {
+      return [...base, { value: String(user.districtId), label: user.district.label }]
     }
     return base
-  }, [user?.districtId, user?.district?.label])
+  }, [districts, user?.districtId, user?.district?.label])
 
   return (
     <>
@@ -143,9 +150,9 @@ export default function Topbar({ title, subtitle, showDistrict = true, showDepar
           {showDepartment && (
             <div className="hidden sm:flex items-center max-w-[180px] min-w-0">
               {canSwitchDepartment ? (
-                <Select small value={user?.departmentId} onChange={setDepartment} options={DEPARTMENTS.map((d) => ({ value: d.id, label: d.label }))} />
+                <Select small value={user?.departmentId} onChange={setDepartment} options={departmentOptions} />
               ) : (
-                <Badge tone="info">{currentDepartment?.label || 'Department workspace'}</Badge>
+                <Badge tone="info">{user?.department?.label || 'Department workspace'}</Badge>
               )}
             </div>
           )}

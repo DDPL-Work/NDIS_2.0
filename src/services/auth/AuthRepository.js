@@ -7,5 +7,8 @@ export const AuthRepository = {
   // GET /api/auth/roles/ — public catalog of the platform's roles.
   async listRoles() { return apiRequest('/auth/roles/', { authenticated: false }) },
   async refreshToken() { const current = tokenManager.get(); const tokens = await apiRequest('/auth/token/refresh/', { method: 'POST', body: { refresh: current.refresh }, authenticated: false }); tokenManager.save({ access: tokens.access, refresh: tokens.refresh || current.refresh, user: current.user }); return tokens },
+  async changePassword(payload) { return apiRequest('/auth/change-password/', { method: 'POST', body: payload }) },
+  async forgotPassword(payload) { return apiRequest('/auth/forgot-password/', { method: 'POST', body: payload, authenticated: false }) },
+  async resetPassword(payload) { return apiRequest('/auth/forgot-password/reset/', { method: 'POST', body: payload, authenticated: false }) },
   logout() { tokenManager.clear() },
 }

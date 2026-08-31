@@ -1,7 +1,7 @@
 // Complaints & Inspections (Field Operations) — Vol 3 §15.2, §16.
 // Field Engineers & Department Officers update status with geo-tagged inspection photos.
 import { useState } from 'react'
-import { Camera, CheckCircle2, Wrench, Upload, MapPin, AlertCircle } from 'lucide-react'
+import { Camera, CheckCircle2, Wrench, Upload, MapPin, AlertCircle, Loader2 } from 'lucide-react'
 import PageHeader from '../../components/ui/PageHeader'
 import Tabs from '../../components/ui/Tabs'
 import DataTable from '../../components/ui/DataTable'
@@ -30,11 +30,11 @@ export default function FieldOps() {
   const [tab, setTab] = useState('assigned')
   const [selected, setSelected] = useState(null)
 
-  // Photo upload & EXIF state
+  // Photo upload & EXIF verification state
   const [photoFile, setPhotoFile] = useState(null)
   const [photoPreview, setPhotoPreview] = useState(null)
-  const [exifGps, setExifGps] = useState(null) // { lat, lng, verified, distanceM }
-  const [validatingGps, setValidatingGps] = useState(false)
+  const [geotagResult, setGeotagResult] = useState(null) // backend verify-geotag response
+  const [verifyingGps, setVerifyingGps] = useState(false)
   const [busy, setBusy] = useState(false)
 
   const { data: grievances, loading, refetch } = useAsync(
@@ -48,29 +48,28 @@ export default function FieldOps() {
 
     setPhotoFile(file)
     setPhotoPreview(URL.createObjectURL(file))
-    setValidatingGps(true)
+    setGeotagResult(null)
 
-    // Simulate EXIF GPS extraction & spatial proximity validation against facility location (200m tolerance)
-    setTimeout(() => {
-      // Mock generated GPS coordinate close to site (e.g. 42 meters away)
-      setExifGps({
-        lat: 25.1384,
-        lng: 85.4442,
-        // Local preview is not evidence; only a backend verifier may set true.
-        verified: false,
-        distanceM: 42,
-        timestamp: new Date().toISOString(),
-      })
-      setValidatingGps(false)
-      pushToast('Photo uploaded — EXIF GPS validated within 200m of asset location!', 'success')
-    }, 700)
+    const lat = selected?.location?.position?.[1] || selected?.latitude
+    const lng = selected?.location?.position?.[0] || selected?.longitude
+    if (lat && lng) {
+      setVerifyingGps(true)
+      import('../../api/gisApi').then(({ backendGisApi }) =>
+        backendGisApi.verifyGeotag({ latitude: lat, longitude: lng })
+          .then((result) => setGeotagResult(result))
+          .catch(() => setGeotagResult(null))
+          .finally(() => setVerifyingGps(false))
+      )
+    } else {
+      pushToast('No asset coordinates available for EXIF verification.', 'warning')
+    }
   }
 
   function clearPhoto() {
     if (photoPreview) URL.revokeObjectURL(photoPreview)
     setPhotoFile(null)
     setPhotoPreview(null)
-    setExifGps(null)
+    setGeotagResult(null)
   }
 
   async function updateStatus(next) {
@@ -155,7 +154,7 @@ export default function FieldOps() {
               <Button
                 icon={CheckCircle2}
                 loading={busy}
-                disabled={!exifGps?.verified}
+                disabled={!geotagResult?.verified}
                 onClick={() => updateStatus('resolved')}
               >
                 Mark resolved
@@ -214,22 +213,39 @@ export default function FieldOps() {
                           </button>
                         </div>
 
-                        {validatingGps ? (
+                        {verifyingGps ? (
                           <div className="flex items-center gap-1.5 text-[11.5px] text-ink-500">
-                            <span className="animate-spin text-saffron-500">⏳</span> Validating EXIF GPS metadata…
+                            <Loader2 size={12} className="animate-spin text-saffron-500" /> Verifying EXIF GPS via backend…
                           </div>
-                        ) : exifGps?.verified ? (
+                        ) : geotagResult?.verified ? (
                           <div className="space-y-1">
                             <Badge tone="positive" className="inline-flex items-center gap-1">
-                              <CheckCircle2 size={11} /> EXIF GPS Verified ({exifGps.distanceM}m from asset)
+                              <CheckCircle2 size={11} /> EXIF GPS Verified ({geotagResult.distance_offset_meters}m from pin)
                             </Badge>
                             <p className="kbd-mono text-[11px] text-ink-500">
-                              Lat: {exifGps.lat.toFixed(4)}°, Lng: {exifGps.lng.toFixed(4)}°
+                              Lat: {Number(geotagResult.exif_latitude).toFixed(4)}°, Lng: {Number(geotagResult.exif_longitude).toFixed(4)}°
                             </p>
+                            {geotagResult.is_duplicate_25m && (
+                              <p className="text-[11px] text-saffron-700">{geotagResult.nearby_duplicates?.length || 0} nearby features within 25m</p>
+                            )}
+                          </div>
+                        ) : geotagResult && !geotagResult.verified ? (
+                          <div className="space-y-1">
+                            <Badge tone="negative" className="inline-flex items-center gap-1">
+                              <AlertCircle size={11} /> REJECTED — {geotagResult.failure_reason || 'EXIF verification failed'}
+                            </Badge>
+                            {geotagResult.exif_latitude && (
+                              <p className="kbd-mono text-[11px] text-ink-500">
+                                Photo GPS: {Number(geotagResult.exif_latitude).toFixed(4)}°, {Number(geotagResult.exif_longitude).toFixed(4)}°
+                              </p>
+                            )}
+                            {geotagResult.distance_offset_meters != null && (
+                              <p className="text-[11px] text-ink-500">Distance: {geotagResult.distance_offset_meters}m from pin</p>
+                            )}
                           </div>
                         ) : (
-                          <Badge tone="negative" className="inline-flex items-center gap-1">
-                            <AlertCircle size={11} /> GPS Out of Range (&gt;200m)
+                          <Badge tone="neutral" className="inline-flex items-center gap-1">
+                            <AlertCircle size={11} /> Pending verification
                           </Badge>
                         )}
                       </div>
@@ -238,7 +254,7 @@ export default function FieldOps() {
                 )}
 
                 <p className="text-[11.5px] text-ink-400">
-                  EXIF GPS is validated against the asset location (200m tolerance) before this can move to Resolved.
+                  EXIF GPS is verified by the backend against the complaint pin location. The resolve button requires backend VERIFIED status.
                 </p>
               </div>
             )}

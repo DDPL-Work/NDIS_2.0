@@ -1,5 +1,13 @@
 // Central reference data mirroring LLD Vol 1 §7 (Personas), Vol 2 Ch 14 (RBAC),
 // Vol 1 §1.4 (pilot districts) and Vol 3 Ch 15/16 (Workflow & Department Modules).
+//
+// IMPORTANT: The following constants (DEPARTMENTS, DISTRICTS) are FALLBACK/DISPLAY-ONLY
+// constants used for UI colors, icons, and labels when backend data is not yet loaded.
+// The AUTHORITATIVE source of truth for department/district data is the backend API
+// (/api/departments/, /api/districts/, etc.). These constants should NOT be used for
+// business logic, API payloads, or authorization decisions — they are for UI rendering
+// only (colors, icons, labels) and as a last-resort fallback when backend endpoints
+// return 404 or are not yet deployed.
 
 export const PORTALS = {
   CITIZEN: 'citizen',
@@ -69,6 +77,7 @@ export const ROLE_PORTAL = {
 }
 
 // LLD Vol 1 §1.4 (A5) — six pilot sectors
+// FALLBACK/DISPLAY-ONLY: Authoritative department data comes from /api/departments/
 export const DEPARTMENTS = [
   { id: 'water', label: 'Water & Sanitation (JJM)', color: '#1d7ab5', accent: 'sky', icon: 'Droplets' },
   { id: 'health', label: 'Health Department', color: '#c0392b', accent: 'alert', icon: 'HeartPulse' },
@@ -151,6 +160,8 @@ export const CATEGORY_ROUTING_RULES = [
 ]
 
 // Administrative Hierarchy Structure
+// FALLBACK/DISPLAY-ONLY: Authoritative district/block/village data comes from
+// /api/districts/, /api/subdivisions/, /api/blocks/, /api/village-wards/
 export const ADMINISTRATIVE_STRUCTURE = {
   state: 'Bihar',
   districts: [

@@ -30,22 +30,23 @@ import './features/citizen/citizen.css'
 // Feedback Views
 const CitizenFeedbackPage = lazy(() => import('./features/citizen/CitizenFeedbackPage'))
 
-// Admin & Collector Views
-import DistrictCommandPlatform from './features/admin/platform/DistrictCommandPlatform'
-import DecisionDashboard from './features/admin/decisionDashboard/DecisionDashboard'
-import SpatialAnalysis from './features/spatialanalysis/SpatialAnalysis'
-import AdminDashboard from './features/admin/AdminDashboard'
-import SituationMatrix from './features/admin/SituationMatrix'
-import Approvals from './features/admin/Approvals'
-import Tasking from './features/admin/Tasking'
-import Recommendations from './features/admin/Recommendations'
-import GrievanceOversight from './features/admin/GrievanceOversight'
-import AdminReports from './features/admin/AdminReports'
-import StateRollup from './features/admin/StateRollup'
-import Analytics from './features/admin/Analytics'
-import SystemHealth from './features/admin/SystemHealth'
-import AuditLogs from './features/admin/AuditLogs'
-import { AdminDepartmentSupport, LinedeptDepartmentSupport } from './features/departmentsupport/DepartmentSupportPages'
+// Admin & Collector Views — lazy-loaded for code splitting
+const DistrictCommandPlatform = lazy(() => import('./features/admin/platform/DistrictCommandPlatform'))
+const DecisionDashboard = lazy(() => import('./features/admin/decisionDashboard/DecisionDashboard'))
+const SpatialAnalysis = lazy(() => import('./features/spatialanalysis/SpatialAnalysis'))
+const AdminDashboard = lazy(() => import('./features/admin/AdminDashboard'))
+const SituationMatrix = lazy(() => import('./features/admin/SituationMatrix'))
+const Approvals = lazy(() => import('./features/admin/Approvals'))
+const Tasking = lazy(() => import('./features/admin/Tasking'))
+const Recommendations = lazy(() => import('./features/admin/Recommendations'))
+const GrievanceOversight = lazy(() => import('./features/admin/GrievanceOversight'))
+const AdminReports = lazy(() => import('./features/admin/AdminReports'))
+const StateRollup = lazy(() => import('./features/admin/StateRollup'))
+const Analytics = lazy(() => import('./features/admin/Analytics'))
+const SystemHealth = lazy(() => import('./features/admin/SystemHealth'))
+const AuditLogs = lazy(() => import('./features/admin/AuditLogs'))
+const AdminDepartmentSupport = lazy(() => import('./features/departmentsupport/DepartmentSupportPages').then(m => ({ default: m.AdminDepartmentSupport })))
+const LinedeptDepartmentSupport = lazy(() => import('./features/departmentsupport/DepartmentSupportPages').then(m => ({ default: m.LinedeptDepartmentSupport })))
 
 // Gap & Priority Dashboard
 const GapPriorityDashboard = lazy(() => import('./features/admin/gapPriority/GapPriorityDashboard'))
@@ -54,46 +55,46 @@ const GapPriorityDashboard = lazy(() => import('./features/admin/gapPriority/Gap
 const FeedbackAnalyticsDashboard = lazy(() => import('./features/admin/feedback/FeedbackAnalyticsDashboard'))
 const FeedbackMap = lazy(() => import('./features/admin/feedback/FeedbackMap'))
 
-// Line Department Views
-import DepartmentOfficerQueue from './features/linedept/DepartmentOfficerQueue'
-import DataUpload from './features/linedept/DataUpload'
+// Line Department Views — lazy-loaded
+const DepartmentOfficerQueue = lazy(() => import('./features/linedept/DepartmentOfficerQueue'))
+const DataUpload = lazy(() => import('./features/linedept/DataUpload'))
 
-// Field Engineer Views
-import EngineerPortal from './features/engineer/EngineerPortal'
+// Field Engineer Views — lazy-loaded
+const EngineerPortal = lazy(() => import('./features/engineer/EngineerPortal'))
 
-// Program 3 — Enterprise Department Framework
+// Program 3 — Enterprise Department Framework — lazy-loaded
 import DepartmentWorkspaceProvider from './features/department/framework/DepartmentWorkspaceProvider'
 import DepartmentLayout from './features/department/DepartmentLayout'
-import DepartmentDashboardWorkspace from './features/department/workspaces/DepartmentDashboardWorkspace'
-import DepartmentGisWorkspace from './features/department/workspaces/DepartmentGisWorkspace'
-import DepartmentAssetWorkspace from './features/department/workspaces/DepartmentAssetWorkspace'
-import DepartmentWorkflowWorkspace from './features/department/workspaces/DepartmentWorkflowWorkspace'
-import DepartmentReportWorkspace from './features/department/workspaces/DepartmentReportWorkspace'
-import DepartmentProjectDetail from './features/department/workspaces/DepartmentProjectDetail'
-import DepartmentSettingsWorkspace from './features/department/workspaces/DepartmentSettingsWorkspace'
-import DepartmentResourceWorkspace from './features/department/workspaces/DepartmentResourceWorkspace'
-import DepartmentWorkforceWorkspace from './features/department/workspaces/DepartmentWorkforceWorkspace'
-import DepartmentPlanningWorkspace from './features/department/workspaces/DepartmentPlanningWorkspace'
-import DepartmentExecutionWorkspace from './features/department/workspaces/DepartmentExecutionWorkspace'
 import { useCan } from './features/department/identity/hooks/useAuthorization'
+const DepartmentDashboardWorkspace = lazy(() => import('./features/department/workspaces/DepartmentDashboardWorkspace'))
+const DepartmentGisWorkspace = lazy(() => import('./features/department/workspaces/DepartmentGisWorkspace'))
+const DepartmentAssetWorkspace = lazy(() => import('./features/department/workspaces/DepartmentAssetWorkspace'))
+const DepartmentWorkflowWorkspace = lazy(() => import('./features/department/workspaces/DepartmentWorkflowWorkspace'))
+const DepartmentReportWorkspace = lazy(() => import('./features/department/workspaces/DepartmentReportWorkspace'))
+const DepartmentProjectDetail = lazy(() => import('./features/department/workspaces/DepartmentProjectDetail'))
+const DepartmentSettingsWorkspace = lazy(() => import('./features/department/workspaces/DepartmentSettingsWorkspace'))
+const DepartmentResourceWorkspace = lazy(() => import('./features/department/workspaces/DepartmentResourceWorkspace'))
+const DepartmentWorkforceWorkspace = lazy(() => import('./features/department/workspaces/DepartmentWorkforceWorkspace'))
+const DepartmentPlanningWorkspace = lazy(() => import('./features/department/workspaces/DepartmentPlanningWorkspace'))
+const DepartmentExecutionWorkspace = lazy(() => import('./features/department/workspaces/DepartmentExecutionWorkspace'))
 
-// State Administration Panel
+// State Administration Panel — lazy-loaded
 import StateAdminLayout from './features/stateadmin/layout/StateAdminLayout'
-import StateDashboardWorkspace from './features/stateadmin/workspaces/StateDashboardWorkspace'
-import StateMasterWorkspace from './features/stateadmin/workspaces/StateMasterWorkspace'
-import StateBudgetWorkspace from './features/stateadmin/workspaces/StateBudgetWorkspace'
-import StateFinanceWorkspace from './features/stateadmin/workspaces/StateFinanceWorkspace'
-import StateNotificationsWorkspace from './features/stateadmin/workspaces/StateNotificationsWorkspace'
-import StateAuditWorkspace from './features/stateadmin/workspaces/StateAuditWorkspace'
-import StateProjectsWorkspace from './features/stateadmin/workspaces/StateProjectsWorkspace'
-import StateApprovalsWorkspace from './features/stateadmin/workspaces/StateApprovalsWorkspace'
-import StateOrdersWorkspace from './features/stateadmin/workspaces/StateOrdersWorkspace'
-import StateAuthorityWorkspace from './features/stateadmin/workspaces/StateAuthorityWorkspace'
-import StateAnalyticsWorkspace from './features/stateadmin/workspaces/StateAnalyticsWorkspace'
-import StateReportsWorkspace from './features/stateadmin/workspaces/StateReportsWorkspace'
-import StateGisWorkspace from './features/stateadmin/workspaces/StateGisWorkspace'
-import StateUsersWorkspace from './features/stateadmin/workspaces/StateUsersWorkspace'
 import { STATE_PORTAL_ROLES } from './config/stateConstants'
+const StateDashboardWorkspace = lazy(() => import('./features/stateadmin/workspaces/StateDashboardWorkspace'))
+const StateMasterWorkspace = lazy(() => import('./features/stateadmin/workspaces/StateMasterWorkspace'))
+const StateBudgetWorkspace = lazy(() => import('./features/stateadmin/workspaces/StateBudgetWorkspace'))
+const StateFinanceWorkspace = lazy(() => import('./features/stateadmin/workspaces/StateFinanceWorkspace'))
+const StateNotificationsWorkspace = lazy(() => import('./features/stateadmin/workspaces/StateNotificationsWorkspace'))
+const StateAuditWorkspace = lazy(() => import('./features/stateadmin/workspaces/StateAuditWorkspace'))
+const StateProjectsWorkspace = lazy(() => import('./features/stateadmin/workspaces/StateProjectsWorkspace'))
+const StateApprovalsWorkspace = lazy(() => import('./features/stateadmin/workspaces/StateApprovalsWorkspace'))
+const StateOrdersWorkspace = lazy(() => import('./features/stateadmin/workspaces/StateOrdersWorkspace'))
+const StateAuthorityWorkspace = lazy(() => import('./features/stateadmin/workspaces/StateAuthorityWorkspace'))
+const StateAnalyticsWorkspace = lazy(() => import('./features/stateadmin/workspaces/StateAnalyticsWorkspace'))
+const StateReportsWorkspace = lazy(() => import('./features/stateadmin/workspaces/StateReportsWorkspace'))
+const StateGisWorkspace = lazy(() => import('./features/stateadmin/workspaces/StateGisWorkspace'))
+const StateUsersWorkspace = lazy(() => import('./features/stateadmin/workspaces/StateUsersWorkspace'))
 
 function useFilteredNav(items) {
   const role = useAuthStore((s) => s.user?.role)
@@ -127,6 +128,10 @@ function AdminShell() {
 
 function DepartmentPage({ permission, children }) {
   const allowed = useCan(permission)
+  // DEV: Trace route guard decision
+  if (import.meta.env.DEV) {
+    console.log('[ROUTE GUARD]', { permission, allowed })
+  }
   if (allowed) return children
   return <div className="m-6 rounded-xl border border-alert-200 bg-alert-50 p-8 text-center"><h1 className="text-lg font-semibold text-ink-950">403 · Access denied</h1><p className="mt-1 text-sm text-ink-600">Your active role does not grant {permission}.</p></div>
 }
@@ -169,29 +174,29 @@ export default function App() {
           {/* Admin / Collector Routes */}
           <Route element={<RequireRole roles={[ROLES.DISTRICT_COLLECTOR, ROLES.DM, ROLES.ADM, ROLES.STATE_ADMIN, ROLES.SYSTEM_ADMIN]} />}>
             <Route path="/admin" element={<AdminShell />}>
-              <Route index element={<DecisionDashboard />} />
-              <Route path="collector-dashboard" element={<DecisionDashboard />} />
-              <Route path="spatial-analysis" element={<SpatialAnalysis />} />
+              <Route index element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DecisionDashboard /></Suspense>} />
+              <Route path="collector-dashboard" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DecisionDashboard /></Suspense>} />
+              <Route path="spatial-analysis" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><SpatialAnalysis /></Suspense>} />
               <Route path="gap-priority" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><GapPriorityDashboard /></Suspense>} />
               <Route path="feedback-analytics" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><FeedbackAnalyticsDashboard /></Suspense>} />
               <Route path="feedback-map" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><FeedbackMap /></Suspense>} />
-              <Route path="department/:departmentId" element={<AdminDepartmentSupport />} />
+              <Route path="department/:departmentId" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><AdminDepartmentSupport /></Suspense>} />
               <Route path="department" element={<Navigate to="/admin/department/general" replace />} />
-              <Route path="command-platform" element={<DistrictCommandPlatform />} />
-              <Route path="situation-matrix" element={<SituationMatrix />} />
+              <Route path="command-platform" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DistrictCommandPlatform /></Suspense>} />
+              <Route path="situation-matrix" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><SituationMatrix /></Suspense>} />
               <Route path="gis-map" element={<CitizenHome />} />
-              <Route path="complaints-oversight" element={<GrievanceOversight />} />
-              <Route path="departments-overview" element={<AdminDashboard />} />
-              <Route path="approvals" element={<Approvals />} />
-              <Route path="tasking" element={<Tasking />} />
-              <Route path="recommendations" element={<Recommendations />} />
-              <Route path="grievances" element={<GrievanceOversight />} />
-              <Route path="analytics" element={<Analytics />} />
-              <Route path="system-health" element={<SystemHealth />} />
-              <Route path="audit-logs" element={<AuditLogs />} />
-              <Route path="reports" element={<AdminReports />} />
-              <Route path="notifications" element={<DistrictCommandPlatform />} />
-              <Route path="state-rollup" element={<StateRollup />} />
+              <Route path="complaints-oversight" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><GrievanceOversight /></Suspense>} />
+              <Route path="departments-overview" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><AdminDashboard /></Suspense>} />
+              <Route path="approvals" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><Approvals /></Suspense>} />
+              <Route path="tasking" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><Tasking /></Suspense>} />
+              <Route path="recommendations" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><Recommendations /></Suspense>} />
+              <Route path="grievances" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><GrievanceOversight /></Suspense>} />
+              <Route path="analytics" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><Analytics /></Suspense>} />
+              <Route path="system-health" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><SystemHealth /></Suspense>} />
+              <Route path="audit-logs" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><AuditLogs /></Suspense>} />
+              <Route path="reports" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><AdminReports /></Suspense>} />
+              <Route path="notifications" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DistrictCommandPlatform /></Suspense>} />
+              <Route path="state-rollup" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateRollup /></Suspense>} />
             </Route>
           </Route>
 
@@ -199,42 +204,42 @@ export default function App() {
           <Route element={<RequireRole roles={[ROLES.DEPT_HEAD, ROLES.DEPT_OFFICER, ROLES.SUPERVISOR, ROLES.ENGINEER, ROLES.FIELD_INSPECTOR]} />}>
             <Route path="/linedept" element={<DepartmentWorkspaceProvider />}>
               <Route element={<DepartmentLayout />}>
-                <Route index element={<DepartmentDashboardWorkspace />} />
-                <Route path="dashboard" element={<DepartmentDashboardWorkspace />} />
+                <Route index element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DepartmentDashboardWorkspace /></Suspense>} />
+                <Route path="dashboard" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DepartmentDashboardWorkspace /></Suspense>} />
                 <Route path="gis-map" element={<CitizenHome />} />
-                <Route path="complaints" element={<DepartmentPage permission="complaints.view"><DepartmentOfficerQueue /></DepartmentPage>} />
+                <Route path="complaints" element={<DepartmentPage permission="complaints.view"><Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DepartmentOfficerQueue /></Suspense></DepartmentPage>} />
                 <Route path="complaints-queue" element={<Navigate to="/linedept/complaints" replace />} />
-                <Route path="gis" element={<DepartmentPage permission="gis.view"><DepartmentGisWorkspace /></DepartmentPage>} />
-                <Route path="assets" element={<DepartmentPage permission="assets.view"><DepartmentAssetWorkspace /></DepartmentPage>} />
-                <Route path="workflow" element={<DepartmentPage permission="projects.view"><DepartmentWorkflowWorkspace /></DepartmentPage>} />
-                <Route path="planning" element={<DepartmentPage permission="projects.view"><DepartmentPlanningWorkspace /></DepartmentPage>} />
-                <Route path="planning/new" element={<DepartmentPage permission="projects.create"><DepartmentPlanningWorkspace view="new" /></DepartmentPage>} />
-                <Route path="planning/proposals/:id" element={<DepartmentPage permission="projects.view"><DepartmentPlanningWorkspace view="proposal" /></DepartmentPage>} />
-                <Route path="planning/drafts" element={<DepartmentPage permission="projects.view"><DepartmentPlanningWorkspace view="drafts" /></DepartmentPage>} />
-                <Route path="planning/submitted" element={<DepartmentPage permission="projects.view"><DepartmentPlanningWorkspace view="submitted" /></DepartmentPage>} />
-                <Route path="planning/returned" element={<DepartmentPage permission="projects.view"><DepartmentPlanningWorkspace view="returned" /></DepartmentPage>} />
-                <Route path="planning/approved" element={<DepartmentPage permission="projects.view"><DepartmentPlanningWorkspace view="approved" /></DepartmentPage>} />
-                <Route path="planning/rejected" element={<DepartmentPage permission="projects.view"><DepartmentPlanningWorkspace view="rejected" /></DepartmentPage>} />
-                <Route path="planning/sanctioned" element={<DepartmentPage permission="projects.view"><DepartmentPlanningWorkspace view="sanctioned" /></DepartmentPage>} />
-                <Route path="planning/dpr" element={<DepartmentPage permission="projects.view"><DepartmentPlanningWorkspace view="dashboard" /></DepartmentPage>} />
-                <Route path="planning/funding" element={<DepartmentPage permission="projects.view"><DepartmentPlanningWorkspace view="dashboard" /></DepartmentPage>} />
-                <Route path="planning/analytics" element={<DepartmentPage permission="projects.view"><DepartmentPlanningWorkspace view="dashboard" /></DepartmentPage>} />
-                <Route path="data-upload" element={<DepartmentPage permission="projects.create"><DataUpload /></DepartmentPage>} />
-                <Route path="decision-support" element={<DepartmentPage permission="assets.view"><LinedeptDepartmentSupport /></DepartmentPage>} />
-                <Route path="projects" element={<DepartmentPage permission="projects.view"><DepartmentExecutionWorkspace /></DepartmentPage>} />
-                <Route path="projects/:id" element={<DepartmentPage permission="projects.view"><DepartmentProjectDetail /></DepartmentPage>} />
-                <Route path="inventory" element={<DepartmentPage permission="inventory.view"><DepartmentResourceWorkspace mode="inventory" /></DepartmentPage>} />
-                <Route path="budget" element={<DepartmentPage permission="budget.view"><DepartmentResourceWorkspace mode="budget" /></DepartmentPage>} />
-                <Route path="reports" element={<DepartmentPage permission="reports.view"><DepartmentReportWorkspace /></DepartmentPage>} />
-                <Route path="employees" element={<DepartmentPage permission="workforce.view"><DepartmentWorkforceWorkspace mode="employees" /></DepartmentPage>} />
-                <Route path="organization" element={<DepartmentPage permission="organization.view"><DepartmentWorkforceWorkspace mode="organization" /></DepartmentPage>} />
-                <Route path="roles" element={<DepartmentPage permission="workforce.roles"><DepartmentWorkforceWorkspace mode="roles" /></DepartmentPage>} />
-                <Route path="permissions" element={<DepartmentPage permission="workforce.roles"><DepartmentWorkforceWorkspace mode="permissions" /></DepartmentPage>} />
-                <Route path="attendance" element={<DepartmentPage permission="workforce.attendance"><DepartmentWorkforceWorkspace mode="attendance" /></DepartmentPage>} />
-                <Route path="leave" element={<DepartmentPage permission="workforce.leave"><DepartmentWorkforceWorkspace mode="leave" /></DepartmentPage>} />
-                <Route path="performance" element={<DepartmentPage permission="workforce.view"><DepartmentWorkforceWorkspace mode="performance" /></DepartmentPage>} />
-                <Route path="audit" element={<DepartmentPage permission="workforce.audit"><DepartmentWorkforceWorkspace mode="audit" /></DepartmentPage>} />
-                <Route path="settings" element={<DepartmentPage permission="settings.view"><DepartmentSettingsWorkspace /></DepartmentPage>} />
+                <Route path="gis" element={<DepartmentPage permission="gis.view"><Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DepartmentGisWorkspace /></Suspense></DepartmentPage>} />
+                <Route path="assets" element={<DepartmentPage permission="assets.view"><Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DepartmentAssetWorkspace /></Suspense></DepartmentPage>} />
+                <Route path="workflow" element={<DepartmentPage permission="projects.view"><Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DepartmentWorkflowWorkspace /></Suspense></DepartmentPage>} />
+                <Route path="planning" element={<DepartmentPage permission="projects.view"><Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DepartmentPlanningWorkspace /></Suspense></DepartmentPage>} />
+                <Route path="planning/new" element={<DepartmentPage permission="projects.create"><Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DepartmentPlanningWorkspace view="new" /></Suspense></DepartmentPage>} />
+                <Route path="planning/proposals/:id" element={<DepartmentPage permission="projects.view"><Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DepartmentPlanningWorkspace view="proposal" /></Suspense></DepartmentPage>} />
+                <Route path="planning/drafts" element={<DepartmentPage permission="projects.view"><Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DepartmentPlanningWorkspace view="drafts" /></Suspense></DepartmentPage>} />
+                <Route path="planning/submitted" element={<DepartmentPage permission="projects.view"><Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DepartmentPlanningWorkspace view="submitted" /></Suspense></DepartmentPage>} />
+                <Route path="planning/returned" element={<DepartmentPage permission="projects.view"><Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DepartmentPlanningWorkspace view="returned" /></Suspense></DepartmentPage>} />
+                <Route path="planning/approved" element={<DepartmentPage permission="projects.view"><Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DepartmentPlanningWorkspace view="approved" /></Suspense></DepartmentPage>} />
+                <Route path="planning/rejected" element={<DepartmentPage permission="projects.view"><Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DepartmentPlanningWorkspace view="rejected" /></Suspense></DepartmentPage>} />
+                <Route path="planning/sanctioned" element={<DepartmentPage permission="projects.view"><Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DepartmentPlanningWorkspace view="sanctioned" /></Suspense></DepartmentPage>} />
+                <Route path="planning/dpr" element={<DepartmentPage permission="projects.view"><Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DepartmentPlanningWorkspace view="dashboard" /></Suspense></DepartmentPage>} />
+                <Route path="planning/funding" element={<DepartmentPage permission="projects.view"><Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DepartmentPlanningWorkspace view="dashboard" /></Suspense></DepartmentPage>} />
+                <Route path="planning/analytics" element={<DepartmentPage permission="projects.view"><Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DepartmentPlanningWorkspace view="dashboard" /></Suspense></DepartmentPage>} />
+                <Route path="data-upload" element={<DepartmentPage permission="projects.create"><Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DataUpload /></Suspense></DepartmentPage>} />
+                <Route path="decision-support" element={<DepartmentPage permission="assets.view"><Suspense fallback={<div className="min-h-screen bg-ink-50" />}><LinedeptDepartmentSupport /></Suspense></DepartmentPage>} />
+                <Route path="projects" element={<DepartmentPage permission="projects.view"><Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DepartmentExecutionWorkspace /></Suspense></DepartmentPage>} />
+                <Route path="projects/:id" element={<DepartmentPage permission="projects.view"><Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DepartmentProjectDetail /></Suspense></DepartmentPage>} />
+                <Route path="inventory" element={<DepartmentPage permission="inventory.view"><Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DepartmentResourceWorkspace mode="inventory" /></Suspense></DepartmentPage>} />
+                <Route path="budget" element={<DepartmentPage permission="budget.view"><Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DepartmentResourceWorkspace mode="budget" /></Suspense></DepartmentPage>} />
+                <Route path="reports" element={<DepartmentPage permission="reports.view"><Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DepartmentReportWorkspace /></Suspense></DepartmentPage>} />
+                <Route path="employees" element={<DepartmentPage permission="workforce.view"><Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DepartmentWorkforceWorkspace mode="employees" /></Suspense></DepartmentPage>} />
+                <Route path="organization" element={<DepartmentPage permission="organization.view"><Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DepartmentWorkforceWorkspace mode="organization" /></Suspense></DepartmentPage>} />
+                <Route path="roles" element={<DepartmentPage permission="workforce.roles"><Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DepartmentWorkforceWorkspace mode="roles" /></Suspense></DepartmentPage>} />
+                <Route path="permissions" element={<DepartmentPage permission="workforce.roles"><Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DepartmentWorkforceWorkspace mode="permissions" /></Suspense></DepartmentPage>} />
+                <Route path="attendance" element={<DepartmentPage permission="workforce.attendance"><Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DepartmentWorkforceWorkspace mode="attendance" /></Suspense></DepartmentPage>} />
+                <Route path="leave" element={<DepartmentPage permission="workforce.leave"><Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DepartmentWorkforceWorkspace mode="leave" /></Suspense></DepartmentPage>} />
+                <Route path="performance" element={<DepartmentPage permission="workforce.view"><Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DepartmentWorkforceWorkspace mode="performance" /></Suspense></DepartmentPage>} />
+                <Route path="audit" element={<DepartmentPage permission="workforce.audit"><Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DepartmentWorkforceWorkspace mode="audit" /></Suspense></DepartmentPage>} />
+                <Route path="settings" element={<DepartmentPage permission="settings.view"><Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DepartmentSettingsWorkspace /></Suspense></DepartmentPage>} />
               </Route>
             </Route>
           </Route>
@@ -242,14 +247,14 @@ export default function App() {
           {/* Field Engineer Routes */}
           <Route element={<RequireRole roles={[ROLES.ENGINEER, ROLES.FIELD_INSPECTOR]} />}>
             <Route path="/engineer" element={<EngineerShell />}>
-              <Route index element={<EngineerPortal />} />
-              <Route path="today-tasks" element={<EngineerPortal />} />
-              <Route path="navigation" element={<EngineerPortal />} />
+              <Route index element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><EngineerPortal /></Suspense>} />
+              <Route path="today-tasks" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><EngineerPortal /></Suspense>} />
+              <Route path="navigation" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><EngineerPortal /></Suspense>} />
               <Route path="gis-map" element={<CitizenHome />} />
-              <Route path="inspection" element={<EngineerPortal />} />
-              <Route path="evidence" element={<EngineerPortal />} />
-              <Route path="offline-sync" element={<EngineerPortal />} />
-              <Route path="settings" element={<EngineerPortal />} />
+              <Route path="inspection" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><EngineerPortal /></Suspense>} />
+              <Route path="evidence" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><EngineerPortal /></Suspense>} />
+              <Route path="offline-sync" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><EngineerPortal /></Suspense>} />
+              <Route path="settings" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><EngineerPortal /></Suspense>} />
             </Route>
           </Route>
 
@@ -264,51 +269,51 @@ export default function App() {
           {/* State Administration Panel Routes */}
           <Route element={<RequireRole roles={STATE_PORTAL_ROLES} />}>
             <Route path="/state-admin" element={<StateAdminLayout />}>
-              <Route index element={<StateDashboardWorkspace />} />
+              <Route index element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateDashboardWorkspace /></Suspense>} />
               <Route path="dashboard" element={<Navigate to="/state-admin" replace />} />
-              <Route path="budget/state" element={<StateBudgetWorkspace mode="state" />} />
-              <Route path="budget/departments" element={<StateBudgetWorkspace mode="departments" />} />
-              <Route path="budget/districts" element={<StateBudgetWorkspace mode="districts" />} />
-              <Route path="budget/history" element={<StateBudgetWorkspace mode="history" />} />
-              <Route path="budget/scheme-mapping" element={<StateBudgetWorkspace mode="scheme-mapping" />} />
-              <Route path="finance/sanctions" element={<StateFinanceWorkspace mode="sanctions" />} />
-              <Route path="finance/releases" element={<StateFinanceWorkspace mode="releases" />} />
-              <Route path="finance/reappropriation" element={<StateFinanceWorkspace mode="reappropriation" />} />
-              <Route path="finance/ledger" element={<StateFinanceWorkspace mode="ledger" />} />
-              <Route path="master/departments" element={<StateMasterWorkspace mode="departments" />} />
-              <Route path="master/department-hierarchy" element={<StateMasterWorkspace mode="hierarchy" />} />
-              <Route path="master/department-users" element={<StateMasterWorkspace mode="department-users" />} />
-              <Route path="master/department-heads" element={<StateMasterWorkspace mode="department-heads" />} />
-              <Route path="master/districts" element={<StateMasterWorkspace mode="districts" />} />
-              <Route path="master/district-officers" element={<StateMasterWorkspace mode="district-officers" />} />
-              <Route path="master/schemes" element={<StateMasterWorkspace mode="schemes" />} />
-              <Route path="master/scheme-categories" element={<StateMasterWorkspace mode="scheme-categories" />} />
-              <Route path="master/scheme-guidelines" element={<StateMasterWorkspace mode="scheme-guidelines" />} />
-              <Route path="master/financial-years" element={<StateMasterWorkspace mode="financial-years" />} />
-              <Route path="master/budget-heads" element={<StateMasterWorkspace mode="budget-heads" />} />
-              <Route path="notifications" element={<StateNotificationsWorkspace />} />
-              <Route path="audit" element={<StateAuditWorkspace />} />
-              <Route path="projects/registry" element={<StateProjectsWorkspace mode="registry" />} />
-              <Route path="projects/templates" element={<StateProjectsWorkspace mode="templates" />} />
-              <Route path="projects/monitoring" element={<StateProjectsWorkspace mode="monitoring" />} />
-              <Route path="projects/categories" element={<StateProjectsWorkspace mode="categories" />} />
-              <Route path="approvals/pending" element={<StateApprovalsWorkspace mode="pending" />} />
-              <Route path="approvals/escalated" element={<StateApprovalsWorkspace mode="escalated" />} />
-              <Route path="approvals/history" element={<StateApprovalsWorkspace mode="history" />} />
-              <Route path="orders/circulars" element={<StateOrdersWorkspace mode="circulars" />} />
-              <Route path="orders/notifications" element={<StateOrdersWorkspace mode="notifications" />} />
-              <Route path="orders/financial" element={<StateOrdersWorkspace mode="financial" />} />
-              <Route path="orders/administrative" element={<StateOrdersWorkspace mode="administrative" />} />
-              <Route path="orders/all" element={<StateOrdersWorkspace mode="all" />} />
-              <Route path="orders/documents" element={<StateOrdersWorkspace mode="documents" />} />
-              <Route path="gis/layers" element={<StateGisWorkspace mode="layers" />} />
-              <Route path="gis/assets" element={<StateGisWorkspace mode="assets" />} />
-              <Route path="gis/district-assets" element={<StateGisWorkspace mode="district-assets" />} />
-              <Route path="gis/department-assets" element={<StateGisWorkspace mode="department-assets" />} />
-              <Route path="analytics" element={<StateAnalyticsWorkspace />} />
-              <Route path="reports" element={<StateReportsWorkspace />} />
-              <Route path="users" element={<StateUsersWorkspace />} />
-              <Route path="authority" element={<StateAuthorityWorkspace />} />
+              <Route path="budget/state" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateBudgetWorkspace mode="state" /></Suspense>} />
+              <Route path="budget/departments" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateBudgetWorkspace mode="departments" /></Suspense>} />
+              <Route path="budget/districts" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateBudgetWorkspace mode="districts" /></Suspense>} />
+              <Route path="budget/history" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateBudgetWorkspace mode="history" /></Suspense>} />
+              <Route path="budget/scheme-mapping" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateBudgetWorkspace mode="scheme-mapping" /></Suspense>} />
+              <Route path="finance/sanctions" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateFinanceWorkspace mode="sanctions" /></Suspense>} />
+              <Route path="finance/releases" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateFinanceWorkspace mode="releases" /></Suspense>} />
+              <Route path="finance/reappropriation" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateFinanceWorkspace mode="reappropriation" /></Suspense>} />
+              <Route path="finance/ledger" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateFinanceWorkspace mode="ledger" /></Suspense>} />
+              <Route path="master/departments" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateMasterWorkspace mode="departments" /></Suspense>} />
+              <Route path="master/department-hierarchy" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateMasterWorkspace mode="hierarchy" /></Suspense>} />
+              <Route path="master/department-users" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateMasterWorkspace mode="department-users" /></Suspense>} />
+              <Route path="master/department-heads" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateMasterWorkspace mode="department-heads" /></Suspense>} />
+              <Route path="master/districts" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateMasterWorkspace mode="districts" /></Suspense>} />
+              <Route path="master/district-officers" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateMasterWorkspace mode="district-officers" /></Suspense>} />
+              <Route path="master/schemes" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateMasterWorkspace mode="schemes" /></Suspense>} />
+              <Route path="master/scheme-categories" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateMasterWorkspace mode="scheme-categories" /></Suspense>} />
+              <Route path="master/scheme-guidelines" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateMasterWorkspace mode="scheme-guidelines" /></Suspense>} />
+              <Route path="master/financial-years" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateMasterWorkspace mode="financial-years" /></Suspense>} />
+              <Route path="master/budget-heads" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateMasterWorkspace mode="budget-heads" /></Suspense>} />
+              <Route path="notifications" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateNotificationsWorkspace /></Suspense>} />
+              <Route path="audit" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateAuditWorkspace /></Suspense>} />
+              <Route path="projects/registry" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateProjectsWorkspace mode="registry" /></Suspense>} />
+              <Route path="projects/templates" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateProjectsWorkspace mode="templates" /></Suspense>} />
+              <Route path="projects/monitoring" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateProjectsWorkspace mode="monitoring" /></Suspense>} />
+              <Route path="projects/categories" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateProjectsWorkspace mode="categories" /></Suspense>} />
+              <Route path="approvals/pending" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateApprovalsWorkspace mode="pending" /></Suspense>} />
+              <Route path="approvals/escalated" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateApprovalsWorkspace mode="escalated" /></Suspense>} />
+              <Route path="approvals/history" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateApprovalsWorkspace mode="history" /></Suspense>} />
+              <Route path="orders/circulars" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateOrdersWorkspace mode="circulars" /></Suspense>} />
+              <Route path="orders/notifications" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateOrdersWorkspace mode="notifications" /></Suspense>} />
+              <Route path="orders/financial" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateOrdersWorkspace mode="financial" /></Suspense>} />
+              <Route path="orders/administrative" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateOrdersWorkspace mode="administrative" /></Suspense>} />
+              <Route path="orders/all" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateOrdersWorkspace mode="all" /></Suspense>} />
+              <Route path="orders/documents" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateOrdersWorkspace mode="documents" /></Suspense>} />
+              <Route path="gis/layers" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateGisWorkspace mode="layers" /></Suspense>} />
+              <Route path="gis/assets" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateGisWorkspace mode="assets" /></Suspense>} />
+              <Route path="gis/district-assets" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateGisWorkspace mode="district-assets" /></Suspense>} />
+              <Route path="gis/department-assets" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateGisWorkspace mode="department-assets" /></Suspense>} />
+              <Route path="analytics" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateAnalyticsWorkspace /></Suspense>} />
+              <Route path="reports" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateReportsWorkspace /></Suspense>} />
+              <Route path="users" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateUsersWorkspace /></Suspense>} />
+              <Route path="authority" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><StateAuthorityWorkspace /></Suspense>} />
             </Route>
           </Route>
 

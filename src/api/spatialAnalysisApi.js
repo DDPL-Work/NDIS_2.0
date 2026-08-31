@@ -29,11 +29,16 @@ const LAYER_CACHE_TTL_MS = 5 * 60 * 1000
 const layerCache = new Map()
 
 let endpointCapability = null // 'backend' | 'client-engine' | null (unprobed)
+let endpointBugMessage = null // human-readable description when endpoint exists but is broken
 let savedQueriesCapabilityState = null // 'supported' | 'unsupported' | null
 
 const QUERY_DOC = 'https://nalanda.drdesigntech.com/api' // surfaced in provenance only
 
 async function probeAnalysisEndpoint() {
+  // Probe with a lightweight valid payload. The backend accepts any valid shape
+  // and returns results (possibly empty) or an error indicating the endpoint
+  // does not exist. We detect deployment by checking for a successful response
+  // or a 400 (payload exists but rejected), NOT by response content.
   const probe = {
     target_layer: { layer_id: '__probe__', name: '__probe__', geometry_type: 'Point' },
     spatial: { condition: 'within_radius', distance_km: 1, reference: { type: 'point', point: [85.4, 25.2] } },
@@ -44,18 +49,33 @@ async function probeAnalysisEndpoint() {
   }
   try {
     const response = await apiRequest('/spatial-analysis/query/', { method: 'POST', body: probe, timeout: 10000 })
-    if (response && typeof response === 'object') return 'backend'
+    // Any successful response (even empty) means the endpoint is deployed
+    if (response && typeof response === 'object') {
+      return 'backend'
+    }
     return 'backend'
   } catch (error) {
+    // 404/405 = endpoint genuinely not deployed
     if (error?.status === 404 || error?.status === 405) return 'client-engine'
-    if (error?.status === 400 || error?.status === 422) return 'backend-payload-mismatch'
-    return 'client-engine' // network/timeout/5xx — engine is still the safe honest path
+    // 400/422 = endpoint exists but our probe payload was rejected — still deployed
+    if (error?.status === 400 || error?.status === 422) return 'backend'
+    // 5xx = endpoint exists but has a backend-side bug
+    if (error?.status >= 500) {
+      endpointBugMessage = error?.message || `POST /api/spatial-analysis/query/ returned ${error.status} — backend bug, not a missing endpoint`
+      return 'client-engine'
+    }
+    // Network/timeout — assume client engine is safer
+    return 'client-engine'
   }
 }
 
 export async function spatialAnalysisCapability() {
   if (endpointCapability === null) endpointCapability = await probeAnalysisEndpoint()
   return endpointCapability
+}
+
+export function spatialAnalysisBugMessage() {
+  return endpointBugMessage
 }
 
 export async function savedQueriesCapability() {
@@ -184,19 +204,14 @@ export async function executeSpatialAnalysis(query, context = {}) {
 
   if (capability === 'backend') {
     const response = await apiRequest('/spatial-analysis/query/', { method: 'POST', body: toBackendPayload(query), timeout: 60000 })
+    // Backend returns { target_layer, total_count, geojson, results, ... }
     return {
       mode: 'backend',
       backendQueryEndpoint: 'POST /api/spatial-analysis/query/',
       results: Array.isArray(response?.results) ? response.results : [],
-      summary: response?.summary || { totalFound: 0 },
+      summary: response?.summary || { totalFound: response?.total_count ?? 0 },
       provenance: response?.provenance || { generatedAt: new Date().toISOString() },
     }
-  }
-
-  if (capability === 'backend-payload-mismatch') {
-    const error = new Error('The backend exposes a spatial-analysis endpoint but rejected the typed query payload. The frontend contract and the backend schema must be aligned — no client-side execution was attempted.')
-    error.code = 'BACKEND_PAYLOAD_MISMATCH'
-    throw error
   }
 
   // Client engine over the real collections.

@@ -6,7 +6,7 @@ import { Clock } from 'lucide-react'
 // when the reader can see where it came from.
 export default function Provenance({ source, definition, updatedAt }) {
   return (
-    <div className="space-y-1 text-[11px] leading-snug text-ink-400">
+    <div className="space-y-1.5 text-[11px] leading-snug text-ink-400 border-t border-ink-100 pt-3">
       {source && (
         <p>
           <span className="font-medium text-ink-500">Source:</span> <span className="kbd-mono">{source}</span>

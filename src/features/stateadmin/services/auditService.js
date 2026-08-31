@@ -6,7 +6,7 @@ export function buildAuditEntry({ actor, role, action, entity, entityId, oldValu
   const timestamp = new Date().toISOString()
   const payload = JSON.stringify({ actor, action, entity, entityId, oldValue, newValue, timestamp })
   return {
-    id: `STAUD-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`.toUpperCase(),
+    id: `STAUD-${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 8)}`.toUpperCase(),
     actor,
     role,
     action,
@@ -18,8 +18,8 @@ export function buildAuditEntry({ actor, role, action, entity, entityId, oldValu
     referenceType,
     referenceNo,
     timestamp,
-    ipAddress: '10.142.0.' + Math.floor(Math.random() * 250),
+    ipAddress: 'client-side',
     hashSignature: sha(payload).slice(0, 16),
-    status: 'VERIFIED_IMMUTABLE',
+    status: 'LOCAL_PENDING_SYNC',
   }
 }

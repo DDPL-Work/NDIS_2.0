@@ -12,11 +12,15 @@ import ComplaintDetailHub from '../../shared/ComplaintDetailHub'
 import { useDepartment } from './DepartmentContext'
 import { useAsync } from '../../../hooks/useAsync'
 import { backendDashboardApi } from '../../../api/dashboardApi'
+import { useDistrictCenter } from '../../../hooks/useLookups'
+import { useAuthStore } from '../../../app/store/authStore'
 import { DATA_SCOPES } from '../../../app/store/dataVersionStore'
 import { formatNumber } from '../../../utils/format'
 
 export default function DepartmentDashboardBuilder() {
   const { dept, complaints, kpis, assets } = useDepartment()
+  const user = useAuthStore((s) => s.user)
+  const districtCenter = useDistrictCenter(user?.districtId)
   const [selectedTicketId, setSelectedTicketId] = useState(null)
 
   // Live backend department dashboard envelope (complaint KPIs, queue,
@@ -43,7 +47,7 @@ export default function DepartmentDashboardBuilder() {
     departmentId: dept.id,
     categoryLabel: a.typeLabel || a.categoryLabel,
     status: a.status,
-    gapScore: 0.25,
+    gapScore: a.gapScore ?? null,
     position: a.position,
   }))
 
@@ -112,7 +116,7 @@ export default function DepartmentDashboardBuilder() {
                   <CardHeader title="Sector GIS Map" subtitle="Spatial asset distribution" icon={MapPin} />
                   <CardBody className="!p-2">
                     <div className="h-[clamp(160px,24vh,224px)] rounded-xl overflow-hidden relative">
-                      <MapView center={[85.4211, 25.0294]} zoom={12} facilities={mapFacilities} className="h-full" />
+                      <MapView center={districtCenter || [85.4434, 25.1372]} zoom={12} facilities={mapFacilities} className="h-full" />
                     </div>
                   </CardBody>
                 </Card>

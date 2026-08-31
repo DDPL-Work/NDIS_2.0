@@ -18,6 +18,7 @@ export default function BudgetCard({ budget, status, error, onRetry, loadedAt })
     >
       {status === 'error' ? (
         <EmptyState
+          compact
           icon={Landmark}
           title="Budget data unavailable"
           description={`The backend did not return district allocations for this session. ${error || ''}`}
@@ -25,6 +26,7 @@ export default function BudgetCard({ budget, status, error, onRetry, loadedAt })
         />
       ) : !budget ? (
         <EmptyState
+          compact
           icon={Landmark}
           title="No district allocations on record"
           description="No district allocation records were returned for the current session's district. The budget section will populate automatically when the backend serves them."

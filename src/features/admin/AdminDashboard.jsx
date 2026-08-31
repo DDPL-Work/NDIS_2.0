@@ -47,7 +47,7 @@ export default function AdminDashboard() {
             <>
               <StatCard label="Total facilities" value={formatNumber(coverage?.facilityCount)} icon={Building2} tone="ink" sub={`${coverage?.rows?.length ?? '—'} sectors tracked`} />
               <StatCard label="Avg. gap score" value={coverage?.avgGapScore == null ? '—' : coverage.avgGapScore.toFixed(2)} icon={AlertTriangle} tone="saffron" sub="Lower is better served" />
-              <StatCard label="Approval cycle time" value={approvalCycleDays == null ? '—' : `${approvalCycleDays}d`} icon={Timer} tone="leaf" delta={approvalCycleDays == null ? undefined : approvalCycleDays <= 5 ? 12 : -8} sub="Target: ≤ 5 days" />
+              <StatCard label="Approval cycle time" value={approvalCycleDays == null ? '—' : `${approvalCycleDays}d`} icon={Timer} tone="leaf" sub="Target: ≤ 5 days" />
               <StatCard label="Grievance closure (SLA)" value={Number.isFinite(slaRate) ? formatPercent(slaRate) : '—'} icon={ClipboardCheck} tone="sky" sub="Target: ≥ 70% within 14 days" />
             </>
           )}

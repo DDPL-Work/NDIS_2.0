@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react'
+import React, { useState, useMemo, useCallback } from 'react'
 import clsx from 'clsx'
-import { MapPin, Play, Save, Download, AlertTriangle, Info, ChevronDown } from 'lucide-react'
+import { MapPin, Play, Save, Download, AlertTriangle, Info, ChevronDown, X, Check } from 'lucide-react'
 import Select from '../../../components/ui/Select'
 import Button from '../../../components/ui/Button'
 import Badge from '../../../components/ui/Badge'
@@ -9,6 +9,7 @@ import MapView from '../../../components/map/MapView'
 import { SPATIAL_CONDITIONS, DERIVED_FIELDS, DEFAULT_RESULT_LIMIT, MAX_RESULT_LIMIT } from '../spatialAnalysisModel'
 import LayerPicker from './LayerPicker'
 import AttributeFilters from './AttributeFilters'
+import { MAP_TOOLS } from '../../../hooks/useMapTools'
 
 function Step({ number, title, description, error, children, defaultOpen = false }) {
   const [open, setOpen] = useState(defaultOpen)
@@ -63,6 +64,7 @@ export default function QueryBuilder({
   onExecute, onSave, onExport, loading,
 }) {
   const [pointPickerOpen, setPointPickerOpen] = useState(false)
+  const [pickedPoint, setPickedPoint] = useState(null) // { lat, lng } | null
   const [saveOpen, setSaveOpen] = useState(false)
   const [saveForm, setSaveForm] = useState({ name: '', description: '', visibility: 'public', department: '' })
 
@@ -96,8 +98,15 @@ export default function QueryBuilder({
   }
 
   const setReferencePoint = (point) => {
-    patchSpatial({ reference: { type: 'point', id: 'point', name: 'Picked point', geometryType: 'Point', point } })
-    setPointPickerOpen(false)
+    setPickedPoint(point)
+  }
+
+  const confirmPickedPoint = () => {
+    if (pickedPoint) {
+      patchSpatial({ reference: { type: 'point', id: 'point', name: 'Picked point', geometryType: 'Point', point: [pickedPoint.lng, pickedPoint.lat] } })
+      setPickedPoint(null)
+      setPointPickerOpen(false)
+    }
   }
 
   const renderStep = (step) => {
@@ -326,19 +335,47 @@ export default function QueryBuilder({
         </div>
       )}
 
-      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((step) => renderStep(step))}
+      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((step) => <React.Fragment key={step}>{renderStep(step)}</React.Fragment>)}
 
       {/* Reference point picker */}
-      <Modal open={pointPickerOpen} onClose={() => setPointPickerOpen(false)} title="Pick reference point" scrollBody={false}>
-        <div className="h-[420px]">
-          <MapView
-            center={[85.4434, 25.1372]}
-            zoom={9.5}
-            facilities={[]}
-            onMapClick={(point) => setReferencePoint(point)}
-            className="h-full"
-          />
-          <p className="px-4 py-2 text-[12px] text-ink-500 bg-white border-t border-ink-100">Click anywhere on the map to set the reference point.</p>
+      <Modal open={pointPickerOpen} onClose={() => { setPointPickerOpen(false); setPickedPoint(null) }} title="Pick reference point on the map" scrollBody={false} width="max-w-2xl">
+        <div className="h-[480px] flex flex-col">
+          <p className="px-4 py-2 text-[12px] text-ink-600 bg-ink-50 border-b border-ink-100">
+            {pickedPoint ? 'Reference point selected. Click another location to change it.' : 'Click anywhere on the map to select the reference point.'}
+          </p>
+          <div className="flex-1 relative">
+            <MapView
+              center={query.spatial?.reference?.point ? [query.spatial.reference.point[0], query.spatial.reference.point[1]] : [85.4434, 25.1372]}
+              zoom={9.5}
+              facilities={[]}
+              activeTool={MAP_TOOLS.PICK_POINT}
+              pickPoint={pickedPoint || (query.spatial?.reference?.point ? { lat: query.spatial.reference.point[1], lng: query.spatial.reference.point[0] } : null)}
+              onMapClick={(point) => setReferencePoint(point)}
+              className="h-full"
+            />
+          </div>
+          {pickedPoint && (
+            <div className="px-4 py-3 bg-white border-t border-ink-100">
+              <div className="grid grid-cols-2 gap-3 text-[12px]">
+                <div>
+                  <span className="text-ink-400">Latitude</span>
+                  <div className="font-mono text-ink-900 mt-0.5">{pickedPoint.lat.toFixed(6)}°</div>
+                </div>
+                <div>
+                  <span className="text-ink-400">Longitude</span>
+                  <div className="font-mono text-ink-900 mt-0.5">{pickedPoint.lng.toFixed(6)}°</div>
+                </div>
+              </div>
+            </div>
+          )}
+          <div className="px-4 py-3 bg-white border-t border-ink-100 flex items-center justify-end gap-2">
+            <Button size="sm" variant="outline" onClick={() => { setPointPickerOpen(false); setPickedPoint(null) }}>
+              <X size={13} /> Cancel
+            </Button>
+            <Button size="sm" variant="primary" onClick={confirmPickedPoint} disabled={!pickedPoint}>
+              <Check size={13} /> Confirm location
+            </Button>
+          </div>
         </div>
       </Modal>
 
