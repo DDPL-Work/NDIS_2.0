@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import clsx from 'clsx'
-import { Rocket, RefreshCw, Info, Database, Server } from 'lucide-react'
+import { RefreshCw, Database, Server, ArrowLeft } from 'lucide-react'
 import PageHeader from '../../components/ui/PageHeader'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -13,6 +13,7 @@ import {
 import { DEMO_QUERY, validateQuery, buildFieldCatalog, ROAD_LAYER_NAMES } from './spatialAnalysisModel'
 import { getDepartmentConfig, DEPARTMENT_CONFIGS } from '../departmentsupport/departmentConfigs'
 import { entityRowsFromFacilities } from '../departmentsupport/departmentModel'
+import SimpleQueryBuilder from './builder/SimpleQueryBuilder'
 import QueryBuilder from './builder/QueryBuilder'
 import ResultsPanel from './ResultsPanel'
 
@@ -33,7 +34,7 @@ function downloadBlob(content, filename, mimeType) {
 export default function SpatialAnalysis() {
   const [searchParams] = useSearchParams()
   const [query, setQuery] = useState(() => JSON.parse(JSON.stringify(DEMO_QUERY)))
-  const [capability, setCapability] = useState(null) // null | 'backend' | 'client-engine'
+  const [capability, setCapability] = useState(null)
   const [savedQueriesCap, setSavedQueriesCap] = useState('unverified')
   const [catalog, setCatalog] = useState(null)
   const [facilities, setFacilities] = useState([])
@@ -44,13 +45,14 @@ export default function SpatialAnalysis() {
   const [executing, setExecuting] = useState(false)
   const [runError, setRunError] = useState(null)
   const [saveNotice, setSaveNotice] = useState('')
+  const [mode, setMode] = useState('simple') // 'simple' | 'advanced'
 
   const validation = useMemo(() => validateQuery(query), [query])
 
-  // Bootstrap: capabilities + the real collections the engine executes over.
+  // Bootstrap: capabilities + real collections
   useEffect(() => {
-    let cancelled = false
-    ;(async () => {
+    let cancelled = false;
+    (async () => {
       try {
         const [cap, savedCap, catalogData, facilityData] = await Promise.all([
           spatialAnalysisCapability(),
@@ -63,7 +65,6 @@ export default function SpatialAnalysis() {
         setSavedQueriesCap(savedCap)
         setCatalog(catalogData)
         setFacilities(facilityData)
-        // Road layers are optional — load in background, don't block bootstrap
         Promise.all(ROAD_LAYER_NAMES.map((name) => loadLayerFeatures(name).catch(() => null)))
           .then((results) => {
             if (cancelled) return
@@ -123,9 +124,7 @@ export default function SpatialAnalysis() {
     return [...categories, ...departmentEntries]
   }, [facilities])
 
-  // Department-aware prefill: /admin/spatial-analysis?department=<id> loads
-  // the query with that department's first entity group as the target layer
-  // (shared engine, department-configured layers — §10).
+  // Department-aware prefill
   useEffect(() => {
     const departmentId = searchParams.get('department')
     if (!departmentId) return
@@ -143,7 +142,6 @@ export default function SpatialAnalysis() {
 
   const layerOptions = useMemo(() => ({ gisLayers, facilityCategories }), [gisLayers, facilityCategories])
 
-  // Resolve the query's target/reference layers into real engine inputs.
   const resolveTargetRows = useCallback(async (targetLayer) => {
     if (!targetLayer?.id) return []
     if (targetLayer.source === 'facility-category') {
@@ -229,41 +227,34 @@ export default function SpatialAnalysis() {
       setSaveNotice('Backend dependency: GET /api/saved-queries/ is not deployed yet — the query could not be persisted. The query builder and export remain fully functional.')
       return
     }
-    setSaveNotice(`Save API is live — “${form.name}” would be persisted with ${form.visibility} visibility. (Persistence requires the backend contract; wiring is ready.)`)
+    setSaveNotice(`Save API is live — "${form.name}" would be persisted with ${form.visibility} visibility. (Persistence requires the backend contract; wiring is ready.)`)
   }, [savedQueriesCap])
 
   return (
     <div className="min-h-screen bg-ink-50 pb-10">
       <PageHeader
         eyebrow="DDST · Spatial Analysis"
-        title="Spatial Analysis"
-        description="Build a structured decision query — spatial condition, attribute filters, output fields, ranking — and see results on the map, in a sortable table and as a summary, all over real backend data."
+        title="Find Locations"
+        description="Use simple questions to identify areas that may need attention."
         action={
           <div className="flex items-center gap-2">
             <Button size="md" variant="primary" onClick={() => runQuery(query)} loading={executing} disabled={validation.errors.length > 0}>
-              <Rocket size={15} /> Execute query
+              {executing ? 'Finding...' : 'Find Results'}
             </Button>
-            <Button size="md" variant="outline" onClick={() => { setQuery(JSON.parse(JSON.stringify(DEMO_QUERY))); setResult(null); setRunError(null) }}>
-              <RefreshCw size={14} /> Load DST demo query
+            <Button size="md" variant="outline" onClick={() => { setQuery(JSON.parse(JSON.stringify(DEMO_QUERY))); setResult(null); setRunError(null); setMode('simple') }}>
+              <RefreshCw size={14} /> Reset
             </Button>
           </div>
         }
       />
 
       <div className="px-6 pb-6 space-y-3">
-        {/* Mode banner — where the query actually runs */}
+        {/* Engine mode banner */}
         <div className={clsx('flex flex-wrap items-center gap-2 rounded-xl border px-4 py-2.5 text-[12.5px]', capability === 'client-engine' ? 'border-sky-200 bg-sky-50/70 text-sky-800' : capability === 'backend' ? 'border-leaf-200 bg-leaf-50/70 text-leaf-800' : 'border-ink-200 bg-ink-50/70 text-ink-700')}>
           {capability === 'backend' ? <Server size={14} className="shrink-0" /> : <Database size={14} className="shrink-0" />}
-         
-          {dataLoading && <Badge tone="info" dot>Loading real data…</Badge>}
+          {dataLoading && <Badge tone="info" dot>Loading real data...</Badge>}
           {!dataLoading && <Badge tone="neutral">{facilityCategories.length} facility categories · {gisLayers.length} GIS layers · {roads.length} road features</Badge>}
         </div>
-
-        {/* Honest data-granularity note */}
-        {/* <div className="flex items-start gap-2 rounded-xl border border-saffron-200 bg-saffron-50/60 px-4 py-2.5 text-[12.5px] text-saffron-800">
-          <Info size={14} className="shrink-0 mt-0.5" />
-          <span>Data note: the backend serves population at <strong>CD-block census level (20 blocks)</strong>, not village level, so the demo target layer is Rural_population blocks. Road accessibility is <strong>derived</strong> from the distance to the nearest road layer feature (Other Roads / State Highway / National Highway) — the catalog has no accessibility attribute.</span>
-        </div> */}
 
         {dataError && (
           <div className="rounded-xl border border-alert-200 bg-alert-50/60 px-4 py-3 text-[12.5px] text-alert-800">
@@ -271,25 +262,45 @@ export default function SpatialAnalysis() {
           </div>
         )}
 
+        {saveNotice && (
+          <div className="rounded-lg border border-ink-200 bg-white px-3 py-2 text-[12px] text-ink-600">{saveNotice}</div>
+        )}
+
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
           {/* Builder */}
           <div>
-            <QueryBuilder
-              query={query}
-              setQuery={setQuery}
-              layers={layerOptions}
-              targetFieldCatalog={targetFieldCatalog}
-              errors={validation.errors}
-              warnings={validation.warnings}
-              capabilities={{ savedQueries: savedQueriesCap }}
-              result={result}
-              onExecute={() => runQuery(query)}
-              onSave={handleSave}
-              onExport={handleExport}
-              loading={executing}
-            />
-            {saveNotice && (
-              <div className="mt-2 rounded-lg border border-ink-200 bg-white px-3 py-2 text-[12px] text-ink-600">{saveNotice}</div>
+            {mode === 'simple' ? (
+              <SimpleQueryBuilder
+                query={query}
+                setQuery={setQuery}
+                layers={layerOptions}
+                onExecute={() => runQuery(query)}
+                loading={executing}
+                hasResults={Boolean(result?.results?.length)}
+                onSwitchToAdvanced={() => setMode('advanced')}
+              />
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="ghost" onClick={() => setMode('simple')}>
+                    <ArrowLeft size={14} /> Simple mode
+                  </Button>
+                </div>
+                <QueryBuilder
+                  query={query}
+                  setQuery={setQuery}
+                  layers={layerOptions}
+                  targetFieldCatalog={targetFieldCatalog}
+                  errors={validation.errors}
+                  warnings={validation.warnings}
+                  capabilities={{ savedQueries: savedQueriesCap }}
+                  result={result}
+                  onExecute={() => runQuery(query)}
+                  onSave={handleSave}
+                  onExport={handleExport}
+                  loading={executing}
+                />
+              </div>
             )}
           </div>
 
@@ -297,18 +308,27 @@ export default function SpatialAnalysis() {
           <div>
             {!result && !executing && !runError && (
               <div className="card flex flex-col items-center justify-center px-6 py-16 text-center">
-                <div className="grid h-12 w-12 place-items-center rounded-full bg-ink-100 text-ink-400 mb-3"><Rocket size={22} /></div>
-                <h4 className="text-[14.5px] font-semibold text-ink-800">Run a query to see results</h4>
-                <p className="text-[13px] text-ink-500 mt-1 max-w-md">The DST demo query is pre-loaded: Rural population blocks within 5 km of a health facility, population ≥ 1,000, road accessibility = Poor, ranked by priority score. Press <strong>Execute query</strong>.</p>
+                <div className="grid h-12 w-12 place-items-center rounded-full bg-ink-100 text-ink-400 mb-3">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                </div>
+                <h4 className="text-[14.5px] font-semibold text-ink-800">Find locations that need attention</h4>
+                <p className="text-[13px] text-ink-500 mt-1 max-w-md">Choose a question above or create your own search. Results will appear here with a map, ranked list and summary.</p>
               </div>
             )}
             {executing && (
               <div className="card flex items-center justify-center gap-3 px-6 py-16 text-[13.5px] text-ink-600">
                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-ink-300 border-t-ink-900" />
-                Resolving target and reference layers, computing distances against real geometry…
+                Finding locations against real backend data...
               </div>
             )}
-            {(result || runError) && (
+            {runError && (
+              <div className="card p-6 text-center">
+                <h4 className="text-[14px] font-semibold text-ink-800 mb-1">Unable to load results</h4>
+                <p className="text-[13px] text-ink-500 mb-3">{runError.message || 'Please try again.'}</p>
+                <Button size="sm" variant="outline" onClick={() => runQuery(query)}>Try Again</Button>
+              </div>
+            )}
+            {result && (
               <ResultsPanel
                 result={result}
                 query={query}
@@ -319,7 +339,7 @@ export default function SpatialAnalysis() {
                 referenceRows={result?.referenceRows || []}
                 referencePoint={result?.referencePoint || null}
                 targetGeometryRows={result?.targetRows || []}
-              />  
+              />
             )}
           </div>
         </div>

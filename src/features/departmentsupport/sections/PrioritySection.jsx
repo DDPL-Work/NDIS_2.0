@@ -42,9 +42,9 @@ export default function PrioritySection({ plan, loadedAt, onSelectEntity }) {
       />
       <CardBody>
         <div className="space-y-2">
-          {rows.sorted.map(({ entity, priority, rank }) => (
+          {rows.sorted.map(({ entity, priority, rank }, idx) => (
             <button
-              key={entity.id}
+              key={`${entity.id}-${rank ?? idx}`}
               onClick={() => onSelectEntity?.(entity)}
               className="w-full text-left rounded-lg border border-ink-100 hover:border-ink-200 hover:shadow-sm transition p-3 flex flex-wrap items-center gap-3"
             >

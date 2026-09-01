@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import clsx from 'clsx'
-import { Map as MapIcon, Table2, LayoutDashboard, SearchX, ArrowUpDown, ArrowUp, ArrowDown, ExternalLink } from 'lucide-react'
+import { Map as MapIcon, Table2, LayoutDashboard, SearchX, ArrowUpDown, ArrowUp, ArrowDown, ExternalLink, AlertTriangle, Info } from 'lucide-react'
 import MapView from '../../components/map/MapView'
 import Modal from '../../components/ui/Modal'
 import Button from '../../components/ui/Button'
@@ -108,8 +108,9 @@ export default function ResultsPanel({
     setSort((current) => (current.field === field
       ? { field, direction: current.direction === 'asc' ? 'desc' : 'asc' }
       : { field, direction: 'desc' }))
-  }
-
+  } 
+  
+  
   const popTotal = rows.reduce((acc, r) => acc + (Number(resolveField(r, 'population')) || 0), 0)
   const poorCount = rows.filter((r) => r.accessibility === 'Poor').length
   const goodCount = rows.filter((r) => r.accessibility === 'Good').length
@@ -127,55 +128,85 @@ export default function ResultsPanel({
             {[0, 1, 2, 3].map((i) => <div key={i} className="h-16 rounded-lg bg-ink-100" />)}
           </div>
         </div>
-        <p className="text-[12px] text-ink-500 mt-3 text-center">Executing the typed query against real backend collections…</p>
+        <p className="text-[12.5px] text-ink-500 mt-3 text-center">Finding locations against real data...</p>
       </div>
     )
   }
 
+  // Natural-language summary of results
+  const summaryText = useMemo(() => {
+    if (!rows.length) return null
+    const targetName = query?.targetLayer?.name || 'locations'
+    const refName = query?.spatial?.reference?.name || 'service'
+    const distKm = query?.spatial?.distanceKm
+    const popTotal = rows.reduce((acc, r) => acc + (Number(resolveField(r, 'population')) || 0), 0)
+    const poorRows = rows.filter((r) => r.accessibility === 'Poor')
+    const topPriority = rows[0]
+
+    const parts = []
+    parts.push(`${rows.length} ${targetName} match your search.`)
+    if (popTotal > 0) parts.push(`These cover approximately ${popTotal.toLocaleString('en-IN')} people.`)
+    if (poorRows.length > 0) parts.push(`${poorRows.length} have poor accessibility to ${refName}.`)
+    if (topPriority?.priorityScore != null) parts.push(`Top priority area: "${topPriority.name}" (priority score ${topPriority.priorityScore.toFixed(1)}).`)
+    if (distKm && rows.some((r) => r.distanceKm > Number(distKm) * 0.7)) {
+      const farCount = rows.filter((r) => Number(r.distanceKm) > Number(distKm) * 0.7).length
+      if (farCount > 0) parts.push(`${farCount} are more than ${Math.round(Number(distKm) * 0.7)} km from the nearest facility — these may need urgent attention.`)
+    }
+    return parts.join(' ')
+  }, [rows, query])
+
   if (error) {
     return (
-      <EmptyState
-        icon={SearchX}
-        title="The query could not be executed"
-        description={error.message || 'The backend rejected the request. No client-side fallback was attempted for this failure mode.'}
-      />
+      <div className="space-y-3">
+        <EmptyState
+          icon={SearchX}
+          title="Something went wrong"
+          description={error.message || 'Could not load results. Please try again.'}
+        />
+        <div className="flex justify-center">
+          <Button size="sm" variant="outline" onClick={() => onRelaxFilter(null)}>Try Again</Button>
+        </div>
+      </div>
     )
   }
 
   if (!result || rows.length === 0) {
     const diagnosis = result?.diagnosis || {}
     return (
-      <EmptyState
-        icon={SearchX}
-        title="No rows match this query"
-        description="The result set is empty because of how the real data is distributed. The engine reports the actual distribution so you can see exactly why."
-        action={
-          <div className="space-y-3 w-full max-w-md">
-            <div className="rounded-xl border border-ink-200 bg-ink-50/60 px-4 py-3 text-left text-[12.5px] text-ink-700 space-y-1">
+      <div className="space-y-3">
+        <EmptyState
+          icon={SearchX}
+          title="No results found"
+          description="No locations match your current search. This usually means the conditions are too strict for the available data."
+        />
+        {/* Plain-language diagnosis */}
+        {result && (
+          <div className="card p-4 space-y-3">
+            <h4 className="text-[13px] font-semibold text-ink-800 flex items-center gap-2">
+              <Info size={14} className="text-ink-500" /> Why were no results found?
+            </h4>
+            <ul className="space-y-1.5 text-[12.5px] text-ink-600">
               {diagnosis.blocksExamined != null && (
-                <p><strong>{diagnosis.blocksExamined}</strong> target features examined.</p>
+                <li>Searched <strong>{diagnosis.blocksExamined}</strong> areas in total.</li>
               )}
               {diagnosis.withinRadius != null && (
-                <p><strong>{diagnosis.withinRadius}</strong> are within {query?.spatial?.distanceKm || '?'} km of the reference features (real distance).</p>
+                <li><strong>{diagnosis.withinRadius}</strong> are within {query?.spatial?.distanceKm || '?'} km of a facility (some may have been excluded by other filters).</li>
               )}
               {diagnosis.populationPassed != null && (
-                <p><strong>{diagnosis.populationPassed}</strong> pass the population filter.</p>
-              )}
-              {diagnosis.roadRange && (
-                <p>Nearest-road distances range <strong>{diagnosis.roadRange.min}–{diagnosis.roadRange.max} km</strong> (median {diagnosis.roadRange.median} km).</p>
+                <li><strong>{diagnosis.populationPassed}</strong> match the population filter.</li>
               )}
               {accessibilityFilter && (
-                <p>The accessibility filter requires “{String(accessibilityFilter.value)}” (<strong>{accessibilityFilter.value}</strong>), but <strong>{diagnosis.byAccessibility?.Poor ?? 0} features qualify as Poor</strong> — that is why the set is empty.</p>
+                <li>The search requires accessibility = "<strong>{String(accessibilityFilter.value)}</strong>", but only <strong>{diagnosis.byAccessibility?.Poor ?? 0}</strong> areas qualify as Poor — that is why the set is empty.</li>
               )}
-            </div>
-            <div className="flex flex-wrap justify-center gap-2">
-              <Button size="sm" variant="outline" onClick={() => onRelaxFilter('Good')}>Run with accessibility = Good</Button>
-              <Button size="sm" variant="outline" onClick={() => onRelaxFilter('Moderate')}>Run with accessibility = Moderate</Button>
+            </ul>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={() => onRelaxFilter('Good')}>Show areas with Good access</Button>
+              <Button size="sm" variant="outline" onClick={() => onRelaxFilter('Moderate')}>Show areas with Moderate access</Button>
               <Button size="sm" variant="ghost" onClick={() => onRelaxFilter(null)}>Remove accessibility filter</Button>
             </div>
           </div>
-        }
-      />
+        )}
+      </div>
     )
   }
 
@@ -195,6 +226,14 @@ export default function ResultsPanel({
           <Button size="sm" variant="outline" onClick={() => onExport('geojson')}>Export GeoJSON</Button>
         </div>
       </div>
+
+      {/* Summary banner */}
+      {summaryText && (
+        <div className="flex items-start gap-3 rounded-xl border border-leaf-200 bg-leaf-50/60 px-4 py-3">
+          <Info size={16} className="text-leaf-600 mt-0.5 shrink-0" />
+          <p className="text-[13px] text-leaf-800 leading-relaxed">{summaryText}</p>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex items-center gap-1 border-b border-ink-100">
@@ -278,6 +317,14 @@ export default function ResultsPanel({
       {/* SUMMARY TAB */}
       {tab === 'summary' && (
         <div className="space-y-3">
+          {/* Natural language summary */}
+          {summaryText && (
+            <div className="card p-4">
+              <h4 className="text-[13.5px] font-semibold text-ink-900 mb-2">What we found</h4>
+              <p className="text-[13px] text-ink-700 leading-relaxed">{summaryText}</p>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             {[
               { label: 'Results', value: rows.length.toLocaleString('en-IN') },
@@ -294,12 +341,12 @@ export default function ResultsPanel({
           </div>
 
           <div className="card p-4">
-            <h4 className="text-[13.5px] font-semibold text-ink-900 mb-2">Query executed</h4>
+            <h4 className="text-[13.5px] font-semibold text-ink-900 mb-2">Search details</h4>
             <dl className="grid grid-cols-1 gap-x-6 gap-y-1.5 text-[13px] sm:grid-cols-2">
-              <div className="flex justify-between gap-4"><dt className="text-ink-500">Target layer</dt><dd className="text-ink-800 font-medium">{result.summary?.targetLayer || query?.targetLayer?.name || '—'}</dd></div>
-              <div className="flex justify-between gap-4"><dt className="text-ink-500">Condition</dt><dd className="text-ink-800 font-medium">{result.summary?.condition || '—'}</dd></div>
-              <div className="flex justify-between gap-4"><dt className="text-ink-500">Reference</dt><dd className="text-ink-800 font-medium">{result.summary?.referenceLayer || '—'}</dd></div>
-              <div className="flex justify-between gap-4"><dt className="text-ink-500">Result limit</dt><dd className="text-ink-800 font-medium">{result.summary?.limit ?? '—'}</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-ink-500">What</dt><dd className="text-ink-800 font-medium">{result.summary?.targetLayer || query?.targetLayer?.name || '—'}</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-ink-500">Compared to</dt><dd className="text-ink-800 font-medium">{result.summary?.referenceLayer || '—'}</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-ink-500">Distance</dt><dd className="text-ink-800 font-medium">{result.summary?.condition || '—'}</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-ink-500">Limit</dt><dd className="text-ink-800 font-medium">{result.summary?.limit ?? '—'} results</dd></div>
             </dl>
           </div>
 
