@@ -3,7 +3,21 @@
 // backend's numbers verbatim and only formats for display.  Unrecognized
 // fields stay untouched inside `raw`.  There is NO fallback to example
 // figures — any missing amount is 0 so screens render EMPTY states honestly.
-const rows = (value) => (Array.isArray(value) ? value : value?.results || value?.data || [])
+// Normalize any backend response envelope into a flat array of rows.
+// Handles: bare arrays, { results: [...] }, { data: [...] }, { records: [...] },
+// and single-key collection wrappers like { allocations: [...] }.
+const rows = (value) => {
+  if (Array.isArray(value)) return value
+  if (value && typeof value === 'object') {
+    if (Array.isArray(value.results)) return value.results
+    if (Array.isArray(value.data)) return value.data
+    if (Array.isArray(value.records)) return value.records
+    // Single-key wrapper: { allocations: [...] } or { items: [...] }
+    const values = Object.values(value)
+    if (values.length === 1 && Array.isArray(values[0])) return values[0]
+  }
+  return []
+}
 
 const amount = (value) => {
   if (value === null || value === undefined || value === '') return 0

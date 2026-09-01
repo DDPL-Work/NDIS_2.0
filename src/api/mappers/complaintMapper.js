@@ -182,7 +182,19 @@ export function mapComplaint(dto = {}) {
 }
 
 export function mapComplaintList(response) {
-  const rows = Array.isArray(response) ? response : (response?.results || response?.data || response?.complaints || [])
+  let rows = []
+  if (Array.isArray(response)) {
+    rows = response
+  } else if (response && typeof response === 'object') {
+    if (Array.isArray(response.results)) rows = response.results
+    else if (Array.isArray(response.data)) rows = response.data
+    else if (Array.isArray(response.complaints)) rows = response.complaints
+    else if (Array.isArray(response.records)) rows = response.records
+    else {
+      const values = Object.values(response)
+      if (values.length === 1 && Array.isArray(values[0])) rows = values[0]
+    }
+  }
   return rows.map(mapComplaint)
 }
 

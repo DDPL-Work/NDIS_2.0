@@ -384,7 +384,7 @@ function QuestionAnalyticsCard({ data }) {
   const questionText = data.questionText || data.question_text || data.text || '—'
   const totalResponses = data.totalResponses || data.total_answers || 0
   const avgRating = data.avgRating ?? data.avg_rating ?? null
-  const distribution = (data.distribution || []).map((d) => ({
+  const distribution = (Array.isArray(data.distribution) ? data.distribution : []).map((d) => ({
     label: d.label || d.rating || d.value || '—',
     percentage: d.percentage ?? 0,
     count: d.count || 0,

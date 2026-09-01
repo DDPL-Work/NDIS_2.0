@@ -319,7 +319,7 @@ export default function SpatialAnalysis() {
                 referenceRows={result?.referenceRows || []}
                 referencePoint={result?.referencePoint || null}
                 targetGeometryRows={result?.targetRows || []}
-              />
+              />  
             )}
           </div>
         </div>

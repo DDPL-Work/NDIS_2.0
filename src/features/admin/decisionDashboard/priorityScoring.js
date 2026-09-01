@@ -14,6 +14,30 @@
 //    priority, escalation and SLA-breach flags (all backend fields).
 //  - planning pressure: proposal priority + population impact (backend fields).
 
+// ---------------------------------------------------------------------------
+// Status normalization — the backend returns UPPERCASE Django TextChoices
+// (e.g. DRAFT_DPR, PENDING_REVIEW, APPROVED) but the pipeline/action logic
+// uses lowercase canonical keys.  This helper maps any backend status to the
+// normalized lowercase form used throughout the derivation layer.
+// ---------------------------------------------------------------------------
+const STATUS_MAP = {
+  DRAFT_DPR: 'draft',
+  PENDING_REVIEW: 'pending_review',
+  APPROVED: 'approved',
+  SANCTIONED: 'sanctioned',
+  IN_EXECUTION: 'in_execution',
+  COMPLETED: 'completed',
+  REJECTED: 'rejected',
+  UNDER_NEGOTIATION: 'under_negotiation',
+}
+
+export function normalizeStatus(status) {
+  const raw = String(status || '').trim()
+  if (!raw) return ''
+  const upper = raw.toUpperCase()
+  return STATUS_MAP[upper] || raw.toLowerCase()
+}
+
 export const GAP_CRITICAL = 0.66
 export const GAP_EXTREME = 0.8
 
@@ -170,9 +194,9 @@ export function computePriorityAreas({ facilities = [], complaints = [], proposa
   })
 
   // 3. Planning pressure — high-priority proposals that are stuck before the
-  //    execution gate (draft / pending review / approved awaiting sanction).
+  //    execution gate (draft / pending review / under negotiation / approved awaiting sanction).
   proposals
-    .filter((proposal) => ['draft', 'pending_review', 'approved'].includes(String(proposal.status)))
+    .filter((proposal) => PRE_EXECUTION_STATUSES.includes(normalizeStatus(proposal.status)))
     .filter((proposal) => ['urgent', 'high'].includes(String(proposal.priority).toLowerCase()))
     .forEach((proposal) => {
       const stageLabel = String(proposal.status).replace(/_/g, ' ')
@@ -221,16 +245,22 @@ export const PIPELINE_STAGES = [
   { key: 'monitoring', label: 'Monitoring', hint: 'Completed — verification & monitoring' },
 ]
 
+// Pre-execution statuses — proposals that are still before the execution gate
+// (draft → review → negotiation → approved → sanction).  Used by pipeline
+// buckets, priority areas and KPI calculations so that UNDER_NEGOTIATION is
+// not silently dropped.
+const PRE_EXECUTION_STATUSES = ['draft', 'pending_review', 'under_negotiation', 'approved']
+
 export function pipelineBuckets(proposals = []) {
   const list = Array.isArray(proposals) ? proposals : []
   const byKey = {
-    priority: list.filter((p) => ['draft', 'pending_review', 'approved'].includes(String(p.status)) && ['urgent', 'high'].includes(String(p.priority).toLowerCase())),
-    intervention: list.filter((p) => Boolean(p.linkedComplaint) && String(p.status) !== 'completed'),
-    dpr: list.filter((p) => String(p.status) === 'draft'),
-    budget: list.filter((p) => String(p.status) === 'pending_review'),
-    sanction: list.filter((p) => String(p.status) === 'approved'),
-    execution: list.filter((p) => ['sanctioned', 'in_execution'].includes(String(p.status))),
-    monitoring: list.filter((p) => String(p.status) === 'completed'),
+    priority: list.filter((p) => PRE_EXECUTION_STATUSES.includes(normalizeStatus(p.status)) && ['urgent', 'high'].includes(String(p.priority).toLowerCase())),
+    intervention: list.filter((p) => Boolean(p.linkedComplaint) && normalizeStatus(p.status) !== 'completed'),
+    dpr: list.filter((p) => normalizeStatus(p.status) === 'draft'),
+    budget: list.filter((p) => ['pending_review', 'under_negotiation'].includes(normalizeStatus(p.status))),
+    sanction: list.filter((p) => normalizeStatus(p.status) === 'approved'),
+    execution: list.filter((p) => ['sanctioned', 'in_execution'].includes(normalizeStatus(p.status))),
+    monitoring: list.filter((p) => normalizeStatus(p.status) === 'completed'),
   }
   return PIPELINE_STAGES.map((stage) => ({ ...stage, count: byKey[stage.key].length, items: byKey[stage.key] }))
 }
@@ -304,7 +334,7 @@ export function buildActionQueue({ complaints = [], proposals = [], projectSumma
       complaintId: complaint.id,
     })
   })
-  proposals.filter((p) => String(p.status) === 'approved').forEach((proposal) => {
+  proposals.filter((p) => normalizeStatus(p.status) === 'approved').forEach((proposal) => {
     items.push({
       key: `sanction-${proposal.proposalId}`,
       type: 'sanction_pending',
@@ -317,7 +347,7 @@ export function buildActionQueue({ complaints = [], proposals = [], projectSumma
       proposalId: proposal.proposalId,
     })
   })
-  proposals.filter((p) => String(p.status) === 'pending_review').forEach((proposal) => {
+  proposals.filter((p) => normalizeStatus(p.status) === 'pending_review').forEach((proposal) => {
     items.push({
       key: `review-${proposal.proposalId}`,
       type: 'pending_review',
@@ -326,6 +356,19 @@ export function buildActionQueue({ complaints = [], proposals = [], projectSumma
       location: proposal.village || proposal.block || '',
       urgency: 'medium',
       recommendedAction: 'Review the financial estimation and clearances; approve or return.',
+      entity: proposal,
+      proposalId: proposal.proposalId,
+    })
+  })
+  proposals.filter((p) => normalizeStatus(p.status) === 'under_negotiation').forEach((proposal) => {
+    items.push({
+      key: `negotiation-${proposal.proposalId}`,
+      type: 'under_negotiation',
+      typeLabel: 'Under negotiation',
+      title: proposal.title,
+      location: proposal.village || proposal.block || '',
+      urgency: 'medium',
+      recommendedAction: 'Complete the negotiation on cost, timeline and scope; finalize the agreed terms.',
       entity: proposal,
       proposalId: proposal.proposalId,
     })
@@ -357,9 +400,10 @@ export function computeKpis({ facilities = [], complaints = [], proposals = [], 
   const atRisk = facilities.filter((f) => f.hazardSafe === false || f.gapScore >= GAP_EXTREME).length
   const escalated = open.filter((c) => String(c.state) === 'escalated').length
   const slaBreached = open.filter((c) => c.isSlaBreached).length
-  const pendingReview = proposals.filter((p) => String(p.status) === 'pending_review').length
-  const awaitingSanction = proposals.filter((p) => String(p.status) === 'approved').length
-  const projectsPending = Number(projectSummary.inspectionDue || 0) + pendingReview + awaitingSanction
+  const pendingReview = proposals.filter((p) => normalizeStatus(p.status) === 'pending_review').length
+  const awaitingSanction = proposals.filter((p) => normalizeStatus(p.status) === 'approved').length
+  const underNegotiation = proposals.filter((p) => normalizeStatus(p.status) === 'under_negotiation').length
+  const projectsPending = Number(projectSummary.inspectionDue || 0) + pendingReview + awaitingSanction + underNegotiation
   const highPriorityLocations = new Set(
     computePriorityAreas({ facilities, complaints, proposals })
       .filter((area) => ['critical', 'high'].includes(area.priorityLevel))
@@ -399,7 +443,7 @@ export function computeKpis({ facilities = [], complaints = [], proposals = [], 
         key: 'projects_pending_action',
         label: 'Projects pending action',
         value: projectsPending,
-        sub: `${awaitingSanction} awaiting sanction · ${pendingReview} in review · ${Number(projectSummary.inspectionDue || 0)} inspections due`,
+        sub: `${awaitingSanction} awaiting sanction · ${pendingReview} in review · ${underNegotiation} under negotiation · ${Number(projectSummary.inspectionDue || 0)} inspections due`,
         tone: 'sky',
         source: 'GET /api/projects/summary/ + GET /api/proposals/',
         definition: 'inspection_due + proposals pending_review + proposals approved awaiting sanction',

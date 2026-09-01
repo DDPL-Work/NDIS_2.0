@@ -1,4 +1,14 @@
-const rows = (value) => Array.isArray(value) ? value : value?.results || value?.data || []
+const rows = (value) => {
+  if (Array.isArray(value)) return value
+  if (value && typeof value === 'object') {
+    if (Array.isArray(value.results)) return value.results
+    if (Array.isArray(value.data)) return value.data
+    if (Array.isArray(value.records)) return value.records
+    const values = Object.values(value)
+    if (values.length === 1 && Array.isArray(values[0])) return values[0]
+  }
+  return []
+}
 
 export function mapGisCatalog(response = {}) {
   const categories = response.categories || {}

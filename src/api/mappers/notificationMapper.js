@@ -1,7 +1,17 @@
 // Notification DTO normalization (backend_next_guide §9).  Backend channel
 // values (PORTAL / EMAIL / SMS / WHATSAPP) are preserved verbatim; labels are
 // presentation-only and derived from the backend's own type/template fields.
-const rows = (value) => (Array.isArray(value) ? value : value?.results || value?.data || [])
+const rows = (value) => {
+  if (Array.isArray(value)) return value
+  if (value && typeof value === 'object') {
+    if (Array.isArray(value.results)) return value.results
+    if (Array.isArray(value.data)) return value.data
+    if (Array.isArray(value.records)) return value.records
+    const values = Object.values(value)
+    if (values.length === 1 && Array.isArray(values[0])) return values[0]
+  }
+  return []
+}
 
 export function mapNotification(dto = {}) {
   const template = String(dto.template_name || dto.type || '').toLowerCase()

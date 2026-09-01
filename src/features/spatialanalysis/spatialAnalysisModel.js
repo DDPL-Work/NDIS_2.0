@@ -1,30 +1,4 @@
-// Typed Spatial Analysis query model + validation.
-//
-// This is the FRONTEND SERVICE CONTRACT for the DDST Spatial Analysis engine.
-// The logical endpoint the backend SHOULD expose is:
-//
-//   POST /api/spatial-analysis/query
-//   {
-//     target_layer: { layer_id, name, geometry_type },
-//     spatial: {
-//       condition: "within_radius" | "buffer" | "nearest" | "polygon_containment"
-//                | "intersects" | "distance" | "road_route",
-//       distance_km: number | null,
-//       reference: { type: "gis-layer" | "facility-category" | "point", layer_id, name, point }
-//     },
-//     attribute_filters: [ { field, operator, value, logic } ],
-//     output_fields: [...],
-//     sort: { field, direction },
-//     limit: number
-//   }
-//   -> { mode, results: [...], summary, provenance }
-//
-// As of 2026-08 the live backend does not expose this endpoint, so the app
-// executes the SAME logical contract through a typed client engine over the
-// real backend collections (GET /api/facilities/, GET /api/gis/catalog/,
-// GET /api/gis/layers/{name}/).  Results are real backend data; every derived
-// field is computed from real coordinates and documented.  No data is ever
-// fabricated.
+
 
 export const SPATIAL_CONDITIONS = [
   { key: 'within_radius', label: 'Within radius', description: 'Target features within a straight-line radius of the reference geometry.' },

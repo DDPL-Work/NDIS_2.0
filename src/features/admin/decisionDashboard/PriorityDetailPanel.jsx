@@ -3,7 +3,7 @@ import GapScoreRing from '../../../components/ui/GapScoreRing'
 import StatusBadge from '../../../components/ui/StatusBadge'
 import Badge from '../../../components/ui/Badge'
 import Button from '../../../components/ui/Button'
-import { isOpenComplaint } from './priorityScoring'
+import { isOpenComplaint, normalizeStatus } from './priorityScoring'
 import { formatCurrencyINR } from '../../../utils/format'
 
 const TYPE_META = {
@@ -42,7 +42,7 @@ export default function PriorityDetailPanel({ area, complaints = [], proposals =
   const linkedProposals = (() => {
     if (!area) return []
     if (area.proposalIds?.length) return (proposals || []).filter((p) => area.proposalIds.includes(p.proposalId))
-    if (area.village) return (proposals || []).filter((p) => String(p.village || '').toLowerCase() === String(area.village).toLowerCase() && String(p.status) !== 'completed')
+    if (area.village) return (proposals || []).filter((p) => String(p.village || '').toLowerCase() === String(area.village).toLowerCase() && normalizeStatus(p.status) !== 'completed')
     return []
   })()
 

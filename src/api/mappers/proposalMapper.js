@@ -5,7 +5,20 @@
 // No status is invented on this side.
 import { mapNegotiation } from './negotiationMapper'
 
-const rows = (value) => (Array.isArray(value) ? value : value?.results || value?.data || [])
+// Normalize any backend response envelope into a flat array of rows.
+// Handles: bare arrays, { results: [...] }, { data: [...] }, { records: [...] },
+// and single-key collection wrappers.
+const rows = (value) => {
+  if (Array.isArray(value)) return value
+  if (value && typeof value === 'object') {
+    if (Array.isArray(value.results)) return value.results
+    if (Array.isArray(value.data)) return value.data
+    if (Array.isArray(value.records)) return value.records
+    const values = Object.values(value)
+    if (values.length === 1 && Array.isArray(values[0])) return values[0]
+  }
+  return []
+}
 
 const amount = (value) => {
   if (value === null || value === undefined || value === '') return 0

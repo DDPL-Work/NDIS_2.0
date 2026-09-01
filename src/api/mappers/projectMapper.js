@@ -4,7 +4,20 @@
 // proposed_amount, sanction_amount, expenditure_amount, sanction_order_no,
 // progress_percentage, contract) is the source of truth; the legacy aliases
 // below are retained defensively for older backend payloads.
-const rows = (value) => (Array.isArray(value) ? value : value?.results || value?.data || [])
+// Normalize any backend response envelope into a flat array of rows.
+// Handles: bare arrays, { results: [...] }, { data: [...] }, { records: [...] },
+// and single-key collection wrappers.
+const rows = (value) => {
+  if (Array.isArray(value)) return value
+  if (value && typeof value === 'object') {
+    if (Array.isArray(value.results)) return value.results
+    if (Array.isArray(value.data)) return value.data
+    if (Array.isArray(value.records)) return value.records
+    const values = Object.values(value)
+    if (values.length === 1 && Array.isArray(values[0])) return values[0]
+  }
+  return []
+}
 
 const numberOr = (value, fallback = 0) => {
   if (value === null || value === undefined || value === '') return fallback

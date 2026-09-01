@@ -15,6 +15,7 @@ import {
   buildActionQueue,
   computeKpis,
   healthSnapshot,
+  normalizeStatus,
 } from './priorityScoring'
 import { backendIndicatorApis } from '../../../api/indicatorApi'
 import { ROLES } from '../../../config/constants'
@@ -109,6 +110,29 @@ export function useDecisionDashboard() {
       heatmap: settle(results[5]),
       indicators: settle(results[6]),
     })
+
+    // ── TEMPORARY DATA-FLOW DIAGNOSTICS ──────────────────────────────────
+    if (import.meta.env.DEV) {
+      console.group('[NDISP FLOW] Raw API responses')
+      results.forEach((result, idx) => {
+        const labels = ['dashboard', 'proposals', 'projectSummary', 'budget', 'facilities', 'heatmap', 'indicators']
+        const label = labels[idx] || `result[${idx}]`
+        if (result.status === 'fulfilled') {
+          const v = result.value
+          const isArr = Array.isArray(v)
+          console.log(`${label}:`, {
+            isArray: isArr,
+            type: typeof v,
+            count: isArr ? v.length : (v && typeof v === 'object' ? Object.keys(v).length : null),
+            keys: !isArr && v && typeof v === 'object' ? Object.keys(v).slice(0, 10) : null,
+            preview: isArr ? v.slice(0, 2) : v,
+          })
+        } else {
+          console.warn(`${label}: REJECTED`, result.reason?.message || result.reason)
+        }
+      })
+      console.groupEnd()
+    }
   }, [role, districtId, user?.departmentId])
 
   useEffect(() => { load() }, [load])
@@ -118,6 +142,68 @@ export function useDecisionDashboard() {
     const proposals = sources.proposals.data || []
     const projectSummary = sources.projectSummary.data || {}
     const indicators = sources.indicators.data || { metrics: [] }
+
+    const _pipeline = pipelineBuckets(proposals)
+    const _actions = buildActionQueue({ complaints, proposals, projectSummary })
+
+    // ── COMPREHENSIVE DATA-FLOW DIAGNOSTICS ─────────────────────────────
+    if (import.meta.env.DEV) {
+      console.group('[NDISP FLOW] Dashboard data verification')
+      console.log(`District: ${districtId || 'N/A'}`)
+
+      // Proposals
+      const proposalStatusCounts = {}
+      proposals.forEach((p) => {
+        const s = normalizeStatus(p.status)
+        proposalStatusCounts[s] = (proposalStatusCounts[s] || 0) + 1
+      })
+      console.group('PROPOSALS')
+      console.log('  API (raw count):', sources.proposals.data?.length ?? '?')
+      console.log('  Mapped count:', proposals.length)
+      console.log('  Status breakdown:', proposalStatusCounts)
+      console.log('  Pipeline buckets:', _pipeline.map((s) => `${s.key}:${s.count}`).join('  '))
+      console.groupEnd()
+
+      // Complaints
+      console.group('COMPLAINTS')
+      console.log('  Count:', complaints?.length ?? '?')
+      console.log('  Hydration:', hydrationStatus)
+      const complaintStateCounts = {}
+      complaints?.forEach((c) => {
+        const s = String(c.state || 'unknown')
+        complaintStateCounts[s] = (complaintStateCounts[s] || 0) + 1
+      })
+      console.log('  State breakdown:', complaintStateCounts)
+      console.groupEnd()
+
+      // Facilities
+      console.group('FACILITIES')
+      console.log('  API (raw count):', sources.facilities.data?.length ?? '?')
+      console.log('  Mapped count:', facilities.length)
+      const withPosition = facilities.filter((f) => Array.isArray(f.position)).length
+      const withGap = facilities.filter((f) => f.gapScore > 0).length
+      console.log('  With valid position:', withPosition)
+      console.log('  With gapScore > 0:', withGap)
+      console.groupEnd()
+
+      // Budget
+      console.group('BUDGET')
+      const budgetRecords = sources.budget.data || []
+      console.log('  API (raw count):', budgetRecords.length)
+      if (budgetRecords.length > 0) {
+        console.log('  First record keys:', Object.keys(budgetRecords[0]))
+      }
+      console.groupEnd()
+
+      // Action queue
+      console.group('ACTION QUEUE')
+      console.log('  Items:', _actions.length)
+      _actions.forEach((item) => console.log(`    ${item.urgency}: ${item.typeLabel} — ${item.title}`))
+      console.groupEnd()
+
+      console.groupEnd()
+    }
+
     return {
       areas: computePriorityAreas({ facilities, complaints, proposals }),
       kpis: computeKpis({ facilities, complaints, proposals, projectSummary }),

@@ -25,7 +25,7 @@ export default function AdminReports() {
   const [downloadId, setDownloadId] = useState(null)
   const [actionError, setActionError] = useState(null)
 
-  const { data: budget } = useAsync(() => analyticsApi.getBudgetUtilization(user?.districtId), [user?.districtId])
+  const { data: budget } = useAsync(() => analyticsApi.getBudgetUtilization(user?.districtId).catch(() => null), [user?.districtId])
 
   const listFetcher = useMemo(() => () => backendReportApi.list(), [])
   const { data: reports, loading: listLoading, error: listError, refetch } = useAsync(listFetcher, [])

@@ -4,7 +4,17 @@
 // vary by deployment.  All numbers are coerced defensively; nothing is
 // invented on this side — fields the backend did not send stay null/0 so the
 // UI renders EMPTY/ERROR states honestly.
-const rows = (value) => (Array.isArray(value) ? value : value?.results || value?.data || [])
+const rows = (value) => {
+  if (Array.isArray(value)) return value
+  if (value && typeof value === 'object') {
+    if (Array.isArray(value.results)) return value.results
+    if (Array.isArray(value.data)) return value.data
+    if (Array.isArray(value.records)) return value.records
+    const values = Object.values(value)
+    if (values.length === 1 && Array.isArray(values[0])) return values[0]
+  }
+  return []
+}
 
 const number = (value) => {
   const parsed = Number(value)

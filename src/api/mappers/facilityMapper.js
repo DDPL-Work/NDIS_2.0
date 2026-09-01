@@ -83,8 +83,22 @@ export function facilityRows(response) {
   if (Array.isArray(response)) return response
   // Production deployments may envelope DRF pagination under `data` or use a
   // resource key.  Normalise the documented collection before mapping.
-  const candidate = response?.results || response?.facilities || response?.data?.results || response?.data?.facilities || response?.data
-  return Array.isArray(candidate) ? candidate : []
+  if (response && typeof response === 'object') {
+    if (Array.isArray(response.results)) return response.results
+    if (Array.isArray(response.data)) return response.data
+    if (Array.isArray(response.facilities)) return response.facilities
+    if (Array.isArray(response.records)) return response.records
+    // Nested: { data: { results: [...] } } or { data: { facilities: [...] } }
+    const nested = response.data
+    if (nested && typeof nested === 'object') {
+      if (Array.isArray(nested.results)) return nested.results
+      if (Array.isArray(nested.facilities)) return nested.facilities
+    }
+    // Single-key wrapper: { items: [...] }
+    const values = Object.values(response)
+    if (values.length === 1 && Array.isArray(values[0])) return values[0]
+  }
+  return []
 }
 export function mapFacilityList(response, context = {}) {
   const mapped = facilityRows(response).map((dto) => mapFacility({ ...dto, district_slug: dto.district_slug || context.districtId }))
