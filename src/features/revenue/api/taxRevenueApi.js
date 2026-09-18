@@ -91,9 +91,9 @@ export const taxRevenueApi = {
     Object.entries(params).forEach(([k, v]) => {
       if (v !== undefined && v !== null && v !== '') qs.set(k, String(v))
     })
-    // Receipt tabs bypass the Vite proxy, so use the configured API origin.
-    const apiBase = (import.meta.env.VITE_API_BASE_URL || 'https://nalanda.drdesigntech.com/api').replace(/\/$/, '')
-    return `${apiBase}${ENDPOINTS.TAX_SLIP}?${qs.toString()}`
+    // Tax slip is served at root path, not under /api/
+    const baseUrl = (import.meta.env.VITE_API_BASE_URL || 'https://nalanda.drdesigntech.com/api').replace(/\/api\/?$/, '').replace(/\/$/, '')
+    return `${baseUrl}${ENDPOINTS.TAX_SLIP}?${qs.toString()}`
   },
 
   /**

@@ -1,5 +1,5 @@
 // RevenueMapWorkspace — Enterprise Native Leaflet GIS Map Workspace for Tax & Revenue
-import React, { useRef, useMemo, useEffect, useImperativeHandle, forwardRef } from 'react'
+import React, { useRef, useMemo, useEffect, useLayoutEffect, useImperativeHandle, forwardRef } from 'react'
 import L from 'leaflet'
 import { createRoot } from 'react-dom/client'
 import PropertyPopup from './PropertyPopup'
@@ -42,6 +42,7 @@ export const RevenueMapWorkspace = forwardRef(function RevenueMapWorkspace({
   const { activeTool } = tools
   const popupRef = useRef(null)
   const popupRootRef = useRef(null)
+  const pendingCleanupRef = useRef(null)
 
   useImperativeHandle(ref, () => ({
     focusFeature(feature) {
@@ -59,11 +60,30 @@ export const RevenueMapWorkspace = forwardRef(function RevenueMapWorkspace({
     },
   }), [])
 
+  // Deferred cleanup to avoid synchronous unmount during render
+  useLayoutEffect(() => {
+    if (pendingCleanupRef.current) {
+      pendingCleanupRef.current()
+      pendingCleanupRef.current = null
+    }
+  })
+
   useEffect(() => {
     const map = mapRef.current?.map
     if (!map) return
-    if (popupRef.current) { map.closePopup(popupRef.current); popupRef.current = null }
-    popupRootRef.current?.unmount?.(); popupRootRef.current = null
+
+    // Defer cleanup to after paint
+    if (popupRef.current) {
+      map.closePopup(popupRef.current)
+      popupRef.current = null
+    }
+    if (popupRootRef.current) {
+      pendingCleanupRef.current = () => {
+        popupRootRef.current?.unmount?.()
+        popupRootRef.current = null
+      }
+    }
+
     if (!selectedFeature?.geometry) return
     const bounds = L.geoJSON(selectedFeature).getBounds()
     if (!bounds.isValid()) return
@@ -73,9 +93,6 @@ export const RevenueMapWorkspace = forwardRef(function RevenueMapWorkspace({
     root.render(<PropertyPopup feature={selectedFeature} onClose={close} onPay={onPayProperty} onReceipt={onReceiptProperty} />)
     const popup = L.popup({ autoPan: true, closeButton: false, maxWidth: 340, className: 'ndisp-tax-property-popup' })
       .setLatLng(bounds.getCenter()).setContent(node)
-    // A selection is followed by the parent calling focusFeature(). Waiting for
-    // Leaflet's moveend anchors the card after that fly animation instead of
-    // letting auto-pan fight it and visibly jump the map.
     let opened = false
     const openPopup = () => {
       if (opened) return
@@ -89,8 +106,11 @@ export const RevenueMapWorkspace = forwardRef(function RevenueMapWorkspace({
     return () => {
       window.clearTimeout(fallbackTimer)
       map.off('moveend', openPopup)
-      root.unmount()
-      if (popupRef.current === popup) popupRef.current = null
+      // Defer unmount
+      pendingCleanupRef.current = () => {
+        root.unmount()
+        if (popupRef.current === popup) popupRef.current = null
+      }
     }
   }, [selectedFeature, onCloseProperty, onPayProperty, onReceiptProperty])
 
