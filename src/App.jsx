@@ -6,8 +6,10 @@ import RequireRole from './app/RequireRole'
 import AppShell from './components/layout/AppShell'
 import LoginPage from './features/auth/LoginPage'
 import AuthBootstrap from './app/AuthBootstrap'
+import { PortalProvider } from './context/PortalContext'
 
 const PublicLandingPage = lazy(() => import('./features/landing/PublicLandingPage'))
+const PublicExplorePage = lazy(() => import('./features/publicExplore/PublicExplorePage'))
 
 import { CITIZEN_NAV, ADMIN_NAV, ENGINEER_NAV } from './config/navigation'
 import { ROLES } from './config/constants'
@@ -38,6 +40,7 @@ const AdminDashboard = lazy(() => import('./features/admin/AdminDashboard'))
 const SituationMatrix = lazy(() => import('./features/admin/SituationMatrix'))
 const Approvals = lazy(() => import('./features/admin/Approvals'))
 const Tasking = lazy(() => import('./features/admin/Tasking'))
+const DmSchedulePage = lazy(() => import('./features/admin/dmSchedule/DmSchedulePage'))
 const Recommendations = lazy(() => import('./features/admin/Recommendations'))
 const GrievanceOversight = lazy(() => import('./features/admin/GrievanceOversight'))
 const AdminReports = lazy(() => import('./features/admin/AdminReports'))
@@ -54,6 +57,14 @@ const GapPriorityDashboard = lazy(() => import('./features/admin/gapPriority/Gap
 // Feedback Admin
 const FeedbackAnalyticsDashboard = lazy(() => import('./features/admin/feedback/FeedbackAnalyticsDashboard'))
 const FeedbackMap = lazy(() => import('./features/admin/feedback/FeedbackMap'))
+
+// Revenue & Property Intelligence — lazy-loaded
+const RevenueDashboardPage = lazy(() => import('./features/revenue/pages/RevenueDashboardPage'))
+const PropertyRegistryPage = lazy(() => import('./features/revenue/pages/PropertyRegistryPage'))
+const AssessmentPage = lazy(() => import('./features/revenue/pages/AssessmentPage'))
+const DemandPage = lazy(() => import('./features/revenue/pages/DemandPage'))
+const ArrearsPage = lazy(() => import('./features/revenue/pages/ArrearsPage'))
+const RevenueReportsPage = lazy(() => import('./features/revenue/pages/RevenueReportsPage'))
 
 // Line Department Views — lazy-loaded
 const DepartmentOfficerQueue = lazy(() => import('./features/linedept/DepartmentOfficerQueue'))
@@ -146,9 +157,12 @@ export default function App() {
     <I18nProvider>
       <BrowserRouter>
         <AuthBootstrap>
+        <PortalProvider>
         <Routes>
           {/* Public landing page — no authentication required. */}
           <Route path="/" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><PublicLandingPage /></Suspense>} />
+          {/* Public Explore Map — no authentication required. */}
+          <Route path="/explore" element={<Suspense fallback={<div className="min-h-screen bg-ink-50 flex items-center justify-center"><p className="text-[14px] text-ink-500">Loading public map...</p></div>}><PublicExplorePage /></Suspense>} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<LoginPage initialMode="signup" />} />
 
@@ -178,6 +192,13 @@ export default function App() {
               <Route path="collector-dashboard" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DecisionDashboard /></Suspense>} />
               <Route path="spatial-analysis" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><SpatialAnalysis /></Suspense>} />
               <Route path="gap-priority" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><GapPriorityDashboard /></Suspense>} />
+              <Route path="revenue" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><RevenueDashboardPage /></Suspense>} />
+              <Route path="revenue/dashboard" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><RevenueDashboardPage /></Suspense>} />
+              <Route path="revenue/properties" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><PropertyRegistryPage /></Suspense>} />
+              <Route path="revenue/assessments" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><AssessmentPage /></Suspense>} />
+              <Route path="revenue/demands" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DemandPage /></Suspense>} />
+              <Route path="revenue/arrears" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><ArrearsPage /></Suspense>} />
+              <Route path="revenue/reports" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><RevenueReportsPage /></Suspense>} />
               <Route path="feedback-analytics" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><FeedbackAnalyticsDashboard /></Suspense>} />
               <Route path="feedback-map" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><FeedbackMap /></Suspense>} />
               <Route path="department/:departmentId" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><AdminDepartmentSupport /></Suspense>} />
@@ -189,6 +210,7 @@ export default function App() {
               <Route path="departments-overview" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><AdminDashboard /></Suspense>} />
               <Route path="approvals" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><Approvals /></Suspense>} />
               <Route path="tasking" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><Tasking /></Suspense>} />
+              <Route path="schedule-tasks" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><DmSchedulePage /></Suspense>} />
               <Route path="recommendations" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><Recommendations /></Suspense>} />
               <Route path="grievances" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><GrievanceOversight /></Suspense>} />
               <Route path="analytics" element={<Suspense fallback={<div className="min-h-screen bg-ink-50" />}><Analytics /></Suspense>} />
@@ -325,6 +347,7 @@ export default function App() {
 
         {/* Global Reactive Simulation Engine Control Panel Overlay */}
         {/* <SimulationControlPanel /> */}
+        </PortalProvider>
         </AuthBootstrap>
       </BrowserRouter>
     </I18nProvider>

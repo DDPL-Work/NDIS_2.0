@@ -69,16 +69,16 @@ export const backendProposalApi = {
   // module the browser executed; the logs capture raw -> normalized -> direct
   // test in one synchronous chain (before the component's SET STATE log).
   async negotiations(id, params = {}) {
-    console.log('[NEGOTIATION MODULE BUILD]', NEGOTIATION_MAPPER_BUILD)
+    // console.log('[NEGOTIATION MODULE BUILD]', NEGOTIATION_MAPPER_BUILD)
     const raw = await apiRequest(withQuery(`/proposals/${id}/negotiations/`, params))
-    console.log('[NEGOTIATION RAW RESPONSE]', JSON.stringify(raw, null, 2))
-    console.log('[NEGOTIATION RAW TYPE]', typeof raw, Array.isArray(raw), raw && typeof raw === 'object' ? Object.keys(raw) : null)
+    // console.log('[NEGOTIATION RAW RESPONSE]', JSON.stringify(raw, null, 2))
+    // console.log('[NEGOTIATION RAW TYPE]', typeof raw, Array.isArray(raw), raw && typeof raw === 'object' ? Object.keys(raw) : null)
     const normalized = mapNegotiationList(raw)
-    console.log('[NEGOTIATION NORMALIZED]', JSON.stringify(normalized, null, 2))
-    console.log('[NEGOTIATION NORMALIZED LENGTH]', Array.isArray(normalized) ? normalized.length : 'NOT_ARRAY')
-    console.log('[EXECUTED NEGOTIATION MAPPER]', mapNegotiationList.toString())
+    // console.log('[NEGOTIATION NORMALIZED]', JSON.stringify(normalized, null, 2))
+    // console.log('[NEGOTIATION NORMALIZED LENGTH]', Array.isArray(normalized) ? normalized.length : 'NOT_ARRAY')
+    // console.log('[EXECUTED NEGOTIATION MAPPER]', mapNegotiationList.toString())
     const directTest = Array.isArray(raw) ? raw : (raw && typeof raw === 'object' ? [raw] : [])
-    console.log('[NEGOTIATION DIRECT TEST]', directTest, { length: Array.isArray(directTest) ? directTest.length : null })
+    // console.log('[NEGOTIATION DIRECT TEST]', directTest, { length: Array.isArray(directTest) ? directTest.length : null })
     if (Array.isArray(normalized) && normalized.length === 0 && Array.isArray(directTest) && directTest.length > 0) console.log('[NEGOTIATION STALE MAPPER] direct test wraps the raw body but mapNegotiationList returned [] — the executed mapper module predates the bare-record fix')
     return normalized
   },

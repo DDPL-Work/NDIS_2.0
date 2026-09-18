@@ -26,8 +26,8 @@ export default function DistrictExplorerSection({ requestSearch = null }) {
             ))}
           </ul>
           <div className="mt-7 flex flex-wrap gap-3">
-            <LandingCta to="/citizen/map"><Button size="lg" variant="primary">Explore Map</Button></LandingCta>
-            <LandingCta to="/citizen/map"><Button size="lg" variant="outline">Find Nearby</Button></LandingCta>
+            <LandingCta to="/explore"><Button size="lg" variant="primary">Explore Map</Button></LandingCta>
+            <LandingCta to="/explore"><Button size="lg" variant="outline">Find Nearby</Button></LandingCta>
           </div>
         </div>
 

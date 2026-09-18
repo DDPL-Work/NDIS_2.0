@@ -1,14 +1,26 @@
 import clsx from 'clsx'
-export default function Skeleton({ className }) {
-  return <div className={clsx('animate-pulse rounded-md bg-ink-100', className)} />
+
+export function Skeleton({ className, ...rest }) {
+  return (
+    <div
+      className={clsx('animate-pulse rounded bg-ink-200/70', className)}
+      {...rest}
+    />
+  )
 }
 
-export function SkeletonCard() {
+export function SkeletonCard({ className }) {
   return (
-    <div className="card p-4 space-y-3">
-      <Skeleton className="h-3 w-24" />
-      <Skeleton className="h-6 w-16" />
-      <Skeleton className="h-2.5 w-32" />
+    <div className={clsx('card p-4 space-y-3', className)}>
+      <Skeleton className="h-4 w-1/3" />
+      <Skeleton className="h-5 w-3/4" />
+      <Skeleton className="h-3 w-1/2" />
+      <div className="pt-2 flex justify-between items-center">
+        <Skeleton className="h-3 w-1/4" />
+        <Skeleton className="h-8 w-20 rounded-lg" />
+      </div>
     </div>
   )
 }
+
+export default Skeleton

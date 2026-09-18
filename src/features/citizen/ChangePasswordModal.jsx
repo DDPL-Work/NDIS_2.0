@@ -16,7 +16,7 @@ export default function ChangePasswordModal({ open, onClose }) {
   const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
 
-  const validate = () => {
+  const validate = () => { 
     const newErrors = {}
     if (!form.old_password) newErrors.old_password = 'Current password is required'
     if (!form.new_password) newErrors.new_password = 'New password is required'

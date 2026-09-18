@@ -109,23 +109,25 @@ export default function DepartmentDashboardBuilder() {
             )
           }
 
-          if (widget.type === 'gis_mini_map') {
-            return (
-              <div key={widget.id} className={colClass}>
-                <Card>
-                  <CardHeader title="Sector GIS Map" subtitle="Spatial asset distribution" icon={MapPin} />
-                  <CardBody className="!p-2">
-                    <div className="h-[clamp(160px,24vh,224px)] rounded-xl overflow-hidden relative">
-                      <MapView center={districtCenter || [85.4434, 25.1372]} zoom={12} facilities={mapFacilities} className="h-full" />
-                    </div>
-                  </CardBody>
-                </Card>
-              </div>
-            )
-          }
+          // if (widget.type === 'gis_mini_map') {
+          //   return (
+          //     <div key={widget.id} className={colClass}>
+          //       <Card>
+          //         <CardHeader title="Sector GIS Map" subtitle="Spatial asset distribution" icon={MapPin} />
+          //         <CardBody className="!p-2">
+          //           <div className="h-[clamp(160px,24vh,224px)] rounded-xl overflow-hidden relative">
+          //             <MapView center={districtCenter || [85.4434, 25.1372]} zoom={12} facilities={mapFacilities} className="h-full" />
+          //           </div>
+          //         </CardBody>
+          //       </Card>
+          //     </div>
+          //   )
+          // }
 
           return null
-        })}
+        }
+      )
+        }
       </div>
 
       <Modal open={!!selectedTicketId} onClose={() => setSelectedTicketId(null)} width="max-w-4xl" scrollBody={false}>

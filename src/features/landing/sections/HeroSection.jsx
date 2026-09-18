@@ -9,10 +9,10 @@ import HeroSearch from './HeroSearch'
 import LandingCta from '../LandingCta'
 
 const QUICK_ACTIONS = [
-  { icon: MapPin, title: 'Find Nearby', to: '/citizen/map' },
+  { icon: MapPin, title: 'Find Nearby', to: '/explore' },
   { icon: TriangleAlert, title: 'Report Problem', to: '/citizen/register' },
   { icon: SearchCheck, title: 'Track Request', to: '/citizen/track' },
-  { icon: MapPinned, title: 'Explore Map', to: '/citizen/map' },
+  { icon: MapPinned, title: 'Explore Map', to: '/explore' },
 ]
 
 export default function HeroSection({ requestSearch = null, externalQuery = null }) {

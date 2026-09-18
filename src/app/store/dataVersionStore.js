@@ -22,6 +22,8 @@ export const DATA_SCOPES = {
   NOTIFICATIONS: 'notifications',
   EMPLOYEES: 'employees',
   BUDGET: 'budget',
+  INTERVENTIONS: 'interventions',
+  INSPECTIONS: 'inspections',
 }
 
 export const useDataVersion = create((set) => ({

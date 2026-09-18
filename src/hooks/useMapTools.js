@@ -2,14 +2,18 @@
 // Used by MapView / MapToolbar across all three portals.
 // Tools follow the Vol 1 §10.3 GIS interaction requirements.
 import { useState, useCallback, useRef } from 'react'
-import { distanceMeters } from '../utils/geo'
+import { distanceMeters } from '../utils/geo.js'
+import { area as geoJsonArea } from '@turf/turf'
 
 export const MAP_TOOLS = {
   NONE: 'none',
   RADIUS: 'radius',      // Draw deficit radius circle (3km default, Vol 3 §16)
   MEASURE: 'measure',    // Google-Maps-style: click to add vertices, double-click finishes
+  MEASURE_AREA: 'measure-area',
   CLUSTER: 'cluster',    // Toggle facility point clustering
   PICK_POINT: 'pick-point', // Pick a reference point on the map
+  QUERY: 'query',        // Spatial query tool
+  SELECTION: 'selection',// Polygon/box property selection tool
 }
 
 export const BASEMAPS = [
@@ -39,12 +43,22 @@ export function measurePathKm(points) {
   return Number((totalM / 1000).toFixed(3))
 }
 
+export function measurePolygonAreaSqm(points) {
+  if (!Array.isArray(points) || points.length < 3) return null
+  try {
+    const ring = [...points, points[0]]
+    return geoJsonArea({ type: 'Polygon', coordinates: [ring] })
+  } catch { return null }
+}
+
 export function useMapTools() {
   const [activeTool, setActiveTool] = useState(MAP_TOOLS.NONE)
   const [radiusCenter, setRadiusCenter] = useState(null)   // [lng, lat]
   const [radiusKm, setRadiusKm] = useState(3)              // configurable (Vol 3 §16)
   const [measurePoints, setMeasurePoints] = useState([])   // [[lng,lat], ...] — N vertices
   const [measureDistKm, setMeasureDistKm] = useState(null)
+  const [measureAreaSqm, setMeasureAreaSqm] = useState(null)
+  const [measureMode, setMeasureMode] = useState('distance')
   const [clusterEnabled, setClusterEnabled] = useState(false)
   const [basemapId, setBasemapId] = useState('osm')
 
@@ -64,13 +78,16 @@ export function useMapTools() {
       if (cur === tool) {
         // deactivate
         if (tool === MAP_TOOLS.RADIUS) setRadiusCenter(null)
-        if (tool === MAP_TOOLS.MEASURE) { setMeasurePoints([]); setMeasureDistKm(null) }
+        if (tool === MAP_TOOLS.MEASURE || tool === MAP_TOOLS.MEASURE_AREA) { setMeasurePoints([]); setMeasureDistKm(null); setMeasureAreaSqm(null) }
         return MAP_TOOLS.NONE
       }
       // switching tool — clear previous
       setRadiusCenter(null)
       setMeasurePoints([])
       setMeasureDistKm(null)
+      setMeasureAreaSqm(null)
+      if (tool === MAP_TOOLS.MEASURE) setMeasureMode('distance')
+      if (tool === MAP_TOOLS.MEASURE_AREA) setMeasureMode('area')
       return tool
     })
   }, [])
@@ -80,19 +97,21 @@ export function useMapTools() {
     (lngLat) => {
       if (activeTool === MAP_TOOLS.RADIUS) {
         setRadiusCenter([lngLat.lng, lngLat.lat])
-      } else if (activeTool === MAP_TOOLS.MEASURE) {
+      } else if (activeTool === MAP_TOOLS.MEASURE || activeTool === MAP_TOOLS.MEASURE_AREA) {
         const now = Date.now()
         const isDoubleClick = now - lastMapClickAt.current < 400
         lastMapClickAt.current = now
         if (isDoubleClick) {
           // Finished — keep the path and leave the tool (the line stays).
-          setMeasureDistKm(measurePathKm(measurePointsRef.current))
+          if (activeTool === MAP_TOOLS.MEASURE_AREA) setMeasureAreaSqm(measurePolygonAreaSqm(measurePointsRef.current))
+          else setMeasureDistKm(measurePathKm(measurePointsRef.current))
           setActiveTool(MAP_TOOLS.NONE)
           return
         }
         setMeasurePoints((pts) => {
           const next = [...pts, [lngLat.lng, lngLat.lat]]
-          setMeasureDistKm(measurePathKm(next))
+          if (activeTool === MAP_TOOLS.MEASURE_AREA) setMeasureAreaSqm(measurePolygonAreaSqm(next))
+          else setMeasureDistKm(measurePathKm(next))
           return next
         })
       }
@@ -107,14 +126,16 @@ export function useMapTools() {
     const next = pts.slice(0, -1)
     setMeasurePoints(next)
     setMeasureDistKm(measurePathKm(next))
+    setMeasureAreaSqm(measurePolygonAreaSqm(next))
     setActiveTool((cur) => (next.length === 0 ? MAP_TOOLS.NONE : cur))
   }, [])
 
   // Google Maps "Done": exit the tool but keep the drawn path visible.
   const finishMeasure = useCallback(() => {
-    setMeasureDistKm(measurePathKm(measurePointsRef.current))
+    if (measureMode === 'area') setMeasureAreaSqm(measurePolygonAreaSqm(measurePointsRef.current))
+    else setMeasureDistKm(measurePathKm(measurePointsRef.current))
     setActiveTool(MAP_TOOLS.NONE)
-  }, [])
+  }, [measureMode])
 
   const toggleCluster = useCallback(() => {
     setClusterEnabled((v) => !v)
@@ -129,8 +150,9 @@ export function useMapTools() {
   const clearMeasure = useCallback(() => {
     setMeasurePoints([])
     setMeasureDistKm(null)
+    setMeasureAreaSqm(null)
     lastMapClickAt.current = 0
-    if (activeTool === MAP_TOOLS.MEASURE) setActiveTool(MAP_TOOLS.NONE)
+    if (activeTool === MAP_TOOLS.MEASURE || activeTool === MAP_TOOLS.MEASURE_AREA) setActiveTool(MAP_TOOLS.NONE)
   }, [activeTool])
 
   const currentBasemap = BASEMAPS.find((b) => b.id === basemapId) || BASEMAPS[0]
@@ -138,7 +160,7 @@ export function useMapTools() {
   return {
     activeTool, selectTool,
     radiusCenter, radiusKm, setRadiusKm, clearRadius,
-    measurePoints, measureDistKm, removeLastMeasurePoint, finishMeasure, clearMeasure,
+    measurePoints, measureDistKm, measureAreaSqm, measureMode, removeLastMeasurePoint, finishMeasure, clearMeasure,
     clusterEnabled, toggleCluster,
     basemapId, setBasemapId, currentBasemap,
     handleMapClick,

@@ -118,7 +118,7 @@ export default function RouteSummary({ status, route, origin = null, destination
       <div className="flex gap-2 border-t border-ink-100 px-2.5 py-2">
         <Button size="sm" variant="primary" icon={ExternalLink} onClick={() => openDirections(origin, destination)} className="flex-1">Navigate</Button>
         <Button size="sm" variant="outline" icon={Navigation} onClick={onCalculate}>Recalculate</Button>
-        <Button size="sm" variant="ghost" icon={X} onClick={onClear} aria-label="Clear route">Clear</Button>
+        <Button size="sm" variant="ghost" icon={X} onClick={onClear} aria-label="Clear route" title="Clear"></Button>
       </div>
     </div>
   )

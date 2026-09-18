@@ -1,17 +1,16 @@
-// Schedule Field Inspection Ã¢â‚¬â€ workflow for arranging a field visit.
-// Facility-type agnostic. Uses the project engine store for local scheduling.
-// No fabricated data. No hardcoded facility-specific logic.
+// Schedule Field Inspection — workflow for arranging a field visit.
+// Uses TanStack Query mutation hooks. No fabricated data.
 
 import { useState, useCallback, useMemo } from 'react'
 import Modal from '../../../components/ui/Modal'
 import Button from '../../../components/ui/Button'
 import Select from '../../../components/ui/Select'
 import { useUiStore } from '../../../app/store/uiStore'
+import { useCreateInspection } from '../dmSchedule/hooks/useInspectionMutations'
 import FacilityActionSummary from './FacilityActionSummary'
 import ActionSuccessModal from './ActionSuccessModal'
 import { validateInspection, hasErrors } from './facilityActionValidation'
 import { buildInspectionPurpose } from './facilityActionMapper'
-import { scheduleInspection } from './facilityActionService'
 
 const emptyForm = () => ({
   purpose: '',
@@ -30,9 +29,9 @@ const TEAM_OPTIONS = [
 export default function ScheduleInspectionModal({ open, onClose, facility }) {
   const [form, setForm] = useState(emptyForm)
   const [errors, setErrors] = useState({})
-  const [submitting, setSubmitting] = useState(false)
   const [result, setResult] = useState(null)
   const pushToast = useUiStore((s) => s.pushToast)
+  const createInspection = useCreateInspection()
 
   const defaultPurpose = useMemo(() => buildInspectionPurpose(facility), [facility])
 
@@ -40,7 +39,6 @@ export default function ScheduleInspectionModal({ open, onClose, facility }) {
     setForm(emptyForm)
     setErrors({})
     setResult(null)
-    setSubmitting(false)
     onClose()
   }, [onClose])
 
@@ -53,32 +51,41 @@ export default function ScheduleInspectionModal({ open, onClose, facility }) {
       return
     }
     setErrors({})
-    setSubmitting(true)
-    try {
-      const response = await scheduleInspection({ facility, form: { ...form, purpose } })
-      if (response.success) {
-        setResult(response.data)
-        pushToast('Field inspection scheduled successfully.', 'success')
-      } else {
-        setErrors({ submit: response.error })
-        pushToast(response.error || 'Failed to schedule inspection.', 'error')
-      }
-    } finally {
-      setSubmitting(false)
+    const payload = {
+      title: `Inspection — ${facility.name}`,
+      location_name: [facility.village, facility.block, facility.district].filter(Boolean).join(', '),
+      department_code: facility.departmentId || facility.department || '',
+      inspection_purpose: purpose,
+      preferred_date: form.preferredDate || null,
+      scheduled_date: form.preferredDate || null,
+      inspection_team: form.team || '',
+      inspector_name: '',
+      instructions: form.notes || '',
+      remarks: '',
     }
-  }, [facility, form, defaultPurpose, pushToast])
+    createInspection.mutate(payload, {
+      onSuccess: (data) => {
+        setResult(data)
+        pushToast('Field inspection scheduled successfully.', 'success')
+      },
+      onError: (error) => {
+        const msg = error?.message || 'Failed to schedule inspection.'
+        setErrors({ submit: msg })
+        pushToast(msg, 'error')
+      },
+    })
+  }, [facility, form, defaultPurpose, createInspection, pushToast])
 
   const patch = useCallback((field, value) => {
     setForm((f) => ({ ...f, [field]: value }))
     setErrors((e) => ({ ...e, [field]: undefined, submit: undefined }))
   }, [])
 
-  // Get today's date for min date validation
   const today = new Date().toISOString().split('T')[0]
+  const submitting = createInspection.isPending
 
   if (!open) return null
 
-  // Success state
   if (result) {
     return (
       <Modal open onClose={handleClose} title="Schedule Field Inspection" width="max-w-lg">
@@ -102,14 +109,11 @@ export default function ScheduleInspectionModal({ open, onClose, facility }) {
       </>
     }>
       <div className="space-y-5">
-        {/* Facility summary */}
         <FacilityActionSummary facility={facility} />
-
         <p className="text-[12.5px] text-ink-500">
           Arrange a field visit to verify the situation at this facility.
         </p>
 
-        {/* Submit error */}
         {errors.submit && (
           <div className="rounded-xl border border-alert-200 bg-alert-50/60 px-4 py-3 text-[12.5px] text-alert-700">
             {errors.submit}
@@ -117,7 +121,6 @@ export default function ScheduleInspectionModal({ open, onClose, facility }) {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5" id="inspection-form">
-          {/* Section 1: Purpose */}
           <div className="space-y-2">
             <label className="text-[12.5px] font-semibold text-ink-900">Inspection purpose</label>
             <textarea
@@ -130,7 +133,6 @@ export default function ScheduleInspectionModal({ open, onClose, facility }) {
             {errors.purpose && <p className="text-[11.5px] text-alert-600">{errors.purpose}</p>}
           </div>
 
-          {/* Section 2: Date */}
           <div className="space-y-2">
             <label className="text-[12.5px] font-semibold text-ink-900">Preferred date</label>
             <input
@@ -143,7 +145,6 @@ export default function ScheduleInspectionModal({ open, onClose, facility }) {
             {errors.preferredDate && <p className="text-[11.5px] text-alert-600">{errors.preferredDate}</p>}
           </div>
 
-          {/* Section 3: Team */}
           <div className="space-y-2">
             <label className="text-[12.5px] font-semibold text-ink-900">Inspection team</label>
             <Select
@@ -154,7 +155,6 @@ export default function ScheduleInspectionModal({ open, onClose, facility }) {
             />
           </div>
 
-          {/* Section 4: Notes */}
           <div className="space-y-2">
             <label className="text-[12.5px] font-semibold text-ink-900">Instructions / notes for field team</label>
             <textarea

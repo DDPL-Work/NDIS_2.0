@@ -1,6 +1,5 @@
-// Propose Intervention Ã¢â‚¬â€ complete workflow for creating a DPR/proposal.
-// Facility-type agnostic. Uses existing backendProposalApi.
-// No fabricated data. No hardcoded facility-specific logic.
+// Propose Intervention — complete workflow for creating a DPR/proposal.
+// Uses TanStack Query mutation hooks. No fabricated data.
 
 import { useState, useCallback, useMemo } from 'react'
 import Modal from '../../../components/ui/Modal'
@@ -8,12 +7,12 @@ import Button from '../../../components/ui/Button'
 import Select from '../../../components/ui/Select'
 import Badge from '../../../components/ui/Badge'
 import { useUiStore } from '../../../app/store/uiStore'
+import { useCreateIntervention } from '../dmSchedule/hooks/useInterventionMutations'
 import FacilityActionSummary from './FacilityActionSummary'
 import ActionSuccessModal from './ActionSuccessModal'
-import { INTERVENTION_CATEGORIES, TIMELINE_OPTIONS, PRIORITY_BAND_LABELS } from './constants'
+import { INTERVENTION_CATEGORIES, TIMELINE_OPTIONS } from './constants'
 import { validateProposal, hasErrors } from './facilityActionValidation'
 import { buildProblemStatement } from './facilityActionMapper'
-import { createProposal, checkExistingActions } from './facilityActionService'
 
 const emptyForm = () => ({
   interventionType: '',
@@ -25,20 +24,16 @@ const emptyForm = () => ({
 export default function ProposeInterventionModal({ open, onClose, facility }) {
   const [form, setForm] = useState(emptyForm)
   const [errors, setErrors] = useState({})
-  const [submitting, setSubmitting] = useState(false)
   const [result, setResult] = useState(null)
-  const [existingProposal, setExistingProposal] = useState(null)
   const pushToast = useUiStore((s) => s.pushToast)
+  const createIntervention = useCreateIntervention()
 
-  // Pre-populate from facility data when modal opens
   const defaultDescription = useMemo(() => buildProblemStatement(facility), [facility])
 
   const handleClose = useCallback(() => {
     setForm(emptyForm)
     setErrors({})
     setResult(null)
-    setExistingProposal(null)
-    setSubmitting(false)
     onClose()
   }, [onClose])
 
@@ -57,20 +52,27 @@ export default function ProposeInterventionModal({ open, onClose, facility }) {
       return
     }
     setErrors({})
-    setSubmitting(true)
-    try {
-      const response = await createProposal({ facility, form })
-      if (response.success) {
-        setResult(response.data)
-        pushToast('Intervention proposal created successfully.', 'success')
-      } else {
-        setErrors({ submit: response.error })
-        pushToast(response.error || 'Failed to create proposal.', 'error')
-      }
-    } finally {
-      setSubmitting(false)
+    const payload = {
+      facility_name: facility.name,
+      facility_type: facility.category || facility.categoryLabel || '',
+      intervention_type: form.interventionType || '',
+      description: form.description || '',
+      estimated_cost: form.estimatedCost ? Number(form.estimatedCost) : null,
+      expected_timeline: form.timeline || null,
+      coverage_gap_score: facility.gapScore != null ? Math.round(facility.gapScore * 100) : null,
     }
-  }, [facility, form, pushToast])
+    createIntervention.mutate(payload, {
+      onSuccess: (data) => {
+        setResult(data)
+        pushToast('Intervention proposal created successfully.', 'success')
+      },
+      onError: (error) => {
+        const msg = error?.message || 'Failed to create proposal.'
+        setErrors({ submit: msg })
+        pushToast(msg, 'error')
+      },
+    })
+  }, [facility, form, createIntervention, pushToast])
 
   const patch = useCallback((field, value) => {
     setForm((f) => ({ ...f, [field]: value }))
@@ -79,7 +81,6 @@ export default function ProposeInterventionModal({ open, onClose, facility }) {
 
   if (!open) return null
 
-  // Success state
   if (result) {
     return (
       <Modal open onClose={handleClose} title="Intervention Proposal" width="max-w-lg">
@@ -96,29 +97,15 @@ export default function ProposeInterventionModal({ open, onClose, facility }) {
   return (
     <Modal open onClose={handleClose} title="Propose Intervention" width="max-w-xl" footer={
       <>
-        <Button size="sm" variant="ghost" onClick={handleClose} disabled={submitting}>Cancel</Button>
-        <Button size="sm" variant="primary" loading={submitting} disabled={submitting} onClick={handleSubmit}>
-          {submitting ? 'Creating proposal...' : 'Create Intervention Proposal'}
+        <Button size="sm" variant="ghost" onClick={handleClose} disabled={createIntervention.isPending}>Cancel</Button>
+        <Button size="sm" variant="primary" loading={createIntervention.isPending} disabled={createIntervention.isPending} onClick={handleSubmit}>
+          {createIntervention.isPending ? 'Creating proposal...' : 'Create Intervention Proposal'}
         </Button>
       </>
     }>
       <div className="space-y-5">
-        {/* Facility summary */}
         <FacilityActionSummary facility={facility} />
 
-        {/* Existing proposal warning */}
-        {existingProposal && (
-          <div className="rounded-xl border border-saffron-200 bg-saffron-50/60 px-4 py-3">
-            <p className="text-[12.5px] text-saffron-800 font-medium">
-              An intervention proposal is already under review for this facility.
-            </p>
-            <p className="text-[11.5px] text-saffron-600 mt-1">
-              Proposal ID: {existingProposal.proposalId || existingProposal.id}
-            </p>
-          </div>
-        )}
-
-        {/* Submit error */}
         {errors.submit && (
           <div className="rounded-xl border border-alert-200 bg-alert-50/60 px-4 py-3 text-[12.5px] text-alert-700">
             {errors.submit}
@@ -126,7 +113,6 @@ export default function ProposeInterventionModal({ open, onClose, facility }) {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5" id="proposal-form">
-          {/* Section 1: What needs to be done? */}
           <div className="space-y-2">
             <label className="text-[12.5px] font-semibold text-ink-900">What needs to be done?</label>
             <Select
@@ -138,10 +124,9 @@ export default function ProposeInterventionModal({ open, onClose, facility }) {
             {errors.interventionType && <p className="text-[11.5px] text-alert-600">{errors.interventionType}</p>}
           </div>
 
-          {/* Section 2: Description */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-[12.5px] font-semibold text-ink-900">What needs to be done?</label>
+              <label className="text-[12.5px] font-semibold text-ink-900">Description</label>
               {facility?.recommendedAction && (
                 <button type="button" onClick={handleUseRecommended} className="text-[11.5px] text-sky-600 hover:text-sky-800 font-medium">
                   Use recommended action
@@ -158,13 +143,12 @@ export default function ProposeInterventionModal({ open, onClose, facility }) {
             {errors.description && <p className="text-[11.5px] text-alert-600">{errors.description}</p>}
           </div>
 
-          {/* Section 3: Priority (read-only) */}
           {facility?.priority && (
             <div className="space-y-1">
               <label className="text-[12.5px] font-semibold text-ink-900">System priority</label>
               <div className="flex items-center gap-2">
                 <Badge tone={facility.priority.band === 'P1' ? 'negative' : facility.priority.band === 'P2' ? 'warning' : 'info'} dot>
-                  {facility.priority.band} Ã¢â‚¬â€ {facility.priority.bandLabel}
+                  {facility.priority.band} — {facility.priority.bandLabel}
                 </Badge>
                 {facility.priority.score != null && (
                   <span className="text-[12px] text-ink-500">Score: {facility.priority.score}</span>
@@ -173,12 +157,11 @@ export default function ProposeInterventionModal({ open, onClose, facility }) {
             </div>
           )}
 
-          {/* Section 4: Estimated requirement */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-[12.5px] font-semibold text-ink-900">Estimated cost</label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-ink-400">Ã¢â€šÂ¹</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-ink-400">₹</span>
                 <input
                   type="number"
                   min={0}
@@ -201,7 +184,6 @@ export default function ProposeInterventionModal({ open, onClose, facility }) {
             </div>
           </div>
 
-          {/* Section 5: Supporting information */}
           <div className="space-y-2">
             <label className="text-[12.5px] font-semibold text-ink-900">Supporting evidence</label>
             <div className="rounded-lg border border-ink-100 divide-y divide-ink-100 text-[12px]">
@@ -209,12 +191,6 @@ export default function ProposeInterventionModal({ open, onClose, facility }) {
                 <div className="flex justify-between px-3 py-2">
                   <span className="text-ink-500">Gap score</span>
                   <span className="text-ink-800 font-medium">{Math.round(facility.gapScore * 100)}%</span>
-                </div>
-              )}
-              {facility?.hazardSafe != null && (
-                <div className="flex justify-between px-3 py-2">
-                  <span className="text-ink-500">Hazard status</span>
-                  <span className="text-ink-800 font-medium">{facility.hazardSafe ? 'Safe' : 'At risk'}</span>
                 </div>
               )}
               {facility?.district && (

@@ -8,7 +8,7 @@ import { getDefaultRoute } from '../../../app/authRoutes'
 const NAV = [
   { label: 'Home', href: '#top' },
   { label: 'Services', href: '#services' },
-  { label: 'Explore Map', href: '#explore' },
+  { label: 'Explore Map', to: '/explore' },
   { label: 'Complaints', href: '#complaints' },
   { label: 'Schemes', href: '#schemes' },
   { label: 'About', href: '#about' },
@@ -27,8 +27,10 @@ export default function PublicHeader({ onStartTour }) {
     const onScroll = () => {
       setScrolled(window.scrollY > 10)
       const probe = window.scrollY + 140
-      let current = NAV[0].href.slice(1)
+      const firstHref = NAV.find((n) => n.href)?.href
+      let current = firstHref ? firstHref.slice(1) : ''
       for (const item of NAV) {
+        if (!item.href) continue
         const el = document.getElementById(item.href.slice(1))
         if (el && el.offsetTop <= probe) current = item.href.slice(1)
       }
@@ -55,10 +57,22 @@ export default function PublicHeader({ onStartTour }) {
 
         <nav className="ml-4 hidden items-center gap-1 lg:flex" aria-label="Primary">
           {NAV.map((item) => {
-            const isActive = active === item.href.slice(1)
+            const key = item.to || item.href
+            const isActive = item.href && active === item.href.slice(1)
+            if (item.to) {
+              return (
+                <Link
+                  key={key}
+                  to={item.to}
+                  className="rounded-lg px-3 py-2 text-[13.5px] font-medium transition-colors hover:bg-ink-100/70 hover:text-ink-950 text-ink-700"
+                >
+                  {item.label}
+                </Link>
+              )
+            }
             return (
               <a
-                key={item.href}
+                key={key}
                 href={item.href}
                 aria-current={isActive ? 'location' : undefined}
                 className={`rounded-lg px-3 py-2 text-[13.5px] font-medium transition-colors hover:bg-ink-100/70 hover:text-ink-950 ${isActive ? 'bg-ink-100/80 text-ink-950' : 'text-ink-700'}`}
@@ -95,9 +109,17 @@ export default function PublicHeader({ onStartTour }) {
       {open && (
         <nav className="border-t border-ink-100 bg-white px-4 py-3 lg:hidden" aria-label="Mobile">
           <div className="flex flex-col">
-            {NAV.map((item) => (
-              <a key={item.href} href={item.href} onClick={() => setOpen(false)} className="rounded-lg px-3 py-2.5 text-[15px] font-medium text-ink-800 hover:bg-ink-50">{item.label}</a>
-            ))}
+            {NAV.map((item) => {
+              const key = item.to || item.href
+              if (item.to) {
+                return (
+                  <Link key={key} to={item.to} onClick={() => setOpen(false)} className="rounded-lg px-3 py-2.5 text-[15px] font-medium text-ink-800 hover:bg-ink-50">{item.label}</Link>
+                )
+              }
+              return (
+                <a key={key} href={item.href} onClick={() => setOpen(false)} className="rounded-lg px-3 py-2.5 text-[15px] font-medium text-ink-800 hover:bg-ink-50">{item.label}</a>
+              )
+            })}
             <button onClick={() => { setOpen(false); onStartTour?.() }} className="rounded-lg px-3 py-2.5 text-left text-[15px] font-medium text-ink-800 hover:bg-ink-50">Take a Tour</button>
             <div className="mt-2 flex flex-col gap-2 border-t border-ink-100 pt-3">
               {user ? (

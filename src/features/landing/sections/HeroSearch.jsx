@@ -17,7 +17,7 @@ const QUERY_CHIPS = [
 const NAV_CHIPS = [
   { label: 'Register Complaint', to: '/citizen/register' },
   { label: 'Track Complaint', to: '/citizen/track' },
-  { label: 'Explore Facilities', to: '/citizen/map' },
+  { label: 'Explore Facilities', to: '/explore' },
   { label: 'Government Schemes', to: '/citizen/schemes' },
 ]
 
@@ -26,7 +26,7 @@ const POPULAR = [
   { label: 'Nearest School', hint: 'Search education facilities', query: 'Nearest school' },
   { label: 'Register Complaint', hint: 'Create your account to report', to: '/citizen/register' },
   { label: 'Track Complaint', hint: 'Follow your request', to: '/citizen/track' },
-  { label: 'Explore Facilities', hint: 'Open the district map', to: '/citizen/map' },
+  { label: 'Explore Facilities', hint: 'Open the district map', to: '/explore' },
 ]
 
 const PLACEHOLDERS = [
@@ -167,7 +167,7 @@ export default function HeroSearch({ externalQuery = null }) {
         <div className="mt-3 overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-popover">
           <div className="flex items-center justify-between border-b border-ink-100 px-4 py-2.5">
             <p className="text-[12.5px] font-semibold text-ink-800">Nearby results for “{results.queryInfo?.query || query}”</p>
-            <LandingCta to="/citizen/map" className="flex items-center gap-1 rounded-lg px-2 py-1 text-[12px] font-semibold text-ink-600 transition-colors hover:bg-ink-50 hover:text-ink-900"><Navigation size={12} />Open Map</LandingCta>
+            <LandingCta to="/explore" className="flex items-center gap-1 rounded-lg px-2 py-1 text-[12px] font-semibold text-ink-600 transition-colors hover:bg-ink-50 hover:text-ink-900"><Navigation size={12} />Open Map</LandingCta>
           </div>
           {(results.results || []).length === 0 ? (
             <p className="px-4 py-4 text-[12.5px] text-ink-500">No matching places found nearby right now.</p>

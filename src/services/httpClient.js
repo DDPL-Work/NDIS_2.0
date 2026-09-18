@@ -1,8 +1,9 @@
-import { tokenManager } from './auth/tokenManager'
+import { tokenManager } from './auth/tokenManager.js'
 
 // The citizen deployment consumes the published Nalanda backend by default.
 // A local or staging server can still override this through VITE_API_BASE_URL.
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'https://nalanda.drdesigntech.com/api').replace(/\/$/, '')
+const env = (typeof import.meta !== 'undefined' && import.meta.env) || {}
+const API_BASE_URL = (env.VITE_API_BASE_URL || 'https://nalanda.drdesigntech.com/api').replace(/\/$/, '')
 
 // Refresh lock: only one token refresh in flight at a time
 let refreshPromise = null
@@ -151,16 +152,32 @@ function withQuery(path, params) {
 // ---------------------------------------------------------------------------
 
 // Normalize any backend response into a flat array of rows.
-// Handles: bare arrays, { results: [...] }, { data: [...] }, { users: [...] },
-// and nested collection wrappers.
+// Handles: bare arrays, { results: [...] }, { data: [...] }, { records: [...] },
+// { inspections: [...] }, { proposals: [...] }, nested collection wrappers,
+// and paginated envelopes.
 function normalizeRows(response) {
   if (Array.isArray(response)) return response
   if (response && typeof response === 'object') {
+    // Direct array properties
     if (Array.isArray(response.results)) return response.results
     if (Array.isArray(response.data)) return response.data
-    // Some endpoints nest under a resource-specific key (e.g. { users: [...] })
+    if (Array.isArray(response.records)) return response.records
+    // Named collection keys (inspections, proposals, complaints, etc.)
+    if (Array.isArray(response.inspections)) return response.inspections
+    if (Array.isArray(response.proposals)) return response.proposals
+    if (Array.isArray(response.complaints)) return response.complaints
+    // Nested paginated envelopes: { data: { results } }, { data: { records } }
+    if (response.data && typeof response.data === 'object' && !Array.isArray(response.data)) {
+      if (Array.isArray(response.data.results)) return response.data.results
+      if (Array.isArray(response.data.records)) return response.data.records
+      if (Array.isArray(response.data.inspections)) return response.data.inspections
+      if (Array.isArray(response.data.proposals)) return response.data.proposals
+    }
+    // Fallback: scan ALL values for the first array found
     const values = Object.values(response)
-    if (values.length === 1 && Array.isArray(values[0])) return values[0]
+    for (const val of values) {
+      if (Array.isArray(val)) return val
+    }
   }
   return []
 }

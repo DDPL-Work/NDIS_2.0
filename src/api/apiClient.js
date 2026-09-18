@@ -9,7 +9,7 @@ export {
   normalizePagination,
   downloadFile,
   logout,
-} from '../services/httpClient'
+} from '../services/httpClient.js'
 
 export class BackendCapabilityError extends Error {
   constructor(capability) {

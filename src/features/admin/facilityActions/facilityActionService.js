@@ -1,10 +1,10 @@
-// Facility action service Ã¢â‚¬â€ API abstraction layer.
-// Uses existing backendProposalApi and backendComplaintApi.
+// Facility action service — API abstraction layer.
+// All three actions now hit real backend endpoints.
 // No fabricated responses. No mock data. No hardcoded IDs.
-// If no backend endpoint exists, the error is surfaced honestly.
 
+import { backendInterventionApi } from '../../../api/interventionApi'
+import { backendInspectionApi } from '../../../api/inspectionApi'
 import { backendProposalApi } from '../../../api/proposalApi'
-import { invalidateData, DATA_SCOPES } from '../../../app/store/dataVersionStore'
 import { ERROR_MESSAGES } from './constants'
 
 /**
@@ -23,66 +23,46 @@ function normalizeError(error) {
 }
 
 /**
- * Create an intervention proposal via the existing proposal API.
- * Maps the simplified form to the backend proposal contract.
+ * Create an intervention proposal via POST /api/interventions/propose/.
+ * Maps the simplified form to the backend intervention contract.
  */
 export async function createProposal({ facility, form }) {
   try {
     const payload = {
-      title: `${form.interventionType} Ã¢â‚¬â€ ${facility.name}`,
-      category: form.interventionType || 'other',
-      facility_id: facility.id,
       facility_name: facility.name,
-      department: facility.departmentId || null,
-      district: facility.districtId || null,
-      village: facility.village || null,
-      block: facility.block || null,
-      problem_statement: form.description || '',
-      recommended_action: form.description || '',
+      facility_type: facility.category || facility.categoryLabel || '',
+      intervention_type: form.interventionType || '',
+      description: form.description || '',
       estimated_cost: form.estimatedCost ? Number(form.estimatedCost) : null,
-      estimated_timeline: form.timeline || null,
-      priority: facility.priority?.band || null,
-      gap_score: facility.gapScore || null,
+      expected_timeline: form.timeline || null,
+      coverage_gap_score: facility.gapScore != null ? Math.round(facility.gapScore * 100) : null,
     }
-    const proposal = await backendProposalApi.create(payload)
-    invalidateData(DATA_SCOPES.PROPOSALS)
-    invalidateData(DATA_SCOPES.PLANNING)
-    return { success: true, data: proposal }
+    const intervention = await backendInterventionApi.create(payload)
+    return { success: true, data: intervention }
   } catch (error) {
     return { success: false, error: normalizeError(error) }
   }
 }
 
 /**
- * Schedule a field inspection.
- * Uses the complaint API's start-inspection endpoint if a linked complaint exists,
- * otherwise creates a local inspection record via the project engine.
- * If no backend endpoint is available, surfaces the error honestly.
+ * Schedule a field inspection via POST /api/inspections/schedule/.
+ * Maps the simplified form to the backend inspection contract.
  */
 export async function scheduleInspection({ facility, form }) {
   try {
-    // Try the proposal step 2 survey-inspection endpoint if a proposal exists
-    // Otherwise, the inspection is stored locally via the project engine
-    const inspectionPayload = {
-      inspection_date: form.preferredDate,
-      survey_team: form.team || null,
-      inspection_notes: form.notes || '',
-      facility_id: facility.id,
-      facility_name: facility.name,
-      department: facility.departmentId || null,
-      district: facility.districtId || null,
-      priority: facility.priority?.band || null,
-      gap_score: facility.gapScore || null,
-      purpose: form.purpose || '',
+    const payload = {
+      title: `Inspection — ${facility.name}`,
+      location_name: [facility.village, facility.block, facility.district].filter(Boolean).join(', '),
+      department_code: facility.departmentId || facility.department || '',
+      inspection_purpose: form.purpose || `Verify reported service gap at ${facility.name}.`,
+      preferred_date: form.preferredDate || null,
+      scheduled_date: form.preferredDate || null,
+      inspection_team: form.team || '',
+      inspector_name: '',
+      instructions: form.notes || '',
+      remarks: '',
     }
-
-    // Use the local project engine store for inspection scheduling
-    // (no backend endpoint exists yet for standalone facility inspections)
-    const { useProjectEngine } = await import('../../../app/store/projectEngine')
-    const store = useProjectEngine.getState()
-    const inspection = store.scheduleInspection(inspectionPayload)
-
-    invalidateData(DATA_SCOPES.PROJECTS)
+    const inspection = await backendInspectionApi.create(payload)
     return { success: true, data: inspection }
   } catch (error) {
     return { success: false, error: normalizeError(error) }
@@ -91,26 +71,13 @@ export async function scheduleInspection({ facility, form }) {
 
 /**
  * Escalate a facility issue to district administration.
- * Uses the complaint API's escalate endpoint if a linked complaint exists,
- * otherwise creates an escalation via the proposal system.
+ * Uses the proposal API's escalation category since no dedicated
+ * escalation endpoint exists. The proposal system tracks escalations.
  */
 export async function escalateIssue({ facility, form }) {
   try {
-    const escalationPayload = {
-      reason: form.reason || form.additionalMessage || 'Facility escalation from department support.',
-      additional_message: form.additionalMessage || '',
-      facility_id: facility.id,
-      facility_name: facility.name,
-      department: facility.departmentId || null,
-      district: facility.districtId || null,
-      priority: facility.priority?.band || null,
-      gap_score: facility.gapScore || null,
-    }
-
-    // Escalate via the proposal API if the facility has a linked proposal,
-    // otherwise create an escalation record
-    const proposal = await backendProposalApi.create({
-      title: `Escalation Ã¢â‚¬â€ ${facility.name}`,
+    const payload = {
+      title: `Escalation — ${facility.name}`,
       category: 'escalation',
       facility_id: facility.id,
       facility_name: facility.name,
@@ -118,19 +85,13 @@ export async function escalateIssue({ facility, form }) {
       district: facility.districtId || null,
       village: facility.village || null,
       block: facility.block || null,
-      problem_statement: escalationPayload.reason,
+      problem_statement: form.reason || form.additionalMessage || 'Facility escalation from DM.',
+      recommended_action: form.reason || '',
       priority: facility.priority?.band || null,
-      gap_score: facility.gapScore || null,
-    }).catch(() => null)
-
-    if (proposal) {
-      invalidateData(DATA_SCOPES.PROPOSALS)
-      invalidateData(DATA_SCOPES.PLANNING)
-      return { success: true, data: proposal, type: 'proposal' }
+      gap_score: facility.gapScore != null ? Math.round(facility.gapScore * 100) : null,
     }
-
-    // If proposal creation fails, escalate via complaint if available
-    return { success: true, data: escalationPayload, type: 'escalation' }
+    const proposal = await backendProposalApi.create(payload)
+    return { success: true, data: proposal, type: 'proposal' }
   } catch (error) {
     return { success: false, error: normalizeError(error) }
   }
@@ -138,19 +99,33 @@ export async function escalateIssue({ facility, form }) {
 
 /**
  * Check for existing actions on a facility.
- * Returns open proposal/inspection/escalation if the backend provides them.
+ * Returns open interventions, inspections, and proposals from the real APIs.
  */
 export async function checkExistingActions(facilityId) {
   try {
-    const proposals = await backendProposalApi.list({ facility_id: facilityId }).catch(() => ({ results: [] }))
+    const [interventions, inspections, proposals] = await Promise.all([
+      backendInterventionApi.list({ facility_name: '' }).catch(() => []),
+      backendInspectionApi.list({ location_name: '' }).catch(() => []),
+      backendProposalApi.list({ facility_id: facilityId }).catch(() => ({ results: [] })),
+    ])
+
+    const openInterventions = (Array.isArray(interventions) ? interventions : []).filter(
+      (i) => !['completed', 'cancelled', 'rejected'].includes(i.status)
+    )
+    const openInspections = (Array.isArray(inspections) ? inspections : []).filter(
+      (i) => !['completed', 'cancelled'].includes(i.status)
+    )
     const openProposals = (proposals?.results || []).filter(
       (p) => ['DRAFT_DPR', 'PENDING_REVIEW'].includes(p.status)
     )
+
     return {
-      hasOpenProposal: openProposals.length > 0,
-      openProposal: openProposals[0] || null,
+      hasOpenProposal: openInterventions.length > 0 || openProposals.length > 0,
+      openProposal: openInterventions[0] || openProposals[0] || null,
+      hasOpenInspection: openInspections.length > 0,
+      openInspection: openInspections[0] || null,
     }
   } catch {
-    return { hasOpenProposal: false, openProposal: null }
+    return { hasOpenProposal: false, openProposal: null, hasOpenInspection: false, openInspection: null }
   }
 }

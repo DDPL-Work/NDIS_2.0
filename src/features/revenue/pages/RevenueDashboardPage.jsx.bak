@@ -1,0 +1,416 @@
+// Revenue & Property Intelligence — Revenue Dashboard Page
+// Main dashboard with KPIs, map, and analytics
+
+import { useState } from 'react'
+import { useRevenueDashboard } from '../hooks'
+import { RevenueKpiCards, RevenueMap, RevenueFilters } from '../components'
+import { Card, Select, Button, Tabs, Badge, Skeleton } from '../../../components/ui'
+import { Map, TrendingUp, AlertTriangle, Target, Download, RefreshCw } from 'lucide-react'
+import { FINANCIAL_YEARS, REVIEW_CANDIDATE_TYPES } from '../constants/revenueConstants'
+import { formatCurrency, formatIndianNumber } from '../utils/revenueFormatters'
+
+export function RevenueDashboardPage() {
+  const [filters, setFilters] = useState({ financialYear: '2025-26' })
+  const [activeTab, setActiveTab] = useState('overview')
+
+  const { kpis, analytics, trends, anomalies, collectionHeatmap, arrearsHeatmap, isLoading, error, refetch } = useRevenueDashboard(filters)
+
+  if (isLoading && !kpis) {
+    return <DashboardSkeleton />
+  }
+
+  return (
+    <div className="h-full flex flex-col bg-ink-50">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 bg-white border-b border-ink-200">
+        <div>
+          <h1 className="text-xl font-semibold text-ink-900">Revenue & Property Intelligence</h1>
+          <p className="text-sm text-ink-500">District revenue overview, property tax collection, and arrears monitoring</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Select
+            value={filters.financialYear}
+            onValueChange={v => setFilters(prev => ({ ...prev, financialYear: v }))}
+            options={FINANCIAL_YEARS.map(fy => ({ value: fy.id, label: fy.label }))}
+            className="w-48"
+            placeholder="Financial Year"
+          />
+          <Button variant="outline" size="sm" onClick={refetch} className="gap-1">
+            <RefreshCw className="w-4 h-4" />
+            Refresh
+          </Button>
+          <Button variant="primary" size="sm" className="gap-1">
+            <Download className="w-4 h-4" />
+            Export Report
+          </Button>
+        </div>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="p-4">
+        <RevenueKpiCards data={kpis} />
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 overflow-hidden p-4">
+        <Tabs
+          tabs={[
+            { value: 'overview', label: 'Overview' },
+            { value: 'map', label: 'GIS Map' },
+            { value: 'analytics', label: 'Analytics' },
+            { value: 'anomalies', label: 'Review Candidates' },
+          ]}
+          active={activeTab}
+          onChange={setActiveTab}
+        />
+
+        {activeTab === 'overview' && (
+          <div className="flex-1 overflow-y-auto">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {/* Collection vs Demand */}
+                <Card className="lg:col-span-2">
+                  <div className="p-4 border-b border-ink-200">
+                    <h3 className="font-medium text-ink-900">Collection vs Demand Trend</h3>
+                  </div>
+                  <div className="p-4 h-64">
+                    {trends ? (
+                      <CollectionTrendChart data={trends} />
+                    ) : (
+                      <div className="h-full flex items-center justify-center text-ink-500">No trend data available</div>
+                    )}
+                  </div>
+                </Card>
+
+                {/* Quick Stats */}
+                <Card>
+                  <div className="p-4 border-b border-ink-200">
+                    <h3 className="font-medium text-ink-900 flex items-center gap-2">
+                      <Target className="w-5 h-5" />
+                      Key Metrics
+                    </h3>
+                  </div>
+                  <div className="p-4 space-y-4">
+                    <MetricCard
+                      label="Block Coverage"
+                      value={`${analytics?.blocksCovered || 0} / ${analytics?.totalBlocks || 0}`}
+                      trend="+2 this month"
+                      trendPositive
+                    />
+                    <MetricCard
+                      label="Wards with 100% Collection"
+                      value={analytics?.wardsFullCollection || 0}
+                      trend="+5 this quarter"
+                      trendPositive
+                    />
+                    <MetricCard
+                      label="High Value Properties"
+                      value={formatIndianNumber(kpis?.highValueProperties || 0)}
+                      trend="Monitoring"
+                    />
+                    <MetricCard
+                      label="Recovery Cases Active"
+                      value={formatIndianNumber(kpis?.activeRecoveryCases || 0)}
+                      trend={kpis?.activeRecoveryCases > 50 ? 'High' : 'Normal'}
+                      trendPositive={kpis?.activeRecoveryCases <= 50}
+                    />
+                    <MetricCard
+                      label="Properties with Arrears >3yrs"
+                      value={formatIndianNumber(anomalies?.longTermArrears || 0)}
+                      trend="Action Required"
+                      trendPositive={false}
+                    />
+                    <MetricCard
+                      label="GIS-Assessment Mismatches"
+                      value={formatIndianNumber(anomalies?.areaMismatches || 0)}
+                      trend="Under Review"
+                      trendPositive={false}
+                    />
+                  </div>
+                </Card>
+
+                {/* Top Defaulters */}
+                <Card className="lg:col-span-3">
+                  <div className="p-4 border-b border-ink-200 flex items-center justify-between">
+                    <h3 className="font-medium text-ink-900 flex items-center gap-2">
+                      <AlertTriangle className="w-5 h-5" />
+                      Top Defaulters / Review Candidates
+                    </h3>
+                    <Badge variant="outline" className="text-xs">
+                      {anomalies?.totalCandidates || 0} candidates
+                    </Badge>
+                  </div>
+                  <div className="p-4">
+                    <DefaultersTable candidates={anomalies?.candidates || []} />
+                  </div>
+</Card>
+              </div>
+            )}
+
+            {activeTab === 'map' && (
+              <div className="flex-1 overflow-hidden">
+                <RevenueMap
+                  filters={filters}
+                  height="100%"
+                />
+              </div>
+            )}
+
+            {activeTab === 'analytics' && (
+              <div className="flex-1 overflow-y-auto">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* Revenue Gap */}
+                  <Card className="h-full">
+                    <div className="p-4 border-b border-ink-200">
+                      <h3 className="font-medium text-ink-900">Revenue Gap Analysis</h3>
+                    </div>
+                    <div className="p-4 h-64">
+                      {kpis ? (
+                        <RevenueGapChart
+                          expected={kpis.expectedRevenue || 0}
+                          actual={kpis.totalCollected || 0}
+                          gap={kpis.revenueGap || 0}
+                        />
+                      ) : (
+                        <div className="h-full flex items-center justify-center text-ink-500">Loading...</div>
+                      )}
+                    </div>
+                  </Card>
+
+                  {/* Block/Ward Performance */}
+                  <Card className="h-full">
+                    <div className="p-4 border-b border-ink-200">
+                      <h3 className="font-medium text-ink-900">Block-wise Performance</h3>
+                    </div>
+                    <div className="p-4 h-64 overflow-y-auto">
+                      <BlockPerformanceTable blocks={analytics?.blockPerformance || []} />
+                    </div>
+                  </Card>
+
+                  {/* Collection Heatmap */}
+                  <Card className="h-full">
+                    <div className="p-4 border-b border-ink-200">
+                      <h3 className="font-medium text-ink-900">Collection Heatmap</h3>
+                    </div>
+                    <div className="p-4 h-64">
+                      <div className="h-full flex items-center justify-center text-ink-500">
+                        Heatmap visualization (integrates with GIS map)
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Arrears Heatmap */}
+                  <Card className="h-full">
+                    <div className="p-4 border-b border-ink-200">
+                      <h3 className="font-medium text-ink-900">Arrears Concentration</h3>
+                    </div>
+                    <div className="p-4 h-64">
+                      <div className="h-full flex items-center justify-center text-ink-500">
+                        Arrears heatmap visualization
+                      </div>
+                    </div>
+                  </Card>
+                </div>
+              </div>
+            )}
+
+            {/* Anomalies tab - temporarily simplified */}
+            {false && (
+              <div className="flex-1 overflow-y-auto p-4">
+                <p className="text-ink-500">Anomalies tab - under construction</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Sub-components
+function DashboardSkeleton() {
+  return (
+    <div className="h-full flex flex-col bg-ink-50">
+      <div className="p-4 bg-white border-b border-ink-200">
+        <Skeleton className="h-6 w-1/4" />
+        <Skeleton className="h-4 w-1/3 mt-2" />
+      </div>
+      <div className="p-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-4">
+          {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-24" />)}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function MetricCard({ label, value, trend, trendPositive = true }) {
+  return (
+    <div className="p-3 bg-ink-50 rounded-lg">
+      <p className="text-xs text-ink-500">{label}</p>
+      <p className="text-lg font-semibold text-ink-900">{value}</p>
+      <p className={`text-xs ${trendPositive ? 'text-green-600' : 'text-red-600'}`}>{trend}</p>
+    </div>
+  )
+}
+
+function CollectionTrendChart({ data }) {
+  // Simple SVG chart placeholder
+  return (
+    <svg viewBox="0 0 400 200" className="w-full h-full" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="gradient" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#22c55e" stopOpacity="0.3" />
+          <stop offset="100%" stopColor="#22c55e" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <rect x="20" y="20" width="360" height="160" fill="url(#gradient)" />
+      <text x="200" y="110" textAnchor="middle" fill="#22c55e" fontSize="24" fontWeight="bold">
+        {data?.collectionRate || 0}%
+      </text>
+      <text x="200" y="135" textAnchor="middle" fill="#94a3b8" fontSize="12">
+        Collection Rate
+      </text>
+    </svg>
+  )
+}
+
+function RevenueGapChart({ expected, actual, gap }) {
+  const rate = expected > 0 ? (actual / expected) * 100 : 0
+  return (
+    <div className="h-full flex flex-col items-center justify-center gap-4">
+      <svg viewBox="0 0 160 160" className="w-40 h-40">
+        <circle cx="80" cy="80" r="60" stroke="#e2e8f0" strokeWidth="12" fill="none" />
+        <circle
+          cx="80" cy="80" r="60"
+          stroke="#22c55e"
+          strokeWidth="12"
+          fill="none"
+          strokeDasharray={2 * Math.PI * 60 * (rate / 100)}
+          strokeDashoffset={2 * Math.PI * 60}
+          strokeLinecap="round"
+          transform="rotate(-90 80 80)"
+          style={{ transition: 'stroke-dashoffset 1s ease' }}
+        />
+        <circle
+          cx="80" cy="80" r="60"
+          stroke="#ef4444"
+          strokeWidth="12"
+          fill="none"
+          strokeDasharray={2 * Math.PI * 60 * ((100 - rate) / 100)}
+          strokeDashoffset={2 * Math.PI * 60 * (rate / 100)}
+          strokeLinecap="round"
+          transform="rotate(-90 80 80)"
+        />
+      </svg>
+      <div className="text-center">
+        <p className="text-2xl font-bold text-ink-900">{rate.toFixed(1)}%</p>
+        <p className="text-xs text-ink-500">Collection Rate</p>
+        <p className="text-xs text-red-600 mt-1">Gap: {formatCurrency(gap, { compact: true })}</p>
+      </div>
+    </div>
+  )
+}
+
+function BlockPerformanceTable({ blocks = [] }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-ink-200 text-left text-ink-500">
+            <th className="pb-2 font-medium">Block</th>
+            <th className="pb-2 font-medium">Properties</th>
+            <th className="pb-2 font-medium">Demand</th>
+            <th className="pb-2 font-medium">Collected</th>
+            <th className="pb-2 font-medium">Rate</th>
+          </tr>
+        </thead>
+        <tbody>
+          {blocks.length === 0 ? (
+            <tr>
+              <td colSpan="5" className="py-4 text-center text-ink-500">No block data available</td>
+            </tr>
+          ) : (
+            blocks.slice(0, 10).map(block => (
+              <tr key={block.blockId} className="border-b border-ink-100 hover:bg-ink-50">
+                <td className="py-2 text-ink-900">{block.blockName}</td>
+                <td className="py-2 text-ink-700">{formatIndianNumber(block.totalProperties)}</td>
+                <td className="py-2 text-ink-700">{formatCurrency(block.totalDemand, { compact: true })}</td>
+                <td className="py-2 text-green-700">{formatCurrency(block.totalCollected, { compact: true })}</td>
+                <td className="py-2 font-medium">
+                  {block.totalDemand > 0
+                    ? `${((block.totalCollected / block.totalDemand) * 100).toFixed(1)}%`
+                    : 'N/A'}
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function DefaultersTable({ candidates = [] }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-ink-200 text-left text-ink-500">
+            <th className="pb-2 font-medium">Property</th>
+            <th className="pb-2 font-medium">Owner</th>
+            <th className="pb-2 font-medium">Type</th>
+            <th className="pb-2 font-medium">Arrears</th>
+            <th className="pb-2 font-medium">Years</th>
+            <th className="pb-2 font-medium">Review Type</th>
+            <th className="pb-2 font-medium">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {candidates.length === 0 ? (
+            <tr>
+              <td colSpan="7" className="py-4 text-center text-ink-500">No review candidates</td>
+            </tr>
+          ) : (
+            candidates.slice(0, 15).map(c => (
+              <tr key={c.id} className="border-b border-ink-100 hover:bg-ink-50">
+                <td className="py-2 font-mono text-ink-900">{c.plotNo || c.propertyId}</td>
+                <td className="py-2 text-ink-700">{c.ownerName}</td>
+                <td className="py-2"><Badge variant="outline" className="text-xs">{c.propertyType}</Badge></td>
+                <td className="py-2 text-red-700 font-medium">{formatCurrency(c.totalArrears)}</td>
+                <td className="py-2 text-ink-700">{c.yearsPending}</td>
+                <td className="py-2">
+                  <Badge variant="outline" className="text-xs">{c.reviewType}</Badge>
+                </td>
+                <td className="py-2">
+                  <Button variant="ghost" size="sm" className="h-7 px-2">Action</Button>
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function AnomalyList({ type, candidates = [] }) {
+  if (candidates.length === 0) {
+    return <p className="text-sm text-ink-500 text-center py-4">No candidates of this type</p>
+  }
+
+  return (
+    <div className="space-y-2 max-h-64 overflow-y-auto">
+      {candidates.slice(0, 10).map(c => (
+        <div key={c.id} className="p-2 bg-ink-50 rounded border border-ink-100">
+          <div className="flex items-center justify-between">
+            <span className="font-mono text-sm text-ink-900">{c.plotNo || c.propertyId}</span>
+            <Badge variant="outline" className="text-xs">{c.reviewType}</Badge>
+          </div>
+          <p className="text-xs text-ink-600">{c.ownerName} • {formatCurrency(c.totalArrears)} arrears</p>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export default RevenueDashboardPage

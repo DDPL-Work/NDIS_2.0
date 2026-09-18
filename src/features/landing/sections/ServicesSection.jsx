@@ -6,14 +6,14 @@ import LandingCta from '../LandingCta'
 // through LandingCta (real route for signed-in users, in-page anchor or the
 // public login page for anonymous visitors).
 const SERVICES = [
-  { icon: HeartPulse, title: 'Health', text: 'Find hospitals, PHCs and health facilities near you.', cta: 'Explore', to: '/citizen/map', accent: 'bg-saffron-50 text-saffron-600' },
-  { icon: GraduationCap, title: 'Education', text: 'Public schools and learning facilities in your district.', cta: 'Explore', to: '/citizen/map', accent: 'bg-sky-50 text-sky-600' },
-  { icon: Droplets, title: 'Water', text: 'Water supply points and related infrastructure.', cta: 'Explore', to: '/citizen/map', accent: 'bg-cyan-50 text-cyan-600' },
-  { icon: Bus, title: 'Transport', text: 'Public transport and road infrastructure.', cta: 'Explore', to: '/citizen/map', accent: 'bg-ink-50 text-ink-600' },
-  { icon: Building2, title: 'Public Facilities', text: 'Community buildings, parks and public amenities.', cta: 'Explore', to: '/citizen/map', accent: 'bg-leaf-50 text-leaf-600' },
+  { icon: HeartPulse, title: 'Health', text: 'Find hospitals, PHCs and health facilities near you.', cta: 'Explore', to: '/explore', accent: 'bg-saffron-50 text-saffron-600' },
+  { icon: GraduationCap, title: 'Education', text: 'Public schools and learning facilities in your district.', cta: 'Explore', to: '/explore', accent: 'bg-sky-50 text-sky-600' },
+  { icon: Droplets, title: 'Water', text: 'Water supply points and related infrastructure.', cta: 'Explore', to: '/explore', accent: 'bg-cyan-50 text-cyan-600' },
+  { icon: Bus, title: 'Transport', text: 'Public transport and road infrastructure.', cta: 'Explore', to: '/explore', accent: 'bg-ink-50 text-ink-600' },
+  { icon: Building2, title: 'Public Facilities', text: 'Community buildings, parks and public amenities.', cta: 'Explore', to: '/explore', accent: 'bg-leaf-50 text-leaf-600' },
   { icon: FileText, title: 'Complaints', text: 'Report civic issues and track every step.', cta: 'Report an Issue', to: '/citizen/register', accent: 'bg-amber-50 text-amber-600' },
   { icon: Landmark, title: 'Schemes', text: 'Government support and benefit schemes.', cta: 'View Schemes', to: '/citizen/schemes', accent: 'bg-violet-50 text-violet-600' },
-  { icon: Compass, title: 'District Information', text: 'Departments, projects and district updates.', cta: 'View District', to: '/citizen/map', accent: 'bg-ink-50 text-ink-600' },
+  { icon: Compass, title: 'District Information', text: 'Departments, projects and district updates.', cta: 'View District', to: '/explore', accent: 'bg-ink-50 text-ink-600' },
 ]
 
 export default function ServicesSection() {

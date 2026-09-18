@@ -1,3 +1,4 @@
+import React from 'react'
 import clsx from 'clsx'
 import { Loader2 } from 'lucide-react'
 
@@ -8,6 +9,9 @@ const VARIANTS = {
   ghost: 'text-ink-700 hover:bg-ink-100',
   positive: 'bg-leaf-600 text-white hover:bg-leaf-700',
   danger: 'bg-alert-500 text-white hover:bg-alert-600',
+  drawerPrimary: 'bg-white text-[#0B3A5B] hover:bg-white/90 focus-visible:ring-white/30',
+  drawerGhost: 'text-white/70 hover:text-white hover:bg-white/10 focus-visible:ring-white/30',
+  drawerOutline: 'border border-white/30 text-white bg-transparent hover:bg-white/10 focus-visible:ring-white/30',
 }
 
 const SIZES = {
@@ -26,7 +30,7 @@ export default function Button({ as: Comp = 'button', variant = 'primary', size 
       disabled={disabled || loading}
       {...rest}
     >
-      {loading ? <Loader2 size={15} className="animate-spin" /> : Icon ? <Icon size={15} /> : null}
+      {loading ? <Loader2 size={15} className="animate-spin" /> : Icon ? (React.isValidElement(Icon) ? Icon : <Icon size={15} />) : null}
       {children}
     </Comp>
   )

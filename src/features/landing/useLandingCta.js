@@ -7,8 +7,8 @@ import { useAuthStore } from '../../app/store/authStore'
 const ANONYMOUS_TARGET = {
   '/citizen/register': '/login',
   '/citizen/track': '/login',
-  '/citizen/map': '#explore',
-  '/citizen/facilities': '#explore',
+  '/citizen/map': '/explore',
+  '/citizen/facilities': '/explore',
   '/citizen/schemes': '#schemes',
   '/citizen/notifications': '#services',
 }

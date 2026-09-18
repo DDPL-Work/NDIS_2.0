@@ -6,7 +6,7 @@ import Badge from '../../components/ui/Badge'
 import GapScoreRing from '../../components/ui/GapScoreRing'
 import { useAuthStore } from '../../app/store/authStore'
 import { useUiStore } from '../../app/store/uiStore'
-import { backendFeedbackApi } from '../../api/feedbackApi'
+import { backendFeedbackApi, extractQuestions, extractFirstQuestionSet } from '../../api/feedbackApi'
 import CitizenFeedbackWizard from './CitizenFeedbackWizard'
 
 export default function CitizenFeedbackPage({ facility, questionSet, onBack }) {
@@ -19,13 +19,14 @@ export default function CitizenFeedbackPage({ facility, questionSet, onBack }) {
     if (!qs) {
       setLoading(true)
       try {
-        const sets = await backendFeedbackApi.listQuestionSets({
+        const raw = await backendFeedbackApi.listQuestionSets({
           department: fs?.departmentId,
           service_type: fs?.serviceType,
           location_type: 'facility',
         })
-        const matched = sets.find((s) => s.activeFrom ? new Date(s.activeFrom) <= new Date() : true)
-        setWizardQuestionSet(matched || sets[0] || null)
+        // Normalize: extract first question set with its questions
+        const questionSet = extractFirstQuestionSet(raw)
+        setWizardQuestionSet(questionSet)
       } catch (err) {
         pushToast('Failed to load feedback form', 'error')
       } finally {

@@ -5,10 +5,11 @@
 // L.marker([latitude, longitude]) from backend [longitude, latitude].
 import { useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react'
 import L from 'leaflet'
+import { area as geoJsonArea } from '@turf/turf'
 import 'leaflet/dist/leaflet.css'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
-import { MAP_TOOLS, attributionFor, measurePathKm } from '../../hooks/useMapTools'
+import { MAP_TOOLS, attributionFor } from '../../hooks/useMapTools'
 import { createFacilityMarkers, createCatalogLayer, createSearchResultMarkers } from '../../services/LeafletLayerService'
 import { ensureLeafletPlugins } from '../../services/leafletPlugins'
 import { distanceMeters } from '../../utils/geo'
@@ -30,6 +31,14 @@ function formatMeasure(km) {
   if (km < 1) return `${Math.max(1, Math.round(km * 1000))} m`
   if (km < 10) return `${km.toFixed(1)} km`
   return `${Math.round(km)} km`
+}
+
+function formatArea(squareMeters) {
+  if (squareMeters == null || !Number.isFinite(squareMeters)) return null
+  if (squareMeters >= 1000000) return `${(squareMeters / 1000000).toFixed(2)} km²`
+  if (squareMeters >= 10000) return `${Math.round(squareMeters).toLocaleString('en-IN')} m²`
+  if (squareMeters >= 1) return `${squareMeters.toFixed(2)} m²`
+  return `${(squareMeters * 10.7639).toFixed(2)} sq ft`
 }
 
 const MapView = forwardRef(function MapView({
@@ -54,6 +63,8 @@ const MapView = forwardRef(function MapView({
   radiusKm = 3,
   measurePoints = [],
   measureDistKm = null,
+  measureAreaSqm = null,
+  measureMode = 'distance',
   clusterEnabled = false,
   basemapUrl,
   departmentColors = {},
@@ -125,7 +136,7 @@ const MapView = forwardRef(function MapView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [])
 
-  // Vector-only snapshot export (raster tiles are CORS-tainted, so the basemap
+// Vector-only snapshot export (raster tiles are CORS-tainted, so the basemap
   // is intentionally omitted — overlays and markers are redrawn exactly).
   function exportSnapshot() {
     const map = mapRef.current
@@ -174,7 +185,7 @@ const MapView = forwardRef(function MapView({
       zoom,
       zoomControl: false,
     })
-    L.control.zoom({ position: 'topright' }).addTo(map)
+    L.control.zoom({ position: 'bottomright' }).addTo(map)
     L.control.scale({ position: 'bottomright', imperial: false, maxWidth: 80 }).addTo(map)
     tileLayerRef.current = L.tileLayer(basemapUrl || DEFAULT_TILES, { maxZoom: 19, attribution: attributionFor(basemapUrl) }).addTo(map)
     mapRef.current = map
@@ -220,7 +231,7 @@ const MapView = forwardRef(function MapView({
     container.style.cursor = activeTool !== MAP_TOOLS.NONE ? 'crosshair' : ''
     const map = mapRef.current
     if (!map) return
-    if (activeTool === MAP_TOOLS.MEASURE) map.doubleClickZoom.disable()
+    if (activeTool === MAP_TOOLS.MEASURE || activeTool === MAP_TOOLS.MEASURE_AREA) map.doubleClickZoom.disable()
     else map.doubleClickZoom.enable()
   }, [activeTool])
 
@@ -362,6 +373,8 @@ const MapView = forwardRef(function MapView({
       const layer = createCatalogLayer(entry, {
         layerName: entry.layerName,
         category: entry.category,
+        style: entry.style ? (feature) => entry.style(entry.layerName, feature) : undefined,
+        onFeatureClick: entry.onFeatureClick,
       })
       group.addLayer(layer)
     })
@@ -445,16 +458,23 @@ const MapView = forwardRef(function MapView({
       measureRef.current.dots = dotsLayer
     }
     if (measurePoints.length >= 2) {
-      measureRef.current.line = L.polyline(measurePoints.map(toLatLng), {
-        color: MEASURE_COLOR, weight: 2, dashArray: '4 2',
-      }).addTo(map)
-      if (measureDistKm !== null) {
+      if (measureMode === 'area' && measurePoints.length >= 3) {
+        measureRef.current.line = L.polygon(measurePoints.map(toLatLng), {
+          color: MEASURE_COLOR, weight: 2, fillColor: MEASURE_COLOR, fillOpacity: 0.12,
+        }).addTo(map)
+      } else {
+        measureRef.current.line = L.polyline(measurePoints.map(toLatLng), {
+          color: MEASURE_COLOR, weight: 2, dashArray: '4 2',
+        }).addTo(map)
+      }
+      const labelValue = measureMode === 'area' ? formatArea(measureAreaSqm) : formatMeasure(measureDistKm)
+      if (labelValue) {
         const last = toLatLng(measurePoints[measurePoints.length - 1])
         const iconSize = [58, 20]
         measureRef.current.label = L.marker(last, {
           icon: L.divIcon({
             className: '',
-            html: measureLabelHtml(formatMeasure(measureDistKm)),
+            html: measureLabelHtml(labelValue),
             iconSize,
             // pill sits just above the last vertex
             iconAnchor: [iconSize[0] / 2, iconSize[1] + 6],
@@ -464,7 +484,7 @@ const MapView = forwardRef(function MapView({
         }).addTo(map)
       }
     }
-  }, [measurePoints, measureDistKm, ready])
+  }, [measurePoints, measureDistKm, measureAreaSqm, measureMode, ready])
 
   // Rubber-band preview: while the measure tool is active with at least one
   // vertex, a dashed segment follows the cursor from the last vertex and the
@@ -472,29 +492,36 @@ const MapView = forwardRef(function MapView({
   // Layers are mutated in place (no React state) so mousemove stays cheap.
   useEffect(() => {
     const map = mapRef.current
-    if (!map || !ready || activeTool !== MAP_TOOLS.MEASURE) return
+    const isMeasuring = activeTool === MAP_TOOLS.MEASURE || activeTool === MAP_TOOLS.MEASURE_AREA
+    const measurement = measureRef.current
+    if (!map || !ready || !isMeasuring) return
 
     const onMove = (event) => {
       const points = measurePoints
       if (!points.length) return
       const last = toLatLng(points[points.length - 1])
       const latlng = event.latlng
+      const preview = [...points, [latlng.lng, latlng.lat]]
       const doneKm = measureDistKm ?? 0
       const runningKm = doneKm + distanceMeters(points[points.length - 1], [latlng.lng, latlng.lat]) / 1000
-      const { hoverLine, hoverLabel } = measureRef.current
+      const areaLabel = activeTool === MAP_TOOLS.MEASURE_AREA && preview.length >= 3
+        ? formatArea(geoJsonArea({ type: 'Polygon', coordinates: [[...preview, preview[0]]] }))
+        : null
+      const label = areaLabel || formatMeasure(runningKm)
+      const { hoverLine, hoverLabel } = measurement
       if (!hoverLine) {
-        measureRef.current.hoverLine = L.polyline([last, [latlng.lat, latlng.lng]], {
+        measurement.hoverLine = L.polyline([last, [latlng.lat, latlng.lng]], {
           color: MEASURE_COLOR, weight: 2, dashArray: '4 2', opacity: 0.85, interactive: false,
         }).addTo(map)
-        measureRef.current.hoverLabel = L.marker([latlng.lat, latlng.lng], {
-          icon: L.divIcon({ className: '', html: measureLabelHtml(formatMeasure(runningKm)) }),
+        measurement.hoverLabel = L.marker([latlng.lat, latlng.lng], {
+          icon: L.divIcon({ className: '', html: measureLabelHtml(label) }),
           interactive: false,
           keyboard: false,
         }).addTo(map)
       } else {
         hoverLine.setLatLngs([last, [latlng.lat, latlng.lng]])
         hoverLabel.setLatLng([latlng.lat, latlng.lng])
-        hoverLabel.setIcon(L.divIcon({ className: '', html: measureLabelHtml(formatMeasure(runningKm)) }))
+        hoverLabel.setIcon(L.divIcon({ className: '', html: measureLabelHtml(label) }))
       }
     }
 
@@ -502,9 +529,9 @@ const MapView = forwardRef(function MapView({
     return () => {
       map.off('mousemove', onMove)
       // A finished/deactivated measurement must not leave the preview behind.
-      const { hoverLine, hoverLabel } = measureRef.current
-      if (hoverLine) { map.removeLayer(hoverLine); measureRef.current.hoverLine = null }
-      if (hoverLabel) { map.removeLayer(hoverLabel); measureRef.current.hoverLabel = null }
+      const { hoverLine, hoverLabel } = measurement
+      if (hoverLine) { map.removeLayer(hoverLine); measurement.hoverLine = null }
+      if (hoverLabel) { map.removeLayer(hoverLabel); measurement.hoverLabel = null }
     }
   }, [activeTool, measurePoints, measureDistKm, ready])
 
@@ -530,7 +557,7 @@ const MapView = forwardRef(function MapView({
   }, [showHeat, heatPoints, ready, pluginsReady])
 
   return (
-    <div className={`relative z-0 ${className}`}>
+    <div className={`relative z-0 w-full h-full min-h-[420px] ${className}`}>
       <div ref={containerRef} className="absolute inset-0 z-0 rounded-xl2 overflow-hidden" />
       {!ready && (
         <div className="absolute inset-0 grid place-items-center bg-ink-50 rounded-xl2">

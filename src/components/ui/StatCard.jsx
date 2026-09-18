@@ -1,3 +1,4 @@
+import React from 'react'
 import clsx from 'clsx'
 import { ArrowUpRight, ArrowDownRight } from 'lucide-react'
 
@@ -11,7 +12,7 @@ export default function StatCard({ label, value, sub, icon: Icon, tone = 'ink', 
           'bg-ink-100 text-ink-700': tone === 'ink', 'bg-leaf-100 text-leaf-700': tone === 'leaf',
           'bg-saffron-100 text-saffron-700': tone === 'saffron', 'bg-alert-50 text-alert-600': tone === 'alert',
           'bg-sky-100 text-sky-700': tone === 'sky',
-        })}><Icon size={14} /></div>}
+        })}>{React.isValidElement(Icon) ? Icon : <Icon size={14} />}</div>}
       </div>
       <div className="mt-1.5 flex items-baseline gap-2">
         <span className="text-2xl font-display font-semibold text-ink-950">{value}</span>

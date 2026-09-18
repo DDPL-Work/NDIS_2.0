@@ -81,11 +81,13 @@ function routeActionHtml({ isOrigin, includeDetails = false }) {
 export function createCatalogLayer(geojson, {
   layerName = '',
   category = '',
+  style: featureStyle,
+  onFeatureClick,
 } = {}) {
   const collection = geojson?.features ? geojson : { type: 'FeatureCollection', features: geojson?.features || [] }
   const style = styleForCategory(category, layerName)
   const layer = L.geoJSON(collection, {
-    style() { return style },
+    style(feature) { return featureStyle ? featureStyle(feature) : style },
     pointToLayer(_feature, latlng) {
       return L.circleMarker(latlng, {
         radius: 6,
@@ -102,6 +104,7 @@ export function createCatalogLayer(geojson, {
         direction: 'top',
         offset: [0, -6],
       })
+      if (onFeatureClick) leafletLayer.on('click', () => onFeatureClick(feature))
     },
   })
   return layer

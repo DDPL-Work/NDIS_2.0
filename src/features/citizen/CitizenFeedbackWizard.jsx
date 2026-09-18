@@ -3,7 +3,7 @@ import { Check, ChevronRight, Star, MessageSquare, AlertCircle, Loader2 } from '
 import PageHeader from '../../components/ui/PageHeader'
 import Button from '../../components/ui/Button'
 import Select from '../../components/ui/Select'
-import { backendFeedbackApi } from '../../api/feedbackApi'
+import { backendFeedbackApi, extractFirstQuestionSet } from '../../api/feedbackApi'
 import { useAuthStore } from '../../app/store/authStore'
 import { useUiStore } from '../../app/store/uiStore'
 import { FEEDBACK_RESPONSE_TYPES, validateResponse, formatResponse } from '../feedback/feedbackConstants'
@@ -33,10 +33,23 @@ function Rating({ value, onChange, disabled, size = 'md' }) {
   )
 }
 
-// Single question renderer
+// Single question renderer — supports all backend response types
 function QuestionCard({ question, response, onChange, isSubmitting }) {
   const isRequired = question.required
   const error = validateResponse(question.responseType, response, question.options || [])
+
+  const rt = question.responseType
+  const isYesNo = rt === FEEDBACK_RESPONSE_TYPES.YES_NO
+  const isSingleChoice = rt === FEEDBACK_RESPONSE_TYPES.SINGLE_CHOICE || isYesNo
+  const isMultipleChoice = rt === FEEDBACK_RESPONSE_TYPES.MULTIPLE_CHOICE
+  const isRating = rt === FEEDBACK_RESPONSE_TYPES.RATING || rt === FEEDBACK_RESPONSE_TYPES.RATING_5
+  const isText = rt === FEEDBACK_RESPONSE_TYPES.TEXT
+  const isTextarea = rt === FEEDBACK_RESPONSE_TYPES.TEXTAREA
+  const isNumber = rt === FEEDBACK_RESPONSE_TYPES.NUMBER
+
+  const options = isYesNo
+    ? [{ value: 'YES', label: 'Yes' }, { value: 'NO', label: 'No' }]
+    : question.options || []
 
   return (
     <div className="rounded-xl border border-ink-100 bg-white p-4 space-y-3">
@@ -58,9 +71,10 @@ function QuestionCard({ question, response, onChange, isSubmitting }) {
       )}
 
       <div>
-        {question.responseType === FEEDBACK_RESPONSE_TYPES.SINGLE_CHOICE && (
+        {/* Single choice / Yes-No — radio buttons */}
+        {isSingleChoice && (
           <div className="space-y-2" role="radiogroup" aria-label={question.text}>
-            {question.options?.map((opt) => (
+            {options.map((opt) => (
               <label key={opt.value} className="flex items-center gap-2.5 p-3 rounded-lg border border-ink-200 bg-white hover:border-sky-300 hover:bg-sky-50 cursor-pointer transition">
                 <input
                   type="radio"
@@ -77,9 +91,10 @@ function QuestionCard({ question, response, onChange, isSubmitting }) {
           </div>
         )}
 
-        {question.responseType === FEEDBACK_RESPONSE_TYPES.MULTIPLE_CHOICE && (
+        {/* Multiple choice — checkboxes */}
+        {isMultipleChoice && (
           <div className="space-y-2" role="group" aria-label={question.text}>
-            {question.options?.map((opt) => (
+            {options.map((opt) => (
               <label key={opt.value} className="flex items-center gap-2.5 p-3 rounded-lg border border-ink-200 bg-white hover:border-sky-300 hover:bg-sky-50 cursor-pointer transition">
                 <input
                   type="checkbox"
@@ -102,14 +117,28 @@ function QuestionCard({ question, response, onChange, isSubmitting }) {
           </div>
         )}
 
-        {question.responseType === FEEDBACK_RESPONSE_TYPES.RATING && (
+        {/* Rating — star buttons (1-5) */}
+        {isRating && (
           <div className="flex items-center gap-3">
             <Rating value={Number(response) || 0} onChange={(v) => onChange(question.id, v)} disabled={isSubmitting} size="lg" />
             {response && <span className="text-sky-700 font-semibold text-[14px]">{Number(response)}/5</span>}
           </div>
         )}
 
-        {question.responseType === FEEDBACK_RESPONSE_TYPES.TEXT && (
+        {/* Text — single-line input */}
+        {isText && (
+          <input
+            type="text"
+            value={response || ''}
+            onChange={(e) => onChange(question.id, e.target.value)}
+            disabled={isSubmitting}
+            placeholder="Type your response…"
+            className="w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-[13px] text-ink-800 placeholder-ink-400 focus:outline-none focus:ring-2 focus:ring-sky-500"
+          />
+        )}
+
+        {/* Textarea — multi-line input */}
+        {isTextarea && (
           <textarea
             value={response || ''}
             onChange={(e) => onChange(question.id, e.target.value)}
@@ -118,6 +147,44 @@ function QuestionCard({ question, response, onChange, isSubmitting }) {
             rows={3}
             className="w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-[13px] text-ink-800 placeholder-ink-400 focus:outline-none focus:ring-2 focus:ring-sky-500 resize-none"
           />
+        )}
+
+        {/* Number — numeric input */}
+        {isNumber && (
+          <input
+            type="number"
+            value={response ?? ''}
+            onChange={(e) => onChange(question.id, e.target.value)}
+            disabled={isSubmitting}
+            placeholder="Enter a number"
+            className="w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-[13px] text-ink-800 placeholder-ink-400 focus:outline-none focus:ring-2 focus:ring-sky-500"
+          />
+        )}
+
+        {/* Fallback for unknown types */}
+        {!isSingleChoice && !isMultipleChoice && !isRating && !isText && !isTextarea && !isNumber && (
+          options.length > 0 ? (
+            <select
+              value={response || ''}
+              onChange={(e) => onChange(question.id, e.target.value)}
+              disabled={isSubmitting}
+              className="w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-[13px] text-ink-800 focus:outline-none focus:ring-2 focus:ring-sky-500"
+            >
+              <option value="">Select…</option>
+              {options.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          ) : (
+            <input
+              type="text"
+              value={response || ''}
+              onChange={(e) => onChange(question.id, e.target.value)}
+              disabled={isSubmitting}
+              placeholder="Type your response…"
+              className="w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-[13px] text-ink-800 placeholder-ink-400 focus:outline-none focus:ring-2 focus:ring-sky-500"
+            />
+          )
         )}
       </div>
     </div>

@@ -7,8 +7,8 @@ import { MapPinned } from 'lucide-react'
 const CITIZEN_SERVICES = [
   { label: 'Register a Complaint', to: '/citizen/register' },
   { label: 'Track a Complaint', to: '/citizen/track' },
-  { label: 'Explore Map', to: '/citizen/map' },
-  { label: 'Facilities', to: '/citizen/map' },
+  { label: 'Explore Map', to: '/explore' },
+  { label: 'Facilities', to: '/explore' },
   { label: 'Schemes', to: '/citizen/schemes' },
 ]
 
@@ -60,7 +60,7 @@ export default function PublicFooter() {
             <ul className="mt-3 space-y-2">
               <li><Link to="/login" className="text-[13px] text-ink-600 transition-colors hover:text-ink-950 hover:underline">Login</Link></li>
               <li><Link to="/register" className="text-[13px] text-ink-600 transition-colors hover:text-ink-950 hover:underline">Create an Account</Link></li>
-              <li><Link to="/citizen/map" className="text-[13px] text-ink-600 transition-colors hover:text-ink-950 hover:underline">Explore Map</Link></li>
+              <li><Link to="/explore" className="text-[13px] text-ink-600 transition-colors hover:text-ink-950 hover:underline">Explore Map</Link></li>
               <li><Link to="/citizen/track" className="text-[13px] text-ink-600 transition-colors hover:text-ink-950 hover:underline">Track Complaint</Link></li>
             </ul>
           </nav>

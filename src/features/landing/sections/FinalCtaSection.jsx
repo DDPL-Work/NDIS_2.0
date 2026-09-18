@@ -33,7 +33,7 @@ export default function FinalCtaSection() {
               ) : (
                 <>
                   <Link to="/register"><Button size="lg" variant="saffron" icon={UserPlus}>Create Citizen Account</Button></Link>
-                  <a href="#services" className="inline-flex items-center gap-2 rounded-lg border border-ink-600 bg-transparent px-5 py-2.5 text-[15px] font-medium text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron-500/40">Explore Services</a>
+                  <Link to="/explore" className="inline-flex items-center gap-2 rounded-lg border border-ink-600 bg-transparent px-5 py-2.5 text-[15px] font-medium text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron-500/40">Explore Map</Link>
                   <Link to="/login" className="flex items-center gap-1 text-[13.5px] font-semibold text-ink-300 underline-offset-4 hover:text-white hover:underline"><LogIn size={14} />Login</Link>
                 </>
               )}
