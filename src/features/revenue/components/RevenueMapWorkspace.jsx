@@ -1,5 +1,5 @@
 // RevenueMapWorkspace — Enterprise Native Leaflet GIS Map Workspace for Tax & Revenue
-import React, { useRef, useMemo, useEffect, useLayoutEffect, useImperativeHandle, forwardRef } from 'react'
+import React, { useRef, useMemo, useEffect, useImperativeHandle, forwardRef } from 'react'
 import L from 'leaflet'
 import { createRoot } from 'react-dom/client'
 import PropertyPopup from './PropertyPopup'
@@ -42,7 +42,6 @@ export const RevenueMapWorkspace = forwardRef(function RevenueMapWorkspace({
   const { activeTool } = tools
   const popupRef = useRef(null)
   const popupRootRef = useRef(null)
-  const pendingCleanupRef = useRef(null)
 
   useImperativeHandle(ref, () => ({
     focusFeature(feature) {
@@ -60,29 +59,24 @@ export const RevenueMapWorkspace = forwardRef(function RevenueMapWorkspace({
     },
   }), [])
 
-  // Deferred cleanup to avoid synchronous unmount during render
-  useLayoutEffect(() => {
-    if (pendingCleanupRef.current) {
-      pendingCleanupRef.current()
-      pendingCleanupRef.current = null
-    }
-  })
-
   useEffect(() => {
     const map = mapRef.current?.map
     if (!map) return
 
-    // Defer cleanup to after paint
+    // Close existing popup immediately
     if (popupRef.current) {
       map.closePopup(popupRef.current)
       popupRef.current = null
     }
-    if (popupRootRef.current) {
-      pendingCleanupRef.current = () => {
-        popupRootRef.current?.unmount?.()
-        popupRootRef.current = null
-      }
+
+    // Defer root unmount to next microtask to avoid sync unmount during render
+    const prevRoot = popupRootRef.current
+    if (prevRoot) {
+      queueMicrotask(() => {
+        prevRoot.unmount()
+      })
     }
+    popupRootRef.current = null
 
     if (!selectedFeature?.geometry) return
     const bounds = L.geoJSON(selectedFeature).getBounds()
@@ -106,11 +100,14 @@ export const RevenueMapWorkspace = forwardRef(function RevenueMapWorkspace({
     return () => {
       window.clearTimeout(fallbackTimer)
       map.off('moveend', openPopup)
-      // Defer unmount
-      pendingCleanupRef.current = () => {
-        root.unmount()
-        if (popupRef.current === popup) popupRef.current = null
+      // Defer unmount to next microtask
+      const rootToUnmount = popupRootRef.current
+      if (rootToUnmount) {
+        queueMicrotask(() => {
+          rootToUnmount.unmount()
+        })
       }
+      if (popupRef.current === popup) popupRef.current = null
     }
   }, [selectedFeature, onCloseProperty, onPayProperty, onReceiptProperty])
 
