@@ -1,6 +1,6 @@
 import { useEffect, useState, Fragment } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { FlaskConical, LockKeyhole, MapPinned, UserPlus, Mail, RotateCcw } from 'lucide-react'
+import { FlaskConical, LockKeyhole, MapPinned, UserPlus, Mail, RotateCcw, Eye, EyeOff } from 'lucide-react'
 import { useAuthStore } from '../../app/store/authStore'
 import { getDefaultRoute } from '../../app/authRoutes'
 import { DEMO_PERSONAS } from './demoPersonas'
@@ -22,6 +22,7 @@ export default function LoginPage({ initialMode = 'login' }) {
   const [showForgotPassword, setShowForgotPassword] = useState(false)
   const [showResetPassword, setShowResetPassword] = useState(false)
   const [resetIdentifier, setResetIdentifier] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
 
   const busy = status === 'loading'
   useEffect(() => { setSignup(initialMode === 'signup'); setNotice('') }, [initialMode])
@@ -46,7 +47,15 @@ return (
             <form className="space-y-4" onSubmit={submit}>
               {signup && <><Field label="Full name" name="full_name" value={form.full_name} onChange={change} autoComplete="name" /><Field label="Email" name="email" type="email" value={form.email} onChange={change} autoComplete="email" /></>}
               <Field label="Username" name="username" value={form.username} onChange={change} autoComplete="username" />
-              <Field label="Password" name="password" type="password" value={form.password} onChange={change} autoComplete={signup ? 'new-password' : 'current-password'} />
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-medium text-ink-200">Password</span>
+                <div className="relative">
+                  <input required name="password" type={showPassword ? 'text' : 'password'} value={form.password} onChange={change} autoComplete={signup ? 'new-password' : 'current-password'} className="w-full rounded-lg border border-white/15 bg-white/[.07] px-3 py-2.5 text-sm text-white outline-none placeholder:text-ink-400 focus:border-saffron-400 pr-11" />
+                  <button type="button" onClick={() => setShowPassword((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-400 hover:text-saffron-300 transition-colors" aria-label={showPassword ? 'Hide password' : 'Show password'}>
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </label>
               {(storeError || notice) && <p className={storeError ? 'text-xs text-alert-300' : 'text-xs text-leaf-300'}>{storeError || notice}</p>}
               <button disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-lg bg-saffron-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-saffron-600 disabled:opacity-60">
                 {signup ? <UserPlus size={16} /> : <LockKeyhole size={16} />}{busy ? 'Please wait…' : signup ? 'Create account' : 'Sign in'}

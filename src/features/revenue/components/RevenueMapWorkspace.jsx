@@ -169,7 +169,7 @@ export const RevenueMapWorkspace = forwardRef(function RevenueMapWorkspace({
       />
 
       {showToolbar && (
-        <div className="absolute top-4 left-4 z-20 flex flex-col gap-1 bg-white/90 backdrop-blur p-1 rounded-lg border border-slate-200 shadow-lg">
+        <div className="absolute top-20 left-4 z-20 flex flex-col gap-1 bg-white/90 backdrop-blur p-1 rounded-lg border border-slate-200 shadow-lg">
           <Tooltip content="Pan/Select">
             <button
               onClick={() => tools.selectTool(MAP_TOOLS.NONE)}
@@ -244,7 +244,7 @@ export const RevenueMapWorkspace = forwardRef(function RevenueMapWorkspace({
       )}
 
       {(activeTool === MAP_TOOLS.MEASURE || activeTool === MAP_TOOLS.MEASURE_AREA || tools.measurePoints.length > 0) && (
-        <div className="absolute bottom-4 left-4 z-20 flex flex-wrap items-center gap-2 rounded-lg border border-ink-200 bg-white/95 p-2 shadow-lg text-xs text-ink-700">
+        <div className="absolute bottom-12 left-4 z-20 flex flex-wrap items-center gap-2 rounded-lg border border-ink-200 bg-white/95 p-2 shadow-lg text-xs text-ink-700">
           <span className="font-semibold">{tools.measureMode === 'area' ? 'Area' : 'Distance'}: {tools.measureMode === 'area'
             ? (tools.measureAreaSqm == null ? 'Click at least 3 points' : tools.measureAreaSqm >= 1000000 ? `${(tools.measureAreaSqm / 1000000).toFixed(2)} km²` : `${tools.measureAreaSqm.toFixed(2)} m²`)
             : (tools.measureDistKm == null ? 'Click two or more points' : tools.measureDistKm >= 1 ? `${tools.measureDistKm.toFixed(2)} km` : `${Math.round(tools.measureDistKm * 1000)} m`)}</span>

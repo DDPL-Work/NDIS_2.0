@@ -17,7 +17,7 @@ export const TAX_REVENUE_QUERY_KEYS = {
 export function useTaxList(params = {}) {
   const queryKey = TAX_REVENUE_QUERY_KEYS.taxList(params)
 
-  const { data, isLoading, isError, error, refetch } = useQuery({
+  const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
     queryKey,
     queryFn: () => taxRevenueApi.fetchTaxList(params),
     staleTime: 30000,
@@ -29,6 +29,7 @@ export function useTaxList(params = {}) {
   return {
     taxList: data,
     isLoading,
+    isFetching,
     isError,
     error,
     refetch,
@@ -47,16 +48,18 @@ export function useTaxList(params = {}) {
 export function useCadastralResi(params = {}) {
   const queryKey = TAX_REVENUE_QUERY_KEYS.cadastralResi(params)
 
-  const { data, isLoading, isError, error, refetch } = useQuery({
+  const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
     queryKey,
     queryFn: () => taxRevenueApi.fetchCadastralResi(params),
     staleTime: 60000,
     gcTime: 120000,
+    placeholderData: (previousData) => previousData,
   })
 
   return {
     cadastralData: data,
     isLoading,
+    isFetching,
     isError,
     error,
     refetch,

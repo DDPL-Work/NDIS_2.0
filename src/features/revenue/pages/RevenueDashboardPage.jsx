@@ -6,6 +6,7 @@ import { TaxListModal } from '../components/TaxListModal'
 import { PayTaxModal } from '../components/PayTaxModal'
 import { useCadastralResi } from '../hooks/useTaxRevenue'
 import { taxRevenueApi } from '../api/taxRevenueApi'
+import Button from '../../../components/ui/Button'
 import 'leaflet/dist/leaflet.css'
 
 export function RevenueDashboardPage() {
@@ -18,7 +19,17 @@ export function RevenueDashboardPage() {
   const [paymentOpen, setPaymentOpen] = useState(false)
   const [paymentProperty, setPaymentProperty] = useState(null)
   const [receiptError, setReceiptError] = useState(null)
-  const { features, featureCount, isLoading, isError, error, refetch } = useCadastralResi()
+  const { features, featureCount, isLoading, isError, error, refetch, isFetching } = useCadastralResi()
+
+  const handleRefresh = useCallback(async () => {
+    if (isFetching) return
+    try {
+      await refetch()
+    } catch (err) {
+      // Error is handled by TanStack Query error boundary / inline error state
+      console.error('[REVENUE REFRESH] Failed:', err)
+    }
+  }, [refetch, isFetching])
 
   const selectedFeature = useMemo(() => features.find((f) => `data_resi_${f.id}` === String(selectedId) || String(f.id) === String(selectedId)) || null, [features, selectedId])
 
@@ -65,7 +76,30 @@ export function RevenueDashboardPage() {
   return <div className="flex h-full min-h-[calc(100vh-7rem)] flex-col bg-ink-50 p-3 sm:p-5">
     <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
       <div><h1 className="text-lg font-semibold text-ink-950">Property Tax GIS</h1><p className="text-sm text-ink-600">Cadastral property tax workspace · data source: backend API</p></div>
-      <div className="flex items-center gap-2"><button onClick={() => refetch()} className="inline-flex items-center gap-1 rounded-lg border border-ink-300 bg-white px-3 py-2 text-sm font-medium text-ink-700"><RefreshCw className="h-4 w-4" />Refresh</button><button onClick={() => setTaxListOpen(true)} className="inline-flex items-center gap-1 rounded-lg bg-ink-900 px-3 py-2 text-sm font-medium text-white"><ListChecks className="h-4 w-4" />Property Tax Register</button></div>
+      <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          loading={isFetching}
+          onClick={handleRefresh}
+          disabled={isFetching}
+          className="gap-1.5"
+          aria-busy={isFetching}
+          aria-label="Refresh cadastral data"
+        >
+          <RefreshCw className="h-4 w-4" />
+          {isFetching ? 'Refreshing…' : 'Refresh'}
+        </Button>
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={() => setTaxListOpen(true)}
+          className="gap-1.5"
+        >
+          <ListChecks className="h-4 w-4" />
+          Property Tax Register
+        </Button>
+      </div>
     </div>
     <div className="relative flex min-h-0 flex-1 overflow-hidden rounded-xl border border-ink-200 bg-white shadow-sm">
       {receiptError && <div role="alert" className="absolute right-3 top-3 z-50 rounded bg-alert-100 px-3 py-2 text-sm text-alert-900 shadow"><button className="ml-3 underline" onClick={() => setReceiptError(null)}>Dismiss</button>{receiptError}</div>}

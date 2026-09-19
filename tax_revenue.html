@@ -2485,7 +2485,7 @@
         }
 
         function refreshTaxListData() {
-            fetchTaxListData();
+            fetchTaxListData(true);
         }
 
         function changeTaxListPage(delta) {
@@ -2494,9 +2494,15 @@
             fetchTaxListData();
         }
 
-        async function fetchTaxListData() {
+        async function fetchTaxListData(showButtonLoading = false) {
             const tableBody = document.getElementById('taxListTableBody');
             if (!tableBody) return;
+
+            const btn = document.getElementById('taxRefreshBtn');
+            if (showButtonLoading && btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+            }
 
             tableBody.innerHTML = `
                 <tr>
@@ -2554,6 +2560,11 @@
             } catch (err) {
                 console.error("Failed to load tax list:", err);
                 tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #ef4444; padding: 24px;">Network error loading tax records.</td></tr>`;
+            } finally {
+                if (showButtonLoading && btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-rotate"></i>';
+                }
             }
         }
 
@@ -2997,7 +3008,7 @@
                         <i class="fa-solid fa-magnifying-glass" style="color: #94a3b8; font-size: 0.85rem;"></i>
                         <input type="text" id="taxListSearchInput" placeholder="Filter by Name / Plot / Mobile..." oninput="debounceTaxSearch()" />
                     </div>
-                    <button onclick="refreshTaxListData()" class="tax-tab-btn" title="Refresh List">
+                    <button id="taxRefreshBtn" onclick="refreshTaxListData()" class="tax-tab-btn" title="Refresh List">
                         <i class="fa-solid fa-rotate"></i>
                     </button>
                 </div>

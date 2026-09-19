@@ -33,7 +33,7 @@ function UserMenu() {
   const navigate = useNavigate()
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative"  ref={ref}>
       <button onClick={() => setOpen((o) => !o)} className="flex items-center gap-2 rounded-lg pl-1 pr-2 py-1 hover:bg-ink-100">
         <div className="grid h-7 w-7 place-items-center rounded-full bg-saffron-500 text-white text-[11.5px] font-semibold">
           {user?.name?.[0] || 'U'}
@@ -42,7 +42,7 @@ function UserMenu() {
         <ChevronDown size={13} className="text-ink-400" />
       </button>
       {open && (
-        <div className="absolute right-0 mt-2 w-56 max-h-[80vh] overflow-y-auto card p-1.5 z-30 animate-fade-in">
+        <div className="absolute right-0 mt-2 w-56 max-h-[80vh] overflow-y-auto card p-1.5 z-60 animate-fade-in">
           <div className="px-2.5 py-2">
             <p className="text-[13px] font-semibold text-ink-900">{user?.name}</p>
             <p className="text-[11.5px] text-ink-500">{user?.designation || ROLE_LABELS[user?.role]}</p>
@@ -112,7 +112,7 @@ export default function Topbar({ title, subtitle, showDistrict = true, showDepar
 
   return (
     <>
-      <header className="h-14 border-b border-ink-100 bg-white/90 backdrop-blur flex items-center justify-between px-3 sm:px-5 shrink-0 z-20">
+      <header className="h-14 border-b border-ink-100 bg-white/90 backdrop-blur flex items-center justify-between px-3 sm:px-5 shrink-0 z-50">
         <div className="min-w-0 flex items-center gap-2 sm:gap-3">
           <button
             onClick={onMenuClick}

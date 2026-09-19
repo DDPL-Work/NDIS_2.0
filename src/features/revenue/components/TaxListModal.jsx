@@ -7,7 +7,7 @@ import { calculatePropertyTax } from '../utils/propertyTaxCalculator'
 import {
   X, Search, MapPin, Download, CheckCircle, AlertTriangle,
   CreditCard, ChevronLeft, ChevronRight, RefreshCw,
-  Filter, List, ClipboardCheck
+  Filter, List, ClipboardCheck, Loader2
 } from 'lucide-react'
 
 const TABS = [
@@ -30,8 +30,11 @@ export function TaxListModal({
   const modalRef = useRef(null)
   const searchInputRef = useRef(null)
 
-  const { taxList: data, isLoading: loading, isError, error: queryError, refetch } = useTaxList({ status: activeTab, search: searchQuery, page, page_size: pageSize, enabled: isOpen })
+  const { taxList: data, isLoading: loading, isError, error: queryError, refetch, isFetching } = useTaxList({ status: activeTab, search: searchQuery, page, page_size: pageSize, enabled: isOpen })
   const error = isError ? (queryError?.message || 'Unable to load property tax register.') : null
+
+  // Debug logging for refresh flow
+  // console.log('[TAX LIST QUERY STATE]', { loading, isFetching, isError, page, activeTab })
 
   // Handle Escape key
   useEffect(() => {
@@ -63,18 +66,15 @@ export function TaxListModal({
   }, [isOpen])
 
   const results = data?.results || []
-  const pagination = data?.pagination || { page: 1, page_size: pageSize, total_items: 0, total_pages: 0, has_next: false, has_previous: false }
+  const pagination = data?.pagination || { page: 1, page_size: pageSize, count: 0, total_pages: 0, has_next: false, has_previous: false }
   const summary = data?.summary || { total_properties: 0, paid_count: 0, unpaid_count: 0, total_tax_collected: 0, collection_rate_pct: 0 }
 
   const currentPage = Number(pagination.page) || page
-  const totalItems = Number(pagination.total_items ?? pagination.count) || results.length
-  const totalPages = Number(pagination.total_pages) || Math.max(1, Math.ceil(totalItems / pageSize))
-  // Some backend deployments only return next/previous URLs.  Page state is
-  // still authoritative for moving backwards, rather than leaving Previous
-  // disabled because one optional metadata flag is absent.
+  // Use backend total count (pagination.count) for total records, not current page results
+  const totalCount = Number(pagination.count ?? summary.total_properties ?? 0)
+  const totalPages = Number(pagination.total_pages) || (totalCount > 0 ? Math.max(1, Math.ceil(totalCount / pageSize)) : 1)
   const hasPrevious = pagination.has_previous === true || Boolean(pagination.previous) || currentPage > 1
   const hasNext = pagination.has_next === true || Boolean(pagination.next) || currentPage < totalPages
-  const totalCount = summary.total_properties || totalItems
   const paidCount = summary.paid_count !== undefined ? summary.paid_count : results.filter(r => r.is_paid || r.status === 'PAID').length
   const unpaidCount = summary.unpaid_count !== undefined ? summary.unpaid_count : Math.max(0, totalCount - paidCount)
   const totalCollected = summary.total_tax_collected !== undefined ? summary.total_tax_collected : results.filter(r => r.is_paid).reduce((s, r) => s + (r.paid_amount || r.total_paid || r.paid || 0), 0)
@@ -213,16 +213,26 @@ export function TaxListModal({
           <Button
             variant="outline"
             size="xs"
+            loading={isFetching}
             onClick={() => refetch()}
+            disabled={isFetching}
             className="hidden sm:flex items-center gap-1"
+            aria-busy={isFetching}
+            aria-label="Refresh tax register"
           >
             <RefreshCw className="w-3.5 h-3.5" />
-            Refresh
+            {isFetching ? 'Refreshing…' : 'Refresh'}
           </Button>
         </div>
 
         {/* Table Container */}
         <div className="max-h-[430px] overflow-auto p-3 sm:max-h-[48vh]">
+          {isFetching && !loading && (
+            <div className="flex items-center gap-2 px-3 py-1.5 text-[11px] text-ink-500 bg-ink-50 border-b border-ink-200 mb-2">
+              <Loader2 size={12} className="animate-spin" />
+              Refreshing data…
+            </div>
+          )}
           {loading ? (
             <div className="flex flex-col items-center justify-center h-48 gap-2 text-slate-400 text-xs">
               <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
@@ -333,7 +343,7 @@ export function TaxListModal({
         {/* Footer & Pagination */}
         <div className="p-3 bg-ink-50 border-t border-ink-200 flex items-center justify-between text-xs text-ink-500 shrink-0">
           <span>
-            Page {currentPage} of {totalPages} ({formatIndianNumber(totalItems)} Total Records)
+            Page {currentPage} of {totalPages} ({formatIndianNumber(totalCount)} Total Records)
           </span>
           <div className="flex gap-2">
             <Button

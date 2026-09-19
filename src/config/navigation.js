@@ -22,11 +22,11 @@ export const ADMIN_NAV = [
   { to: '/admin/revenue', label: 'Revenue & Property Intelligence', icon: 'Landmark' },
   { to: '/admin/department/general', label: 'Department delivery', icon: 'Building2' },
   { to: '/admin/feedback-analytics', label: 'Citizen insights', icon: 'BarChart2' },
-  { to: '/admin/approvals', label: 'Decisions & approvals', icon: 'ClipboardCheck' },
+  // { to: '/admin/approvals', label: 'Decisions & approvals', icon: 'ClipboardCheck' },
   { to: '/admin/schedule-tasks', label: 'Schedule & tasks', icon: 'Calendar' },
   { to: '/admin/reports', label: 'District reports', icon: 'FileDown' },
   { to: '/admin/complaints-oversight', label: 'Issue records', icon: 'AlertTriangle' },
-  { to: '/admin/notifications', label: 'Notifications', icon: 'Bell' },
+  // { to: '/admin/notifications', label: 'Notifications', icon: 'Bell' },
   { to: '/admin/state-rollup', label: 'Cross-District KPIs', icon: 'Globe2', roles: [ROLES.STATE_ADMIN] },
 ]
 
