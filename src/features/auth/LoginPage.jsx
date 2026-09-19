@@ -69,7 +69,7 @@ return (
             <button onClick={() => { setSignup((value) => !value); setNotice('') }} className="mt-5 w-full text-center text-xs text-saffron-300 hover:text-saffron-200">{signup ? 'Already have an account? Sign in' : 'Need an account? Create one'}</button>
           </div>
 
-          <div className="mt-5 rounded-2xl border border-dashed border-white/15 bg-white/[.03] p-5">
+          {/* <div className="mt-5 rounded-2xl border border-dashed border-white/15 bg-white/[.03] p-5">
             <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-ink-300">
               <FlaskConical size={13} className="text-saffron-400" />Demo access (mock-data build — no backend required)
             </div>
@@ -83,7 +83,7 @@ return (
                 </button>
               ))}
             </div>
-          </div>
+          </div> */}
         </div>
       </div>
       <ForgotPasswordModal isOpen={showForgotPassword} onClose={() => setShowForgotPassword(false)} onOtpSent={handleOtpSent} />
