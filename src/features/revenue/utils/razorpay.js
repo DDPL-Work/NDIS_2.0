@@ -1,6 +1,8 @@
 // Razorpay Payment Integration — TEST mode only
 // Secret key MUST remain server-side; only Key ID is exposed to frontend
 
+import { taxRevenueApi } from '../api/taxRevenueApi'
+
 const RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID
 const RAZORPAY_SCRIPT_URL = 'https://checkout.razorpay.com/v1/checkout.js'
 
@@ -148,7 +150,7 @@ export function openRazorpayCheckout(options) {
 /**
  * Complete property tax payment flow:
  * 1. Open Razorpay checkout
- * 2. On success, submit to backend
+ * 2. On success, submit to backend via taxRevenueApi
  * 3. Verify with backend
  * @param {Object} params - Payment parameters
  * @returns {Promise<Object>} Backend payment response
@@ -213,28 +215,18 @@ export async function processPropertyTaxPayment(params) {
           // Clean undefined
           Object.keys(payload).forEach((k) => payload[k] === undefined && delete payload[k])
 
-          const response = await fetch('/api/gis/pay-tax/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          })
-
-          const data = await response.json()
-
-          if (!response.ok || data.status === 'error') {
-            throw new Error(data.message || 'Backend payment submission failed')
-          }
+          // Use the proper API client to submit payment
+          const response = await taxRevenueApi.submitTaxPayment(payload)
 
           // Step 3: Verify payment status
-          const verifyResponse = await fetch(`/api/gis/pay-tax/?plot_no=${encodeURIComponent(plotNo)}`)
-          const verifyData = await verifyResponse.json()
+          const verifyResponse = await taxRevenueApi.verifyTaxPayment({ plot_no: plotNo })
 
-          if (verifyData.is_tax_paid) {
-            onPaymentSuccess?.(data.data || data)
-            resolve(data.data || data)
+          if (verifyResponse.is_tax_paid) {
+            onPaymentSuccess?.(response.data || response)
+            resolve(response.data || response)
           } else {
             const err = new Error('Payment submitted but backend verification pending. Please check transaction status.')
-            onPaymentFailure?.(err, data)
+            onPaymentFailure?.(err, response)
             reject(err)
           }
         } catch (err) {

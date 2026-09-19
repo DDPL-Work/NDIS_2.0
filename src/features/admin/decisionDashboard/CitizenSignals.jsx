@@ -15,7 +15,7 @@ export default function CitizenSignals({ signals, onOpenComplaint, loadedAt }) {
       id="citizen-signals"
       title="Citizen signals"
       subtitle="What citizens keep reporting, and what the workflow records say — kept deliberately separate."
-      foot={<Provenance source="GET /api/complaints/ (open records)" definition="Recurring signals group open complaints by village + category. Administrative facts read workflow fields (is_sla_breached, state=escalated)." updatedAt={loadedAt} />}
+      // //foot={<Provenance source="GET /api/complaints/ (open records)" definition="Recurring signals group open complaints by village + category. Administrative facts read workflow fields (is_sla_breached, state=escalated)." updatedAt={loadedAt} />}
     >
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         {/* Citizen perception */}

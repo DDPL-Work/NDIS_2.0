@@ -108,7 +108,7 @@ export default function SituationMap({
       title="District situation map"
       subtitle={`What the district looks like right now — ${district?.label || 'the district'} (data from the live backend).`}
       className="p-0 overflow-hidden"
-      foot={<Provenance source="GET /api/facilities/ · /api/complaints/heatmap/ · /api/gis/layers/District_boundary/" definition="Facility markers colored by department or gap score; hotspots weighted by complaint density." updatedAt={loadedAt ? formatDateTime(loadedAt) : undefined} />}
+      // //foot={<Provenance source="GET /api/facilities/ · /api/complaints/heatmap/ · /api/gis/layers/District_boundary/" definition="Facility markers colored by department or gap score; hotspots weighted by complaint density." updatedAt={loadedAt ? formatDateTime(loadedAt) : undefined} />}
     >
       <div className="flex flex-col lg:flex-row min-h-0">
         {/* Map area */}

@@ -14,7 +14,7 @@ export default function BudgetCard({ budget, status, error, onRetry, loadedAt })
       id="budget"
       title="Budget"
       subtitle="District allocation — sanctioned, allocated and spent."
-      foot={<Provenance source="GET /api/district-allocations/" definition="Sum of records for the district: approved = sanctioned, allocated = district allocation, utilized = spent, balance = remaining." updatedAt={loadedAt ? formatDateTime(loadedAt) : undefined} />}
+      // //foot={<Provenance source="GET /api/district-allocations/" definition="Sum of records for the district: approved = sanctioned, allocated = district allocation, utilized = spent, balance = remaining." updatedAt={loadedAt ? formatDateTime(loadedAt) : undefined} />}
     >
       {status === 'error' ? (
         <EmptyState

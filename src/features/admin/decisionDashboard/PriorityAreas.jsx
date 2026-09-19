@@ -23,7 +23,7 @@ export default function PriorityAreas({ areas, onSelect, loadedAt }) {
       title="Priority areas"
       subtitle={`${areas.length} locations require attention${criticalCount ? ` — ${criticalCount} critical` : ''}. Derived from facilities, complaints and the planning pipeline.`}
       action={loadedAt && <Badge tone="ink" className="kbd-mono">tier ≥ {Math.round(GAP_CRITICAL * 100)}%</Badge>}
-      foot={<Provenance source="GET /api/facilities/ · /api/complaints/ · /api/proposals/" definition="Composite score per location: gap heuristic, complaint pressure or planning pressure (see each card)." updatedAt={loadedAt} />}
+      // //foot={<Provenance source="GET /api/facilities/ · /api/complaints/ · /api/proposals/" definition="Composite score per location: gap heuristic, complaint pressure or planning pressure (see each card)." updatedAt={loadedAt} />}
     >
       {!areas.length ? (
         <p className="text-[13px] text-ink-500 py-6 text-center">No priority locations found in the current data.</p>

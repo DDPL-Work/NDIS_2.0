@@ -21,7 +21,7 @@ export default function PlanningPipeline({ pipeline, onOpenProposal, loadedAt })
       id="planning-pipeline"
       title="Planning pipeline"
       subtitle={`${total} proposals in flight across the district's intervention pipeline.`}
-      foot={<Provenance source="GET /api/proposals/" definition="Proposals bucketed by backend status. 'Priority' = urgent/high in draft/review/approved; 'Intervention' = complaint-linked." updatedAt={loadedAt} />}
+      // //foot={<Provenance source="GET /api/proposals/" definition="Proposals bucketed by backend status. 'Priority' = urgent/high in draft/review/approved; 'Intervention' = complaint-linked." updatedAt={loadedAt} />}
     >
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2">
         {stages.map((stage, index) => (

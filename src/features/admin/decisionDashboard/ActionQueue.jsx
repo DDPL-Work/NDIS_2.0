@@ -21,7 +21,7 @@ export default function ActionQueue({ actions, onAction, loadedAt }) {
       id="action-queue"
       title="Action queue"
       subtitle="Items requiring DM attention, ranked by urgency."
-      foot={<Provenance source="GET /api/complaints/ · /api/proposals/ · /api/projects/summary/" definition="Escalated complaints, SLA breaches, proposals awaiting review/sanction and due inspections, sorted by urgency." updatedAt={loadedAt} />}
+      // //foot={<Provenance source="GET /api/complaints/ · /api/proposals/ · /api/projects/summary/" definition="Escalated complaints, SLA breaches, proposals awaiting review/sanction and due inspections, sorted by urgency." updatedAt={loadedAt} />}
     >
       {!actions.length ? (
         <EmptyState compact icon={ListTodo} title="Nothing needs your attention right now" description="New escalations, breaches, review requests and due inspections will appear here automatically." />

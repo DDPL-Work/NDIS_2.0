@@ -128,7 +128,7 @@ export function TaxListModal({
             </div>
             <div>
               <h2 className="text-base font-semibold text-ink-950">Property Tax Register &amp; Cadastral Assessment</h2>
-              <p className="text-xs text-slate-400">Authoritative Municipal Revenue Cadastral Ledger • Nalanda District</p>
+              <p className="text-xs text-slate-400">Authoritative Municipal Revenue Cadastral Ledger • District</p>
             </div>
           </div>
           <button

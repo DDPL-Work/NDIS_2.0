@@ -19,7 +19,7 @@ export default function KpiRow({ kpis, facilitiesLoadedAt, onDrill }) {
     <SectionCard
       title="What requires my attention"
       subtitle="Critical signals across the district — every number is clickable and traced to its source."
-      foot={<Provenance source="GET /api/facilities/ · /api/complaints/ · /api/proposals/ · /api/projects/summary/" definition="Composite of district-wide collections; per-KPI definitions below." updatedAt={facilitiesLoadedAt ? formatDateTime(facilitiesLoadedAt) : undefined} />}
+      //foot={<Provenance source="GET /api/facilities/ · /api/complaints/ · /api/proposals/ · /api/projects/summary/" definition="Composite of district-wide collections; per-KPI definitions below." updatedAt={facilitiesLoadedAt ? formatDateTime(facilitiesLoadedAt) : undefined} />}
     >
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
         {kpis.map((kpi) => {

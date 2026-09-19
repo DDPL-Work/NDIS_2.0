@@ -26,7 +26,7 @@ export default function HealthSnapshot({ health, loadedAt }) {
       action={available.length > 0
         ? <Badge tone="leaf">{available.length} of {health.metrics?.length || 5} metrics live</Badge>
         : <Badge tone="ink">No live telemetry</Badge>}
-      foot={<Provenance source="GET /api/facilities/ (attributes: bed_count, staff_count)" definition="Readiness = share of health facilities reporting staff + beds. Other metrics require telemetry endpoints not yet deployed." updatedAt={loadedAt} />}
+      // //foot={<Provenance source="GET /api/facilities/ (attributes: bed_count, staff_count)" definition="Readiness = share of health facilities reporting staff + beds. Other metrics require telemetry endpoints not yet deployed." updatedAt={loadedAt} />}
     >
       {/* This card lives in a one-third dashboard column.  Do not key its
           internal grid to the viewport: at desktop widths it would otherwise

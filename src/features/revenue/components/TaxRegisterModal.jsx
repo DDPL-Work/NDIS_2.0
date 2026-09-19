@@ -62,7 +62,7 @@ export function TaxRegisterModal({ isOpen, onClose, onLocatePlot, onPayPlot }) {
                 Property Tax Assessment Register & Ledger
               </h2>
               <p className="text-xs text-ink-300">
-                Authoritative Municipal Revenue Cadastral Ledger • Nalanda District
+                Authoritative Municipal Revenue Cadastral Ledger 
               </p>
             </div>
           </div>

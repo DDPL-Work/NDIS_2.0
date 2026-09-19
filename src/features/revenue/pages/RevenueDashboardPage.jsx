@@ -107,7 +107,7 @@ const openPayment = useCallback((feature) => { setPaymentProperty(feature); setP
           className="gap-1.5"
         >
           <MapPin className="h-4 w-4" />
-          Find Paid Tax Property
+          Find & Pay Tax
         </Button>
         <Button
           variant="primary"
