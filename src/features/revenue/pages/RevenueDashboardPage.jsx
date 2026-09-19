@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ListChecks, RefreshCw, Search } from 'lucide-react'
+import { ListChecks, RefreshCw, Search, MapPin } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { RevenueMapWorkspace } from '../components/RevenueMapWorkspace'
 import { TaxListModal } from '../components/TaxListModal'
 import { PayTaxModal } from '../components/PayTaxModal'
+import { FindPropertyModal } from '../components/FindPropertyModal'
 import { useCadastralResi } from '../hooks/useTaxRevenue'
 import { taxRevenueApi } from '../api/taxRevenueApi'
 import Button from '../../../components/ui/Button'
@@ -17,6 +18,7 @@ export function RevenueDashboardPage() {
   const [search, setSearch] = useState('')
   const [taxListOpen, setTaxListOpen] = useState(false)
   const [paymentOpen, setPaymentOpen] = useState(false)
+  const [findPropertyOpen, setFindPropertyOpen] = useState(false)
   const [paymentProperty, setPaymentProperty] = useState(null)
   const [receiptError, setReceiptError] = useState(null)
   const { features, featureCount, isLoading, isError, error, refetch, isFetching } = useCadastralResi()
@@ -56,9 +58,17 @@ export function RevenueDashboardPage() {
     }
   }, [selectedFeature])
 
-  const openPayment = useCallback((feature) => { setPaymentProperty(feature); setPaymentOpen(true) }, [])
+const openPayment = useCallback((feature) => { setPaymentProperty(feature); setPaymentOpen(true) }, [])
   const clearSelected = useCallback(() => setSelectedId(null), [])
   const selectFeature = useCallback((id) => setSelectedId(id), [])
+  const handleFindPropertySelect = useCallback(({ feature, taxCalc }) => {
+    const featureId = `data_resi_${feature.id || feature.plot_id || feature.plotId}`
+    setSelectedId(featureId)
+  }, [])
+  const handlePaymentSuccess = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['taxRevenue', 'cadastralResi'] })
+    queryClient.invalidateQueries({ queryKey: ['taxRevenue', 'taxList'] })
+  }, [queryClient])
   const openReceipt = useCallback((feature) => {
     const p = feature.properties || {}
     const receiptUrl = p.receipt_url || taxRevenueApi.getTaxSlipUrl({
@@ -91,6 +101,15 @@ export function RevenueDashboardPage() {
           {isFetching ? 'Refreshing…' : 'Refresh'}
         </Button>
         <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => setFindPropertyOpen(true)}
+          className="gap-1.5"
+        >
+          <MapPin className="h-4 w-4" />
+          Find Paid Tax Property
+        </Button>
+        <Button
           variant="primary"
           size="sm"
           onClick={() => setTaxListOpen(true)}
@@ -107,11 +126,12 @@ export function RevenueDashboardPage() {
       {isLoading && <div className="absolute inset-0 z-40 grid place-items-center bg-white/80 text-sm text-ink-600">Loading cadastral properties…</div>}
       {isError && <div className="absolute inset-0 z-40 grid place-items-center bg-white p-6 text-center"><div><p className="font-medium text-ink-900">Property data is unavailable</p><p className="mt-1 text-sm text-ink-600">{error?.message || 'The cadastral layer could not be loaded.'}</p><button onClick={() => refetch()} className="mt-3 rounded bg-ink-900 px-3 py-2 text-sm text-white">Retry</button></div></div>}
       {!isLoading && !isError && search.trim() && searchResults.length === 0 && <div role="status" className="absolute left-3 top-16 z-30 rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm text-ink-700 shadow">No property found</div>}
-      <RevenueMapWorkspace ref={mapWorkspaceRef} cadastralFeatures={features} selectedFeatureId={selectedId} selectedFeature={selectedFeature} onFeatureSelect={selectFeature} onCloseProperty={clearSelected} onPayProperty={openPayment} onReceiptProperty={openReceipt} onMapClick={clearSelected} basemap={basemap} onBasemapChange={setBasemap} height="100%" showMeasurements={false} />
+      <RevenueMapWorkspace ref={mapWorkspaceRef} cadastralFeatures={features} selectedFeatureId={selectedId} selectedFeature={selectedFeature} onFeatureSelect={selectFeature} onCloseProperty={clearSelected} onPayProperty={openPayment} onReceiptProperty={openReceipt} onPaymentSuccess={handlePaymentSuccess} onMapClick={clearSelected} basemap={basemap} onBasemapChange={setBasemap} height="100%" showMeasurements={false} />
       <div className="absolute bottom-3 left-3 z-20 rounded bg-white/90 px-2 py-1 text-xs text-ink-600 shadow">{featureCount} backend cadastral properties</div>
     </div>
     <TaxListModal isOpen={taxListOpen} onClose={() => setTaxListOpen(false)} onLocatePlot={(r) => { setSelectedId(`data_resi_${r.plot_id || r.id}`); setTaxListOpen(false) }} onPayPlot={(r) => openPayment({ id: r.plot_id || r.id, properties: { ...r, name: r.owner_name || r.ownerName } })} onViewReceipt={(r) => openReceipt({ id: r.plot_id || r.id, properties: { ...r, name: r.owner_name || r.ownerName } })} />
     <PayTaxModal isOpen={paymentOpen} onClose={() => setPaymentOpen(false)} prefillData={paymentPrefill} onPaymentSuccess={() => { queryClient.invalidateQueries({ queryKey: ['taxRevenue'] }); setPaymentOpen(false) }} />
+    <FindPropertyModal isOpen={findPropertyOpen} onClose={() => setFindPropertyOpen(false)} onPropertySelect={handleFindPropertySelect} />
   </div>
 }
 

@@ -6,6 +6,7 @@ const VARIANTS = {
   primary: 'bg-ink-900 text-white hover:bg-ink-950 focus-visible:ring-ink-900/30',
   saffron: 'bg-saffron-500 text-white hover:bg-saffron-600 focus-visible:ring-saffron-500/30',
   outline: 'border border-ink-200 text-ink-800 bg-white hover:bg-ink-50',
+  secondary: 'border border-sky-500 text-sky-600 bg-white hover:bg-sky-50 focus-visible:ring-sky-500/30',
   ghost: 'text-ink-700 hover:bg-ink-100',
   positive: 'bg-leaf-600 text-white hover:bg-leaf-700',
   danger: 'bg-alert-500 text-white hover:bg-alert-600',

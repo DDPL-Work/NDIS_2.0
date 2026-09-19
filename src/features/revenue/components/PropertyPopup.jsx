@@ -1,126 +1,268 @@
-import { X, CreditCard, FileText, Home, MapPin, Calculator } from 'lucide-react'
+import { X, CreditCard, FileText, Home, MapPin, Calculator, Loader2, CheckCircle, AlertCircle, ChevronRight, Building2 } from 'lucide-react'
 import { formatCurrency, formatArea } from '../utils/revenueFormatters'
 import { normalizeTaxStatus } from '../utils/taxStatus'
 import { calculatePropertyTax, getTaxBreakdown } from '../utils/propertyTaxCalculator'
-
-const displayValue = (value) =>
-  value === null || value === undefined || value === '' || String(value).toLowerCase() === 'null'
-    ? 'N/A'
-    : value
+import { processPropertyTaxPayment } from '../utils/razorpay'
+import { normalizePropertyForDisplay, getTaxStatusBadgeClasses, getTaxStatusDisplay } from '../utils/propertyNormalizer'
+import { useState, useEffect, useRef } from 'react'
+import Swal from 'sweetalert2'
 
 const TaxRow = ({ label, value, highlight = false }) => (
-  <div className="flex justify-between items-center py-1 border-b border-ink-100 last:border-0">
-    <span className="text-sm text-ink-600">{label}</span>
-    <span className={`text-sm font-medium ${highlight ? 'text-ink-950' : 'text-ink-900'}`}>
+  <div className="flex justify-between items-center py-0.5 border-b border-ink-100 last:border-0">
+    <span className="text-[12px] text-ink-600">{label}</span>
+    <span className={`text-[12px] font-medium ${highlight ? 'text-ink-950' : 'text-ink-900'}`}>
       {value}
     </span>
   </div>
 )
 
-export default function PropertyPopup({ feature, onClose, onPay, onReceipt }) {
-  const p = feature?.properties || {}
-  const isPaid = p.is_paid === true || p.is_paid === 1 || String(p.is_paid).toLowerCase() === 'true'
-  const status = normalizeTaxStatus(p.tax_status || p.status || (isPaid ? 'PAID' : 'UNPAID'))
+const SectionHeader = ({ icon: Icon, title }) => (
+  <div className="mb-1.5 font-medium text-ink-900 flex items-center gap-1">
+    <Icon className="w-3 h-3 text-ink-500" />
+    {title}
+  </div>
+)
 
-  const breakdown = getTaxBreakdown(feature)
-  const calculation = calculatePropertyTax(feature)
+const InfoRow = ({ label, value, className = '' }) => (
+  <div className={`flex justify-between ${className}`}>
+    <span className="text-ink-500 text-[12px]">{label}</span>
+    <span className="font-medium text-ink-900 text-[12px] truncate max-w-[200px]">{value}</span>
+  </div>
+)
 
-  if (!breakdown.available) {
-    return (
-      <div className="w-[min(360px,calc(100vw-48px))] p-4 font-sans text-sm leading-5 text-ink-800">
-        <div className="mb-3 flex items-center justify-between">
-          <strong className="text-base text-ink-950">Property Details</strong>
-          <button onClick={onClose} aria-label="Close property details" className="rounded p-1 text-ink-500 hover:bg-ink-100">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="space-y-0.5">
-          <div><b>Plot #:</b> {displayValue(p.plot_no)}</div>
-          <div><b>Owner:</b> {displayValue(p.name || p.feature_name)}</div>
-          <div><b>Mobile:</b> {displayValue(p.mobile)}</div>
-        </div>
-        <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
-          {breakdown.message}
-        </div>
-        <div className="mt-3">{status === 'paid' ? (
-          <button onClick={() => onReceipt(feature)} className="inline-flex items-center gap-1 rounded-md bg-leaf-600 px-3 py-1.5 text-sm font-semibold text-white">
-            <FileText className="h-3.5 w-3.5" /> View Tax Receipt
-          </button>
-        ) : (
-          <button onClick={() => onPay(feature)} className="inline-flex items-center gap-1 rounded-md bg-amber-500 px-3 py-1.5 text-sm font-semibold text-white">
-            <CreditCard className="h-3.5 w-3.5" /> Pay Tax
-          </button>
-        )}</div>
-      </div>
-    )
+const StatusBadge = ({ status }) => (
+  <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold ${getTaxStatusBadgeClasses(status)}`}>
+    {getTaxStatusDisplay(status)}
+  </span>
+)
+
+const displayValue = (value) =>
+  value === null || value === undefined || value === '' || String(value).toLowerCase() === 'null'
+    ? 'Not available'
+    : value
+
+export default function PropertyPopup({ feature, onClose, onPay, onReceipt, onPaymentSuccess }) {
+  const [paymentState, setPaymentState] = useState('idle')
+  const [paymentError, setPaymentError] = useState(null)
+  const contentRef = useRef(null)
+
+  // Handle content scroll to prevent body scroll
+  useEffect(() => {
+    if (contentRef.current) {
+      contentRef.current.addEventListener('wheel', (e) => {
+        const { scrollTop, scrollHeight, clientHeight } = contentRef.current
+        const atTop = scrollTop === 0
+        const atBottom = scrollHeight - scrollTop === clientHeight
+
+        if ((atTop && e.deltaY < 0) || (atBottom && e.deltaY > 0)) {
+          e.preventDefault()
+        }
+      }, { passive: false })
+    }
+    return () => {
+      if (contentRef.current) {
+        contentRef.current.removeEventListener('wheel', () => {})
+      }
+    }
+  }, [])
+
+  // Normalize property data for clean display
+  const normalized = normalizePropertyForDisplay(feature)
+  const { plotNo, ownerName, mobile, propertyType, assessmentYear, gis, tax, payment, raw } = normalized
+  const isPaid = tax.status === 'paid'
+
+  const handlePayment = async () => {
+    if (!tax.calculationAvailable || !raw.taxAmount || raw.taxAmount <= 0) {
+      setPaymentError('Unable to determine tax amount for this property.')
+      setTimeout(() => setPaymentError(null), 5000)
+      return
+    }
+
+    if (isPaid) {
+      setPaymentError('This property tax has already been paid.')
+      setTimeout(() => setPaymentError(null), 5000)
+      return
+    }
+
+    setPaymentState('preparing')
+    setPaymentError(null)
+
+    try {
+      setPaymentState('checkout')
+      await processPropertyTaxPayment({
+        propertyId: raw.propertyId,
+        plotNo: raw.plotNo,
+        ownerName: raw.ownerName,
+        mobile: raw.mobile,
+        areaSqft: raw.areaSqft,
+        taxAmount: raw.taxAmount,
+        paymentMode: 'UPI',
+        assessmentYear: raw.assessmentYear,
+        periodMonth: raw.periodMonth,
+        onPaymentStart: () => setPaymentState('preparing'),
+        onPaymentSuccess: async (result) => {
+          setPaymentState('success')
+          onPaymentSuccess?.()
+          // Show SweetAlert2 success popup
+          await Swal.fire({
+            icon: 'success',
+            title: 'Tax Payment Successful',
+            html: `
+              <div className="text-left space-y-2">
+                <p><strong>Property:</strong> Plot #${raw.plotNo}</p>
+                <p><strong>Amount Paid:</strong> ₹${formatCurrency(raw.taxAmount)}</p>
+                ${result.receipt_no ? `<p><strong>Receipt No:</strong> ${result.receipt_no}</p>` : ''}
+                ${result.transaction_id ? `<p><strong>Transaction Ref:</strong> ${result.transaction_id}</p>` : ''}
+                <p className="text-green-600 font-medium">Status: PAID</p>
+              </div>
+            `,
+            confirmButtonText: 'Done',
+            confirmButtonColor: '#059669',
+          })
+          // Close popup after showing success
+          setTimeout(() => onClose?.(), 1500)
+        },
+        onPaymentFailure: (err) => {
+          setPaymentState('error')
+          setPaymentError(err.message || 'Payment failed. Please try again.')
+          Swal.fire({
+            icon: 'error',
+            title: 'Payment Failed',
+            text: err.message || 'Payment failed. Please try again.',
+            confirmButtonText: 'OK',
+            confirmButtonColor: '#dc2626',
+          })
+          setTimeout(() => setPaymentError(null), 8000)
+        },
+        onPaymentCancel: () => {
+          setPaymentState('idle')
+          setPaymentError('Payment was cancelled. Property tax status remains DUE.')
+          Swal.fire({
+            icon: 'info',
+            title: 'Payment Cancelled',
+            text: 'No payment was recorded. The property remains DUE.',
+            confirmButtonText: 'OK',
+            confirmButtonColor: '#3b82f6',
+          })
+          setTimeout(() => setPaymentError(null), 5000)
+        },
+      })
+    } catch (err) {
+      setPaymentState('error')
+      setPaymentError(err.message || 'Payment initiation failed. Please try again.')
+      Swal.fire({
+        icon: 'error',
+        title: 'Payment Error',
+        text: err.message || 'Payment initiation failed. Please try again.',
+        confirmButtonText: 'OK',
+        confirmButtonColor: '#dc2626',
+      })
+      setTimeout(() => setPaymentError(null), 5000)
+    }
   }
 
+  const renderNotAvailable = (label) => (
+    <div className="flex justify-between">
+      <span className="text-ink-500">{label}</span>
+      <span className="font-medium text-ink-400">Not available</span>
+    </div>
+  )
+
   return (
-    <div className="w-[min(360px,calc(100vw-48px))] max-h-[70vh] overflow-y-auto p-4 font-sans text-sm leading-5 text-ink-800">
-      <div className="mb-3 flex items-center justify-between">
+    <div className="property-popup flex flex-col w-[min(380px,calc(100vw-32px))] max-h-[calc(100dvh-32px)] max-h-[calc(100vh-32px)] max-h-[480px] ">
+      {/* Header - Fixed */}
+      <header className="flex-shrink-0 p-3 border-b border-ink-200 bg-white rounded-t-xl flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-            <Home className="w-4 h-4 text-blue-600" />
+          <div className="w-6 h-6 bg-blue-100 rounded-lg flex items-center justify-center">
+            <Home className="w-3.5 h-3.5 text-blue-600" />
           </div>
-          <strong className="text-base text-ink-950">Property Details</strong>
+          <div>
+            <strong className="text-sm text-ink-950">Property Details</strong>
+            <p className="text-[11px] text-ink-400">Cadastral Property • {propertyType}</p>
+          </div>
         </div>
-        <button onClick={onClose} aria-label="Close property details" className="rounded p-1 text-ink-500 hover:bg-ink-100">
-          <X className="h-4 w-4" />
+        <button onClick={onClose} aria-label="Close property details" className="rounded p-1 text-ink-500 hover:bg-ink-100 transition-colors w-7 h-7 flex items-center justify-center">
+          <X className="h-3.5 w-3.5" />
         </button>
-      </div>
+      </header>
 
-      <div className="mb-3 space-y-1 text-sm">
-        <div className="flex justify-between"><span className="text-ink-500">Plot #</span><span className="font-medium text-ink-900 font-mono">{displayValue(p.plot_no)}</span></div>
-        <div className="flex justify-between"><span className="text-ink-500">Owner</span><span className="font-medium text-ink-900 truncate max-w-[200px]">{displayValue(p.name || p.feature_name)}</span></div>
-        <div className="flex justify-between"><span className="text-ink-500">Mobile</span><span className="font-medium text-ink-900 font-mono">{displayValue(p.mobile)}</span></div>
-        <div className="flex justify-between"><span className="text-ink-500">Property Type</span><span className="font-medium text-ink-900 capitalize">{displayValue(p.sub_class)}</span></div>
-        <div className="flex justify-between"><span className="text-ink-500">Assessment Year</span><span className="font-medium text-ink-900">{displayValue(p.assessment_year || '2026-2027')}</span></div>
-        <div className="flex justify-between">
-          <span className="text-ink-500">Tax Status</span>
-          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold ${
-            status === 'paid' ? 'bg-leaf-100 text-leaf-700' : 'bg-alert-50 text-alert-600'
-          }`}>
-            {status === 'paid' ? 'PAID' : 'DUE / UNPAID'}
-          </span>
+      {/* Content - Scrollable */}
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 pb-1" ref={contentRef}>
+        {/* Property Identity Section */}
+        <div className="mb-3 p-2.5 bg-ink-50 rounded-lg border border-ink-100">
+          <SectionHeader icon={MapPin} title="Property Identity" />
+          <div className="space-y-1.5 text-[12px]">
+            <InfoRow label="Plot Number" value={`#${displayValue(plotNo)}`} />
+            <InfoRow label="Owner" value={displayValue(ownerName)} />
+            <InfoRow label="Mobile" value={displayValue(mobile)} />
+            <InfoRow label="Property Type" value={displayValue(propertyType)} />
+            <InfoRow label="Assessment Year" value={displayValue(assessmentYear)} />
+          </div>
         </div>
-      </div>
 
-      <div className="my-2 border-t border-ink-200" />
-      <div className="mb-2 font-medium text-ink-900 flex items-center gap-1">
-        <MapPin className="w-3.5 h-3.5 text-ink-500" /> GIS Property
-      </div>
-      <div className="mb-3 space-y-1 text-sm">
-        <div className="flex justify-between"><span className="text-ink-500">Area</span><span className="font-medium text-ink-900">{breakdown.areaSqft ? formatArea(breakdown.areaSqft) : 'N/A'}</span></div>
-        <div className="flex justify-between"><span className="text-ink-500">Rate</span><span className="font-medium text-ink-900">{formatCurrency(breakdown.ratePerSqft)}/sq.ft</span></div>
-      </div>
+        {/* Tax Status Badge */}
+        <div className="mb-3 flex items-center gap-2">
+          <span className="text-ink-500 text-[12px]">Tax Status</span>
+          <StatusBadge status={tax.status} />
+        </div>
 
-      <div className="my-2 border-t border-ink-200" />
-      <div className="mb-2 font-medium text-ink-900 flex items-center gap-1">
-        <Calculator className="w-3.5 h-3.5 text-ink-500" /> Tax Breakdown
-      </div>
-      <div className="mb-3 bg-ink-50 rounded-lg p-3 space-y-1">
-        <TaxRow label="Base Property Tax" value={formatCurrency(breakdown.baseTax)} />
-        <TaxRow label="Urban Development Cess (5%)" value={formatCurrency(breakdown.cess)} />
-        <TaxRow label="TOTAL TAX PAYABLE" value={formatCurrency(breakdown.totalAmount)} highlight />
-      </div>
+        {/* GIS Property Section */}
+        <div className="mb-3 p-2.5 bg-ink-50 rounded-lg border border-ink-100">
+          <SectionHeader icon={Building2} title="GIS Property" />
+          <div className="space-y-1.5 text-[12px]">
+            <InfoRow label="Area" value={gis.areaSqft ? formatArea(gis.areaSqft) : 'Not available'} />
+            <InfoRow label="Tax Rate" value={`${formatCurrency(gis.ratePerSqft)}/sq.ft`} />
+            <InfoRow label="Cadastral Layer" value={gis.layer} />
+          </div>
+        </div>
 
-      <div className="flex gap-2 pt-2 border-t border-ink-200">
-        {status === 'paid' ? (
-          <button
-            onClick={() => onReceipt(feature)}
-            className="flex-1 inline-flex items-center justify-center gap-1 rounded-md bg-leaf-600 px-3 py-2 text-sm font-semibold text-white hover:bg-leaf-700"
-          >
-            <FileText className="h-4 w-4" /> View Tax Receipt
-          </button>
-        ) : (
-          <button
-            onClick={() => onPay(feature)}
-            className="flex-1 inline-flex items-center justify-center gap-1 rounded-md bg-amber-500 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-600"
-          >
-            <CreditCard className="h-4 w-4" /> Pay Tax
-          </button>
+        {/* Tax Summary Section */}
+        <div className="mb-3 p-2.5 bg-ink-50 rounded-lg border border-ink-100">
+          <SectionHeader icon={Calculator} title="Tax Summary" />
+          <div className="space-y-0.5">
+            <TaxRow label="Base Property Tax" value={formatCurrency(tax.baseTax)} />
+            <TaxRow label="Urban Development Cess (5%)" value={formatCurrency(tax.cess)} />
+            <TaxRow label="TOTAL TAX PAYABLE" value={formatCurrency(tax.totalAmount)} highlight />
+          </div>
+        </div>
+
+        {paymentError && (
+          <div className="mb-3 p-1.5 bg-red-500/10 border border-red-500/30 rounded-lg text-xs text-red-400 text-center animate-fade-in">
+            {paymentError}
+          </div>
         )}
       </div>
+
+      {/* Footer - Fixed */}
+      <footer className="flex-shrink-0 p-3 border-t border-ink-200 bg-white rounded-b-xl">
+        <div className="flex gap-2">
+          {isPaid ? (
+            <button
+              onClick={() => onReceipt?.(feature)}
+              className="flex-1 inline-flex items-center justify-center gap-1 rounded-md bg-leaf-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-leaf-700 transition-colors"
+            >
+              <FileText className="h-3.5 w-3.5" /> View Tax Receipt
+            </button>
+          ) : (
+            <button
+              onClick={handlePayment}
+              disabled={paymentState !== 'idle' || !tax.calculationAvailable}
+              className="flex-1 inline-flex items-center justify-center gap-1 rounded-md bg-amber-500 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {paymentState === 'preparing' && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {paymentState === 'checkout' && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {paymentState === 'verifying' && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {paymentState === 'success' && <CheckCircle className="h-3.5 w-3.5" />}
+              {(paymentState === 'idle' || paymentState === 'error') && <CreditCard className="h-3.5 w-3.5" />}
+              {paymentState === 'preparing' && 'Preparing…'}
+              {paymentState === 'checkout' && 'Opening Payment…'}
+              {paymentState === 'verifying' && 'Verifying…'}
+              {paymentState === 'success' && 'Paid!'}
+              {(paymentState === 'idle' || paymentState === 'error') && `Pay Tax ${tax.totalAmount ? `₹${formatCurrency(tax.totalAmount)}` : ''}`}
+            </button>
+          )}
+        </div>
+      </footer>
     </div>
   )
 }

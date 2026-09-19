@@ -4,10 +4,12 @@ import { Button, Input, Badge } from '../../../components/ui'
 import { taxRevenueApi } from '../api/taxRevenueApi'
 import { formatCurrency, formatArea } from '../utils/revenueFormatters'
 import { calculatePropertyTax, getTaxBreakdown } from '../utils/propertyTaxCalculator'
+import { processPropertyTaxPayment } from '../utils/razorpay'
 import {
   X, Search, CreditCard, CheckCircle, AlertCircle, Loader2,
   User, MapPin, Phone, Home, FileText, Calculator, MapPin as MapPinIcon
 } from 'lucide-react'
+import Swal from 'sweetalert2'
 
 export function PayTaxModal({
   isOpen,
@@ -133,39 +135,102 @@ export function PayTaxModal({
     setErrorMessage(null)
 
     try {
-      const payload = {
-        id: `data_resi_${selectedProperty.id || selectedProperty.plotId}`,
-        plot_id: selectedProperty.id || selectedProperty.plotId,
-        plot_no: selectedProperty.plotNo || selectedProperty.plot_no || selectedProperty.plotId,
-        name: selectedProperty.ownerName || selectedProperty.owner_name || selectedProperty.name || undefined,
-        mobile: selectedProperty.mobile || selectedProperty.owner_mobile || '',
-        area_sqft: selectedProperty.landAreaSqft || selectedProperty.areaSqft || selectedProperty.estimated_area_sqft || undefined,
-        tax_amount: paymentForm.amount,
-        payment_mode: paymentForm.paymentMode,
-        remarks: paymentForm.remarks,
-        assessment_year: selectedProperty.assessment_year || undefined,
-        period_month: selectedProperty.period_month || undefined,
+      const propertyId = `data_resi_${selectedProperty.id || selectedProperty.plotId}`
+      const plotNo = selectedProperty.plotNo || selectedProperty.plot_no || selectedProperty.plotId
+      const ownerName = selectedProperty.ownerName || selectedProperty.owner_name || selectedProperty.name
+      const mobile = selectedProperty.mobile || selectedProperty.owner_mobile || ''
+      const areaSqft = selectedProperty.landAreaSqft || selectedProperty.areaSqft || selectedProperty.estimated_area_sqft
+      const taxAmount = paymentForm.amount
+      const assessmentYear = selectedProperty.assessment_year || '2026-2027'
+      const periodMonth = selectedProperty.period_month || new Date().toISOString().slice(0, 7)
+
+      if (!taxAmount || taxAmount <= 0) {
+        setErrorMessage('Invalid payment amount.')
+        setPaymentLoading(false)
+        return
       }
 
-      const response = await taxRevenueApi.submitTaxPayment(payload)
-
-      if (response.status === 'success' || response.success) {
-        const result = response.data || response
-        const verification = await taxRevenueApi.verifyTaxPayment({ plot_no: payload.plot_no })
-        if (!verification?.is_tax_paid) {
-          setErrorMessage('Payment was submitted, but the backend has not yet confirmed its tax status. Please verify before retrying.')
-          return
-        }
-        setPaymentResult(result)
-        setSuccessMessage(`Payment verified. Receipt: ${result.receipt_no || 'available from the backend'}`)
-        onPaymentSuccess?.(result)
-      } else {
-        setErrorMessage(response.message || 'Payment failed. Please try again.')
+      // Check if property is already paid
+      const isPaid = selectedProperty.isPaid || selectedProperty.taxStatus === 'paid'
+      if (isPaid) {
+        await Swal.fire({
+          icon: 'info',
+          title: 'Already Paid',
+          text: 'This property tax has already been paid.',
+          confirmButtonText: 'OK',
+          confirmButtonColor: '#3b82f6',
+        })
+        setPaymentLoading(false)
+        return
       }
+
+      // Use Razorpay for payment processing
+      await processPropertyTaxPayment({
+        propertyId,
+        plotNo,
+        ownerName,
+        mobile,
+        areaSqft,
+        taxAmount,
+        paymentMode: paymentForm.paymentMode,
+        assessmentYear,
+        periodMonth,
+        onPaymentStart: () => setPaymentLoading(true),
+        onPaymentSuccess: async (result) => {
+          setPaymentResult(result)
+          setSuccessMessage(`Payment verified. Receipt: ${result.receipt_no || 'available from the backend'}`)
+          onPaymentSuccess?.(result)
+          setPaymentLoading(false)
+          // Show SweetAlert2 success popup
+          await Swal.fire({
+            icon: 'success',
+            title: 'Tax Payment Successful',
+            html: `
+              <div className="text-left space-y-2">
+                <p><strong>Property:</strong> Plot #${plotNo}</p>
+                <p><strong>Amount Paid:</strong> ₹${formatCurrency(taxAmount)}</p>
+                ${result.receipt_no ? `<p><strong>Receipt No:</strong> ${result.receipt_no}</p>` : ''}
+                ${result.transaction_id ? `<p><strong>Transaction Ref:</strong> ${result.transaction_id}</p>` : ''}
+                <p className="text-green-600 font-medium">Status: PAID</p>
+              </div>
+            `,
+            confirmButtonText: 'Done',
+            confirmButtonColor: '#059669',
+          })
+        },
+        onPaymentFailure: async (err) => {
+          setErrorMessage(err.message || 'Payment failed. Please try again.')
+          setPaymentLoading(false)
+          await Swal.fire({
+            icon: 'error',
+            title: 'Payment Failed',
+            text: err.message || 'Payment failed. Please try again.',
+            confirmButtonText: 'OK',
+            confirmButtonColor: '#dc2626',
+          })
+        },
+        onPaymentCancel: async () => {
+          setErrorMessage('Payment was cancelled. Property tax status remains DUE.')
+          setPaymentLoading(false)
+          await Swal.fire({
+            icon: 'info',
+            title: 'Payment Cancelled',
+            text: 'No payment was recorded. The property remains DUE.',
+            confirmButtonText: 'OK',
+            confirmButtonColor: '#3b82f6',
+          })
+        },
+      })
     } catch (err) {
-      setErrorMessage(err.message || 'Payment submission failed. Please try again.')
-    } finally {
+      setErrorMessage(err.message || 'Payment initiation failed. Please try again.')
       setPaymentLoading(false)
+      await Swal.fire({
+        icon: 'error',
+        title: 'Payment Error',
+        text: err.message || 'Payment initiation failed. Please try again.',
+        confirmButtonText: 'OK',
+        confirmButtonColor: '#dc2626',
+      })
     }
   }
 

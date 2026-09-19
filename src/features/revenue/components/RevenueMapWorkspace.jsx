@@ -7,12 +7,13 @@ import MapView from '../../../components/map/MapView'
 import { MAP_TOOLS } from '../../../hooks/useMapTools'
 import { useMapTools } from '../../../hooks/useMapTools'
 import { Tooltip } from '../../../components/ui'
+import { calculatePropertyBounds } from '../utils/propertyBounds'
 import {
   Navigation, ZoomIn, ZoomOut, Home, Target, Ruler
 } from 'lucide-react'
 
-// Default Nalanda District center (WGS84 [lng, lat] for MapView)
-const DEFAULT_CENTER = [85.5143, 25.1968]
+// Default Nalanda District center (WGS84 [lng, lat] for MapView) — used as fallback only
+const DEFAULT_CENTER = [78.10110535859422, 30.306395466450653]
 const DEFAULT_ZOOM = 14
 
 const BASEMAP_URLS = {
@@ -29,6 +30,7 @@ export const RevenueMapWorkspace = forwardRef(function RevenueMapWorkspace({
   onCloseProperty,
   onPayProperty,
   onReceiptProperty,
+  onPaymentSuccess,
   onMapClick,
   basemap = 'osm',
   onBasemapChange,
@@ -84,8 +86,8 @@ export const RevenueMapWorkspace = forwardRef(function RevenueMapWorkspace({
     const node = document.createElement('div')
     const root = createRoot(node)
     const close = () => onCloseProperty?.()
-    root.render(<PropertyPopup feature={selectedFeature} onClose={close} onPay={onPayProperty} onReceipt={onReceiptProperty} />)
-    const popup = L.popup({ autoPan: true, closeButton: false, maxWidth: 340, className: 'ndisp-tax-property-popup' })
+    root.render(<PropertyPopup feature={selectedFeature} onClose={close} onPay={onPayProperty} onReceipt={onReceiptProperty} onPaymentSuccess={onPaymentSuccess} />)
+    const popup = L.popup({ autoPan: true, closeButton: false, maxWidth: 390, minWidth: 320, className: 'ndisp-tax-property-popup' })
       .setLatLng(bounds.getCenter()).setContent(node)
     let opened = false
     const openPopup = () => {
@@ -110,6 +112,36 @@ export const RevenueMapWorkspace = forwardRef(function RevenueMapWorkspace({
       if (popupRef.current === popup) popupRef.current = null
     }
   }, [selectedFeature, onCloseProperty, onPayProperty, onReceiptProperty])
+
+  // Fit map to cadastral features on initial load
+  const viewportInitializedRef = useRef(false)
+  useEffect(() => {
+    if (viewportInitializedRef.current) return
+    if (!cadastralFeatures?.length) return
+
+    const map = mapRef.current?.map
+    if (!map) return
+
+    try {
+      // Filter features with valid geometry
+      const validFeatures = cadastralFeatures.filter(f => f.geometry)
+      if (validFeatures.length === 0) return
+
+      // Calculate bounds from all valid features
+      const bounds = calculatePropertyBounds(validFeatures)
+      if (!bounds || !bounds.isValid()) return
+
+      map.fitBounds(bounds, {
+        padding: [40, 40],
+        maxZoom: 16,
+        duration: 1.0,
+      })
+      viewportInitializedRef.current = true
+      console.debug('[RevenueMapWorkspace] Map fitted to cadastral property bounds')
+    } catch (err) {
+      console.warn('[RevenueMapWorkspace] Failed to fit map to cadastral bounds:', err)
+    }
+  }, [cadastralFeatures])
 
   const vectorLayers = useMemo(() => {
     if (!cadastralFeatures || !cadastralFeatures.length) return []
