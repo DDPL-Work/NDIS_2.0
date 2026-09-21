@@ -82,20 +82,21 @@ export function createCatalogLayer(geojson, {
   layerName = '',
   category = '',
   style: featureStyle,
-  onFeatureClick,
-} = {}) {
+onFeatureClick,
+  } = {}) {
   const collection = geojson?.features ? geojson : { type: 'FeatureCollection', features: geojson?.features || [] }
   const style = styleForCategory(category, layerName)
   const layer = L.geoJSON(collection, {
     style(feature) { return featureStyle ? featureStyle(feature) : style },
     pointToLayer(_feature, latlng) {
+      const pointStyle = featureStyle ? featureStyle(_feature) : style
       return L.circleMarker(latlng, {
-        radius: 6,
-        fillColor: style.color,
-        color: '#ffffff',
-        weight: 1,
-        opacity: 1,
-        fillOpacity: 0.85,
+        radius: pointStyle?.radius ?? 6,
+        fillColor: pointStyle?.fillColor ?? style.color,
+        color: pointStyle?.color ?? '#ffffff',
+        weight: pointStyle?.weight ?? 1,
+        opacity: pointStyle?.opacity ?? 1,
+        fillOpacity: pointStyle?.fillOpacity ?? 0.85,
       })
     },
     onEachFeature(feature, leafletLayer) {
@@ -121,6 +122,17 @@ export function colorForId(id) {
 }
 
 export function facilityColor(facility, { colorBy = 'department', departmentColors = {} } = {}) {
+  // Spatial Analysis mode: distinguish target vs reference facilities
+  if (colorBy === 'spatial-analysis') {
+    if (facility.isReference) {
+      // Reference/comparison facilities (e.g., Police Stations) - purple
+      return '#a855f7'
+    }
+    // Target facilities (e.g., Banks) - color by gap score
+    if (facility.gapScore >= 0.66) return '#c0392b'      // High gap - red
+    if (facility.gapScore >= 0.33) return '#e07a2c'    // Medium gap - orange
+    return '#1f7a54'                                    // Low gap - green
+  }
   if (colorBy === 'gap') {
     if (facility.gapScore >= 0.66) return '#c0392b'
     if (facility.gapScore >= 0.33) return '#e07a2c'

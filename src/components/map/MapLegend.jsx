@@ -138,3 +138,95 @@ export function GapScoreLegend() {
     </div>
   )
 }
+
+export function SpatialAnalysisLegend({
+  targetLayerLabel,
+  referenceLayerLabel,
+  distanceKm,
+  condition,
+  referenceLayerType,
+  priorityStats,
+}) {
+  const getConditionLabel = (cond) => {
+    switch (cond) {
+      case 'within_radius': return 'Within radius'
+      case 'buffer': return 'Inside buffer'
+      case 'nearest': return 'Nearest'
+      case 'distance': return 'Distance'
+      case 'polygon_containment': return 'Polygon containment'
+      case 'intersects': return 'Intersects'
+      case 'road_route': return 'Road route'
+      default: return cond
+    }
+  }
+
+  const getPriorityColor = (level) => {
+    switch (level) {
+      case 'High': return '#c0392b'
+      case 'Medium': return '#e07a2c'
+      case 'Low': return '#1f7a54'
+      default: return '#546882'
+    }
+  }
+
+  return (
+    <div className="card px-3 py-2.5 min-w-[220px]">
+      <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-400 mb-2">Spatial Analysis</div>
+      
+      <div className="space-y-2 mb-2">
+        <div className="flex items-center gap-2">
+          <span className="h-2.5 w-2.5 rounded-full bg-blue-600 shrink-0" title="Target layer" />
+          <span className="text-[12px] text-ink-900 truncate">{targetLayerLabel || 'Target'}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="h-2.5 w-2.5 rounded-full bg-purple-600 shrink-0" title="Reference layer" />
+          <span className="text-[12px] text-ink-900 truncate">{referenceLayerLabel || 'Reference'}</span>
+        </div>
+      </div>
+
+      {distanceKm && condition && (
+        <div className="border-t border-ink-100 pt-2 mb-2">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-400 mb-1">Search Parameters</div>
+          <div className="space-y-1 text-[12px] text-ink-600">
+            <div className="flex justify-between gap-2">
+              <span>Condition</span>
+              <span className="font-medium text-ink-900">{getConditionLabel(condition)}</span>
+            </div>
+            <div className="flex justify-between gap-2">
+              <span>Distance</span>
+              <span className="font-medium text-ink-900">{distanceKm} km</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="border-t border-ink-100 pt-2 mb-2">
+        <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-400 mb-1.5">Gap Score (Target)</div>
+        <div className="h-2 w-full rounded-full" style={{ background: 'linear-gradient(90deg,#1f7a54,#e07a2c,#c0392b)' }} />
+        <div className="flex justify-between text-[10.5px] text-ink-400 mt-1">
+          <span>Well served</span>
+          <span>Underserved</span>
+        </div>
+      </div>
+
+      {priorityStats && (
+        <div className="border-t border-ink-100 pt-2">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-400 mb-1.5">Priority Levels</div>
+          <div className="space-y-1.5">
+            {['High', 'Medium', 'Low'].map((level) => {
+              const count = priorityStats[level] || 0
+              if (count === 0) return null
+              return (
+                <div key={level} className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: getPriorityColor(level) }} />
+                  <span className="text-[12px] text-ink-900">{level} Priority</span>
+                  <span className="text-[11px] text-ink-500 ml-auto">{count}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

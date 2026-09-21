@@ -17,7 +17,7 @@ const TaxRow = ({ label, value, highlight = false }) => (
 )
 
 const SectionHeader = ({ icon: Icon, title }) => (
-  <div className="mb-1.5 font-medium text-ink-900 flex items-center gap-1">
+  <div className="mb-1 font-medium text-ink-900 text-[12px] flex items-center gap-1">
     <Icon className="w-3 h-3 text-ink-500" />
     {title}
   </div>
@@ -47,9 +47,11 @@ export default function PropertyPopup({ feature, onClose, onPay, onReceipt, onPa
   const contentRef = useRef(null)
 
   // Handle content scroll to prevent body scroll
+  const handleWheel = useRef(null)
+
   useEffect(() => {
     if (contentRef.current) {
-      contentRef.current.addEventListener('wheel', (e) => {
+      handleWheel.current = (e) => {
         const { scrollTop, scrollHeight, clientHeight } = contentRef.current
         const atTop = scrollTop === 0
         const atBottom = scrollHeight - scrollTop === clientHeight
@@ -57,11 +59,12 @@ export default function PropertyPopup({ feature, onClose, onPay, onReceipt, onPa
         if ((atTop && e.deltaY < 0) || (atBottom && e.deltaY > 0)) {
           e.preventDefault()
         }
-      }, { passive: false })
+      }
+      contentRef.current.addEventListener('wheel', handleWheel.current, { passive: false })
     }
     return () => {
-      if (contentRef.current) {
-        contentRef.current.removeEventListener('wheel', () => {})
+      if (contentRef.current && handleWheel.current) {
+        contentRef.current.removeEventListener('wheel', handleWheel.current)
       }
     }
   }, [])
@@ -169,12 +172,12 @@ export default function PropertyPopup({ feature, onClose, onPay, onReceipt, onPa
   )
 
   return (
-    <div className="property-popup flex flex-col w-[min(380px,calc(100vw-32px))] max-h-[calc(100dvh-32px)] max-h-[calc(100vh-32px)] max-h-[480px] ">
+    <div className="property-popup flex flex-col w-[min(360px,calc(100vw-24px))] max-h-[min(400px,calc(100dvh-100px))] max-h-[min(400px,calc(100vh-100px))] rounded-xl overflow-hidden ">
       {/* Header - Fixed */}
-      <header className="flex-shrink-0 p-3 border-b border-ink-200 bg-white rounded-t-xl flex items-center justify-between">
+      <header className="flex-shrink-0 px-3 py-2 border-b border-ink-200 bg-white flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 bg-blue-100 rounded-lg flex items-center justify-center">
-            <Home className="w-3.5 h-3.5 text-blue-600" />
+          <div className="w-5 h-5 bg-blue-100 rounded-lg flex items-center justify-center">
+            <Home className="w-3 h-3 text-blue-600" />
           </div>
           <div>
             <strong className="text-sm text-ink-950">Property Details</strong>
@@ -187,11 +190,11 @@ export default function PropertyPopup({ feature, onClose, onPay, onReceipt, onPa
       </header>
 
       {/* Content - Scrollable */}
-      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 pb-1" ref={contentRef}>
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-2 pb-1" ref={contentRef}>
         {/* Property Identity Section */}
-        <div className="mb-3 p-2.5 bg-ink-50 rounded-lg border border-ink-100">
+        <div className="mb-2 p-2 bg-ink-50 rounded-lg border border-ink-100">
           <SectionHeader icon={MapPin} title="Property Identity" />
-          <div className="space-y-1.5 text-[12px]">
+          <div className="space-y-1 text-[12px]">
             <InfoRow label="Plot Number" value={`#${displayValue(plotNo)}`} />
             <InfoRow label="Owner" value={displayValue(ownerName)} />
             <InfoRow label="Mobile" value={displayValue(mobile)} />
@@ -201,15 +204,15 @@ export default function PropertyPopup({ feature, onClose, onPay, onReceipt, onPa
         </div>
 
         {/* Tax Status Badge */}
-        <div className="mb-3 flex items-center gap-2">
+        <div className="mb-2 flex items-center gap-2">
           <span className="text-ink-500 text-[12px]">Tax Status</span>
           <StatusBadge status={tax.status} />
         </div>
 
         {/* GIS Property Section */}
-        <div className="mb-3 p-2.5 bg-ink-50 rounded-lg border border-ink-100">
+        <div className="mb-2 p-2 bg-ink-50 rounded-lg border border-ink-100">
           <SectionHeader icon={Building2} title="GIS Property" />
-          <div className="space-y-1.5 text-[12px]">
+          <div className="space-y-1 text-[12px]">
             <InfoRow label="Area" value={gis.areaSqft ? formatArea(gis.areaSqft) : 'Not available'} />
             <InfoRow label="Tax Rate" value={`${formatCurrency(gis.ratePerSqft)}/sq.ft`} />
             <InfoRow label="Cadastral Layer" value={gis.layer} />
@@ -217,9 +220,9 @@ export default function PropertyPopup({ feature, onClose, onPay, onReceipt, onPa
         </div>
 
         {/* Tax Summary Section */}
-        <div className="mb-3 p-2.5 bg-ink-50 rounded-lg border border-ink-100">
+        <div className="mb-2 p-2 bg-ink-50 rounded-lg border border-ink-100">
           <SectionHeader icon={Calculator} title="Tax Summary" />
-          <div className="space-y-0.5">
+          <div className="space-y-0">
             <TaxRow label="Base Property Tax" value={formatCurrency(tax.baseTax)} />
             <TaxRow label="Urban Development Cess (5%)" value={formatCurrency(tax.cess)} />
             <TaxRow label="TOTAL TAX PAYABLE" value={formatCurrency(tax.totalAmount)} highlight />
@@ -227,14 +230,14 @@ export default function PropertyPopup({ feature, onClose, onPay, onReceipt, onPa
         </div>
 
         {paymentError && (
-          <div className="mb-3 p-1.5 bg-red-500/10 border border-red-500/30 rounded-lg text-xs text-red-400 text-center animate-fade-in">
+          <div className="mb-2 p-1.5 bg-red-500/10 border border-red-500/30 rounded-lg text-xs text-red-400 text-center animate-fade-in">
             {paymentError}
           </div>
         )}
       </div>
 
       {/* Footer - Fixed */}
-      <footer className="flex-shrink-0 p-3 border-t border-ink-200 bg-white rounded-b-xl">
+      <footer className="flex-shrink-0 px-3 py-2 border-t border-ink-200 bg-white rounded-b-xl">
         <div className="flex gap-2">
           {isPaid ? (
             <button
@@ -247,7 +250,7 @@ export default function PropertyPopup({ feature, onClose, onPay, onReceipt, onPa
             <button
               onClick={handlePayment}
               disabled={paymentState !== 'idle' || !tax.calculationAvailable}
-              className="flex-1 inline-flex items-center justify-center gap-1 rounded-md bg-amber-500 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex-1 inline-flex items-center justify-center gap-1 rounded-md bg-amber-500 px-3 py-1.5 text-sm font-semibold text-white hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {paymentState === 'preparing' && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               {paymentState === 'checkout' && <Loader2 className="h-3.5 w-3.5 animate-spin" />}

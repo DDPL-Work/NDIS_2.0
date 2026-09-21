@@ -23,7 +23,7 @@ import { interiorPoint } from '../gis/engine/SpatialAnalysisEngine'
 import { routingService } from '../services/routingService'
 import { MAX_RESULT_LIMIT, resultsToCsv, resultsToGeoJson } from '../features/spatialanalysis/spatialAnalysisModel'
 
-export { resultsToCsv, resultsToGeoJson }
+export { resultsToCsv, resultsToGeoJson, normalizeLocationQueryResponse }
 
 const LAYER_CACHE_TTL_MS = 5 * 60 * 1000
 const layerCache = new Map()
@@ -199,18 +199,81 @@ function toBackendPayload(query) {
   }
 }
 
+function normalizeLocationQueryResponse(response, query) {
+  if (!response) {
+    throw new Error('Invalid spatial analysis response: empty response')
+  }
+  const payload = response.data ?? response
+  const geojson = payload?.geojson
+  if (!geojson || geojson.type !== 'FeatureCollection' || !Array.isArray(geojson.features)) {
+    throw new Error('Invalid location query response: expected geojson.features[]')
+  }
+  const referenceLayerName = query.spatial?.reference?.name ?? 'reference'
+  const features = geojson.features
+  const normalizedFeatures = features.map((feature, index) => {
+    const properties = feature.properties ?? {}
+    const geometry = feature.geometry
+    const position = geometry?.type === 'Point' && Array.isArray(geometry.coordinates)
+      ? [geometry.coordinates[0], geometry.coordinates[1]]
+      : null
+    return {
+      id: String(properties.id ?? index),
+      name: properties.name ?? properties.Mosque_Nam ?? properties.Temple_Nam ?? properties.Name ?? 'Unnamed',
+      blockName: properties.block_name ?? properties.Block_Name ?? null,
+      population: properties.population ?? null,
+      accessibility: properties.accessibility ?? properties.road_accessibility ?? null,
+      roadAccessibility: properties.road_accessibility ?? null,
+      nearestFacility: properties.nearest_facility ?? properties.nearestFacility ?? null,
+      nearestReference: properties.nearest_facility ?? properties.nearestFacility ?? null,
+      nearestReferenceName: properties.nearest_facility ?? properties.nearestFacility ?? null,
+      distanceKm: properties.distance_km ?? properties.distanceKm ?? null,
+      gapScore: properties.gap_score ?? properties.gapScore ?? null,
+      priorityScore: properties.priority_score ?? properties.priorityScore ?? null,
+      latitude: properties.latitude ?? position?.[1] ?? null,
+      longitude: properties.longitude ?? position?.[0] ?? null,
+      position,
+      geometry,
+      properties,
+      rank: index + 1,
+    }
+  })
+  return {
+    targetLayer: payload.target_layer ?? query.targetLayer?.name ?? '',
+    totalCount: Number(payload.total_count ?? features.length),
+    returnedCount: Number(payload.returned_count ?? features.length),
+    features: normalizedFeatures,
+    geojson,
+  }
+}
+
 export async function executeSpatialAnalysis(query, context = {}) {
   const capability = await spatialAnalysisCapability()
 
   if (capability === 'backend') {
     const response = await apiRequest('/spatial-analysis/query/', { method: 'POST', body: toBackendPayload(query), timeout: 60000 })
-    // Backend returns { target_layer, total_count, geojson, results, ... }
+    // Backend returns { target_layer, total_count, returned_count, geojson: { features: [...] } }
+    const normalized = normalizeLocationQueryResponse(response, query)
+    const referenceLayerName = query.spatial?.reference?.name ?? 'reference'
+    const backendProvenance = { generatedAt: new Date().toISOString() }
     return {
       mode: 'backend',
       backendQueryEndpoint: 'POST /api/spatial-analysis/query/',
-      results: Array.isArray(response?.results) ? response.results : [],
-      summary: response?.summary || { totalFound: response?.total_count ?? 0 },
-      provenance: response?.provenance || { generatedAt: new Date().toISOString() },
+      results: normalized.features,
+      summary: {
+        totalFound: normalized.totalCount,
+        limit: normalized.returnedCount,
+        condition: query.spatial?.condition,
+        targetLayer: query.targetLayer?.name ?? '',
+        referenceLayer: referenceLayerName,
+        referenceLayerType: 'gis-layer',
+      },
+      provenance: {
+        ...backendProvenance,
+        targetLayer: normalized.targetLayer,
+        referenceLayer: referenceLayerName,
+        referenceLayerType: 'gis-layer',
+        distanceKm: query.spatial?.distanceKm ?? null,
+      },
     }
   }
 
@@ -220,6 +283,8 @@ export async function executeSpatialAnalysis(query, context = {}) {
     engine: 'client-engine',
     endpoint: 'GET /api/facilities/ + GET /api/gis/layers/{name}/',
     routing: context.routing !== false ? routingService.getRoute : null,
+    referenceLayerName: context.referenceLayerName,
+    referenceLayerType: context.referenceLayerType,
   })
   return { mode: 'client-engine', backendQueryEndpoint: 'POST /api/spatial-analysis/query/ (not deployed — client engine executed the typed contract)', ...result }
 }

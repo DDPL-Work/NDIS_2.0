@@ -228,8 +228,8 @@ export function evaluateFilter(row, filter) {
 export function resultsToCsv(result, outputFields = []) {
   const rows = result?.results || []
   if (!rows.length) return ''
-  const fields = outputFields.length ? outputFields : ['name', 'population', 'nearestFacility', 'distanceKm', 'accessibility', 'gapScore', 'priorityScore']
-  const header = ['rank', ...fields].join(',')
+  const fields = outputFields.length ? outputFields : ['name', 'population', 'nearestReference', 'distanceKm', 'accessibility', 'gapScore', 'priorityScore']
+  const header = ['Rank', ...fields.map(f => f.charAt(0).toUpperCase() + f.slice(1).replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase()))].join(',')
   const lines = rows.map((row) => [
     row.rank ?? '',
     ...fields.map((field) => {
@@ -242,10 +242,14 @@ export function resultsToCsv(result, outputFields = []) {
     '# NDISP Spatial Analysis export',
     `# Mode: ${result?.mode || 'client-engine'}`,
     `# Generated: ${result?.provenance?.generatedAt || new Date().toISOString()}`,
-    `# Target layer: ${result?.summary?.targetLayer || ''}`,
-    `# Condition: ${result?.summary?.condition || ''} (reference: ${result?.summary?.referenceLayer || ''})`,
-  ]
-  return [...provenance, header, ...lines].join('\n')
+    `# Target layer: ${result?.summary?.targetLayer || result?.provenance?.targetLayer || ''}`,
+    `# Reference layer: ${result?.summary?.referenceLayer || result?.provenance?.referenceLayer || ''}`,
+    `# Condition: ${result?.summary?.condition || ''}`,
+    `# Distance: ${result?.provenance?.distanceKm ? `${result.provenance.distanceKm} km` : ''}`,
+    `# Result count: ${rows.length}`,
+    `# Population covered: ${rows.reduce((acc, r) => acc + (Number(r.population) || 0), 0)}`,
+  ].filter(line => !line.endsWith(': ') && !line.endsWith(':')).join('\n')
+  return [...provenance.split('\n'), header, ...lines].join('\n')
 }
 
 export function resultsToGeoJson(result) {
@@ -261,7 +265,10 @@ export function resultsToGeoJson(result) {
           rank: row.rank,
           name: row.name,
           population: row.population ?? null,
-          nearestFacility: row.nearestFacility ?? null,
+          nearestReference: row.nearestReference ?? null,
+          nearestReferenceId: row.nearestReferenceId ?? null,
+          referenceLayerName: row.referenceLayerName ?? null,
+          referenceLayerType: row.referenceLayerType ?? null,
           distanceKm: row.distanceKm ?? null,
           accessibility: row.accessibility ?? null,
           gapScore: row.gapScore ?? null,
@@ -276,7 +283,12 @@ export function resultsToGeoJson(result) {
     type: 'FeatureCollection',
     generatedAt: result?.provenance?.generatedAt || new Date().toISOString(),
     mode: result?.mode || 'client-engine',
-    targetLayer: result?.summary?.targetLayer || '',
+    targetLayer: result?.summary?.targetLayer || result?.provenance?.targetLayer || '',
+    referenceLayer: result?.summary?.referenceLayer || result?.provenance?.referenceLayer || '',
+    condition: result?.summary?.condition || '',
+    distanceKm: result?.provenance?.distanceKm || null,
+    resultCount: rows.length,
+    populationCovered: rows.reduce((acc, r) => acc + (Number(r.population) || 0), 0),
     features,
   }
 }

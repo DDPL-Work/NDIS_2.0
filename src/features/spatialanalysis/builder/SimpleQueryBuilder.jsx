@@ -207,6 +207,7 @@ export default function SimpleQueryBuilder({
     setSelectedTemplate(template.id)
     const q = template.defaultQuery
     const targetLayer = layerOptions.find((o) => o.value === `${q.targetLayerType}:${q.targetLayerId}`)
+    const referenceLayer = layerOptions.find((o) => o.value === `${q.referenceType}:${q.referenceId}`)
 
     setQuery((current) => ({
       ...current,
@@ -217,7 +218,7 @@ export default function SimpleQueryBuilder({
         ...current.spatial,
         condition: q.condition,
         distanceKm: q.distanceKm,
-        reference: { type: q.referenceType, id: q.referenceId, name: '', geometryType: 'Point', point: current.spatial?.reference?.point || null },
+        reference: { type: q.referenceType, id: q.referenceId, name: referenceLayer?.label || q.referenceId, geometryType: 'Point', point: current.spatial?.reference?.point || null },
       },
       filters: q.filters.map((f, i) => ({ ...f, id: `simple-${i}-${Date.now()}`, logic: 'and' })),
       outputFields: ['name', 'population', 'nearestFacility', 'distanceKm', 'accessibility', 'gapScore', 'priorityScore'],

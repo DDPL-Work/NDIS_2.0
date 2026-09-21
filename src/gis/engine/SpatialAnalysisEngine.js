@@ -180,6 +180,16 @@ function nearestRoadDistance(point, roadFeatures = []) {
 // Derived field computations (documented formulas)
 // ---------------------------------------------------------------------------
 
+// Gap score thresholds (0-100 scale) - aligned with backend specification
+// 0-39: Well served (green)
+// 40-69: Moderate (amber/orange) 
+// 70-100: Underserved (red)
+export const GAP_SCORE_THRESHOLDS = {
+  wellServed: 40,    // < 40 = well served
+  moderate: 70,      // 40-69 = moderate
+  // >= 70 = underserved
+}
+
 export function accessibilityStatus(roadDistanceKm) {
   if (roadDistanceKm === null || roadDistanceKm === undefined) return 'Unknown'
   if (roadDistanceKm <= ACCESSIBILITY_THRESHOLDS_KM.good) return 'Good'
@@ -193,6 +203,22 @@ export function priorityScore({ population, gapScore, accessibility, distanceKm 
   const accessibilityPenalty = accessibility === 'Poor' ? 1 : accessibility === 'Moderate' ? 0.5 : accessibility === 'Good' ? 0 : 0
   const distancePenalty = Number(distanceKm) == null ? 0 : Math.min(1, Number(distanceKm) / 10)
   return Math.round((0.4 * populationTier + 0.3 * gap + 0.2 * accessibilityPenalty + 0.1 * distancePenalty) * 100) / 100
+}
+
+export function getGapScoreLevel(gapScore) {
+  if (gapScore == null) return 'unknown'
+  const score = Number(gapScore)
+  if (score < GAP_SCORE_THRESHOLDS.wellServed) return 'well-served'
+  if (score < GAP_SCORE_THRESHOLDS.moderate) return 'moderate'
+  return 'underserved'
+}
+
+export function getPriorityLevel(priorityScore) {
+  if (priorityScore == null) return 'unknown'
+  const score = Number(priorityScore)
+  if (score >= 70) return 'high'
+  if (score >= 40) return 'medium'
+  return 'low'
 }
 
 // ---------------------------------------------------------------------------
@@ -209,21 +235,27 @@ function nearestReference(row, referenceRows = []) {
   return best
 }
 
+export { nearestReference }
+
 /**
  * Execute a typed query against real data.
  *
  * @param {object} query      typed query (spatialAnalysisModel shape)
- * @param {object} context    { targetRows, referenceRows, roads, routing }
- *   targetRows      unified feature rows of the target layer (real data)
- *   referenceRows   unified feature rows of the reference layer (real data)
- *   roads           real road layer features [{ geometry }]
- *   routing         async ({ origin, destination }) => { distanceKm } | null (OSRM); optional
+ * @param {object} context    { targetRows, referenceRows, roads, routing, referenceLayerName, referenceLayerType }
+ *   targetRows           unified feature rows of the target layer (real data)
+ *   referenceRows        unified feature rows of the reference layer (real data)
+ *   roads                real road layer features [{ geometry }]
+ *   routing              async ({ origin, destination }) => { distanceKm } | null (OSRM); optional
+ *   referenceLayerName   human-readable name of the reference layer
+ *   referenceLayerType   type of reference layer: 'facility-category' | 'gis-layer' | 'point'
  * @returns {{ results, summary, provenance }}
  */
 export async function executeQuery(query = {}, context = {}) {
   const targetRows = (context.targetRows || []).filter((row) => Array.isArray(row.position))
   const referenceRows = (context.referenceRows || []).filter((row) => Array.isArray(row.position))
   const roads = context.roads || []
+  const referenceLayerName = context.referenceLayerName || 'reference'
+  const referenceLayerType = context.referenceLayerType || 'facility-category'
   const condition = query.spatial?.condition || 'within_radius'
   const distanceKm = Number(query.spatial?.distanceKm) || 0
   const limit = Math.min(Number(query.limit ?? DEFAULT_RESULT_LIMIT), MAX_RESULT_LIMIT)
@@ -271,19 +303,23 @@ export async function executeQuery(query = {}, context = {}) {
     .filter((row, index) => spatial(row, index))
     .map((row) => {
       const nearest = nearestReference(row, referenceRows)
-      const nearestFacility = nearest?.reference || null
+      const nearestReferenceFeature = nearest?.reference || null
       const nearestDistanceKm = nearest ? Number((nearest.distanceM / 1000).toFixed(2)) : null
       const roadDistanceKm = nearestRoadDistance(row.position, roads)
       const accessibility = accessibilityStatus(roadDistanceKm)
-      const facilityGap = nearestFacility ? nearestFacility.gapScore : null
+      const facilityGap = nearestReferenceFeature ? nearestReferenceFeature.gapScore : null
       const population = resolveField(row, 'population')
       return {
         ...row,
         id: row.id,
         position: row.position,
         geometry: row.geometry,
-        nearestFacility: nearestFacility?.name || null,
-        nearestFacilityId: nearestFacility?.id || null,
+        nearestReference: nearestReferenceFeature?.name || null,
+        nearestReferenceId: nearestReferenceFeature?.id || null,
+        nearestReferencePosition: nearestReferenceFeature?.position || null,
+        nearestReferenceGeometry: nearestReferenceFeature?.geometry || null,
+        referenceLayerName,
+        referenceLayerType,
         distanceKm: nearestDistanceKm,
         roadDistanceKm,
         accessibility,
@@ -352,6 +388,35 @@ export async function executeQuery(query = {}, context = {}) {
     .slice(0, limit)
     .map((row, index) => ({ ...row, rank: index + 1 }))
 
+  // Compute nearest reference stats for diagnostics
+  const nearestStats = results.reduce((acc, r) => {
+    if (r.nearestReference) acc.found++
+    else acc.missing++
+    return acc
+  }, { found: 0, missing: 0 })
+
+  if (import.meta.env.DEV) {
+    console.debug('[SPATIAL ANALYSIS ENGINE]', {
+      stage: 'executeQuery completed',
+      condition,
+      distanceKm,
+      targetLayer: query.targetLayer?.name,
+      referenceLayer: referenceLayerName,
+      referenceLayerType,
+      targetRowsInput: targetRows.length,
+      referenceRowsInput: referenceRows.length,
+      resultsCount: results.length,
+      nearestStats,
+      sampleResults: results.slice(0, 3).map(r => ({
+        name: r.name,
+        nearestReference: r.nearestReference,
+        distanceKm: r.distanceKm,
+        gapScore: r.gapScore,
+        priorityScore: r.priorityScore,
+      })),
+    })
+  }
+
   const computedFields = []
   if (['within_radius', 'buffer'].includes(condition)) computedFields.push('spatial filter: distance to reference (Haversine)')
   if (condition === 'polygon_containment') computedFields.push('spatial filter: point-in-polygon (real geometry)')
@@ -368,7 +433,9 @@ export async function executeQuery(query = {}, context = {}) {
     backendQueryEndpoint: 'POST /api/spatial-analysis/query — NOT deployed; client engine executes the typed contract',
     computedFields,
     targetLayer: query.targetLayer?.name || null,
-    referenceLayer: query.spatial?.reference?.name || 'point',
+    referenceLayer: referenceLayerName,
+    referenceLayerType,
+    distanceKm: query.spatial?.distanceKm || null,
     roadsUsed: roads.length ? `${roads.length} road features` : 'none',
     generatedAt: new Date().toISOString(),
   }
@@ -380,7 +447,8 @@ export async function executeQuery(query = {}, context = {}) {
       limit,
       condition: query.spatial?.condition,
       targetLayer: query.targetLayer?.name || '',
-      referenceLayer: query.spatial?.reference?.name || 'point',
+      referenceLayer: referenceLayerName,
+      referenceLayerType,
     },
     diagnosis,
     provenance,

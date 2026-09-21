@@ -16,6 +16,7 @@ import {
   resultsToCsv,
   resultsToGeoJson,
 } from '../src/features/spatialanalysis/spatialAnalysisModel.js'
+import { normalizeLocationQueryResponse } from '../src/api/spatialAnalysisApi.js'
 import {
   interiorPoint,
   pointInPolygon,
@@ -198,7 +199,7 @@ const query = {
   filters: [
     { id: 'f1', field: 'population', operator: 'gte', value: '1000', logic: 'and' },
   ],
-  outputFields: ['name', 'population', 'nearestFacility', 'distanceKm', 'accessibility', 'gapScore'],
+  outputFields: ['name', 'population', 'nearestReference', 'distanceKm', 'accessibility', 'gapScore'],
   sort: { field: 'priorityScore', direction: 'desc' },
   limit: 50,
 }
@@ -208,7 +209,7 @@ check('executeQuery: within_radius matches any reference feature (nearest, not f
   assert.equal(result.results.length, 1)
   assert.equal(result.results[0].name, 'Near Block')
   assert.equal(result.results[0].population, 5000)
-  assert.equal(result.results[0].nearestFacility, 'Health Hub')
+  assert.equal(result.results[0].nearestReference, 'Health Hub')
   assert.ok(result.results[0].distanceKm < 1)
   assert.equal(result.results[0].rank, 1)
   assert.ok(typeof result.results[0].priorityScore === 'number')
@@ -274,6 +275,79 @@ check('resultsToGeoJson produces a real FeatureCollection', () => {
   assert.equal(geojson.features[0].geometry.type, 'Point')
   assert.deepEqual(geojson.features[0].geometry.coordinates, [85.4, 25.2])
   assert.ok(geojson.features[0].properties.provenance.includes('client-engine'))
+})
+
+// ---- Normalizer: backend response shape ----
+const templeResponse = {
+  target_layer: 'Temple',
+  total_count: 1,
+  returned_count: 1,
+  geojson: {
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [85.62558, 25.21689] },
+        properties: {
+          id: 7623,
+          name: 'Asthawan',
+          block_name: 'Asthawan',
+          latitude: 25.21689,
+          longitude: 85.62558,
+          population: 2627,
+          road_accessibility: 'poor',
+          accessibility: 'poor',
+          nearest_facility: 'Nalanda District Hospital',
+          nearestFacility: 'Nalanda District Hospital',
+          distance_km: 4.2,
+          distanceKm: 4.2,
+          gap_score: 74.1,
+          gapScore: 74.1,
+          priority_score: 74.1,
+          priorityScore: 74.1,
+        },
+      },
+    ],
+  },
+}
+
+check('normalizeLocationQueryResponse handles confirmed backend response', () => {
+  const query = {
+    targetLayer: { name: 'Temple' },
+    spatial: { reference: { name: 'Hospital' } },
+  }
+  const normalized = normalizeLocationQueryResponse(templeResponse, query)
+  assert.equal(normalized.targetLayer, 'Temple')
+  assert.equal(normalized.totalCount, 1)
+  assert.equal(normalized.returnedCount, 1)
+  assert.ok(Array.isArray(normalized.features))
+  assert.equal(normalized.features.length, 1)
+  assert.equal(normalized.geojson.type, 'FeatureCollection')
+  assert.equal(normalized.features[0].name, 'Asthawan')
+  assert.equal(normalized.features[0].nearestReference, 'Nalanda District Hospital')
+  assert.equal(normalized.features[0].distanceKm, 4.2)
+  assert.equal(normalized.features[0].gapScore, 74.1)
+  assert.equal(normalized.features[0].priorityScore, 74.1)
+})
+
+check('normalizeLocationQueryResponse throws on invalid response', () => {
+  assert.throws(() => normalizeLocationQueryResponse(null, {}), /empty response/)
+  assert.throws(() => normalizeLocationQueryResponse({}, {}), /geojson.features/)
+  assert.throws(() => normalizeLocationQueryResponse({ geojson: { type: 'FeatureCollection' } }, {}), /geojson.features/)
+})
+
+check('normalizeLocationQueryResponse handles valid empty FeatureCollection', () => {
+  const emptyResponse = {
+    target_layer: 'Temple',
+    total_count: 0,
+    returned_count: 0,
+    geojson: { type: 'FeatureCollection', features: [] },
+  }
+  const normalized = normalizeLocationQueryResponse(emptyResponse, { spatial: { reference: { name: 'Hospital' } } })
+  assert.equal(normalized.targetLayer, 'Temple')
+  assert.equal(normalized.totalCount, 0)
+  assert.equal(normalized.returnedCount, 0)
+  assert.equal(normalized.features.length, 0)
 })
 
 console.log(`\n${passed} checks passed`)

@@ -13,6 +13,8 @@ import {
 import { DEMO_QUERY, validateQuery, buildFieldCatalog, ROAD_LAYER_NAMES } from './spatialAnalysisModel'
 import { getDepartmentConfig, DEPARTMENT_CONFIGS } from '../departmentsupport/departmentConfigs'
 import { entityRowsFromFacilities } from '../departmentsupport/departmentModel'
+import { distanceMeters } from '../../utils/geo'
+import { nearestReference } from '../../gis/engine/SpatialAnalysisEngine'
 import SimpleQueryBuilder from './builder/SimpleQueryBuilder'
 import QueryBuilder from './builder/QueryBuilder'
 import ResultsPanel from './ResultsPanel'
@@ -42,6 +44,7 @@ export default function SpatialAnalysis() {
   const [dataError, setDataError] = useState(null)
   const [dataLoading, setDataLoading] = useState(true)
   const [result, setResult] = useState(null)
+  const [executedQuery, setExecutedQuery] = useState(null)
   const [executing, setExecuting] = useState(false)
   const [runError, setRunError] = useState(null)
   const [saveNotice, setSaveNotice] = useState('')
@@ -138,6 +141,7 @@ export default function SpatialAnalysis() {
       const entry = facilityCategories.find((c) => c.id === `dept:${departmentId}:${first.id}`)
       if (entry) setQuery((current) => ({ ...current, targetLayer: { type: 'facility-category', id: entry.id, name: entry.name, geometryType: 'Point' }, spatial: { condition: 'within_radius', distanceKm: 10, reference: { type: 'point', point: [85.4434, 25.1372] } }, filters: [] }))
     }
+    setExecutedQuery(null)
   }, [searchParams, gisLayers, facilityCategories])
 
   const layerOptions = useMemo(() => ({ gisLayers, facilityCategories }), [gisLayers, facilityCategories])
@@ -155,22 +159,20 @@ export default function SpatialAnalysis() {
   }, [facilityCategories, gisLayers])
 
   const resolveReference = useCallback(async (spatial) => {
-    if (!spatial?.reference) return { rows: [], point: null }
+    if (!spatial?.reference) return { rows: [], point: null, resolvedName: null, resolvedType: null }
     const reference = spatial.reference
-    if (reference.type === 'point') return { rows: [], point: Array.isArray(reference.point) ? reference.point : null }
+    if (reference.type === 'point') return { rows: [], point: Array.isArray(reference.point) ? reference.point : null, resolvedName: 'Picked point', resolvedType: 'point' }
     if (reference.type === 'facility-category') {
-      const categories = reference.id === 'health'
-        ? facilityCategories.filter((c) => c.id === 'health')
-        : facilityCategories.filter((c) => c.id === reference.id)
+      const categories = facilityCategories.filter((c) => c.id === reference.id)
       const rows = categories.flatMap((category) => toFeatureRows({ ...category, source: 'facility-category' }))
-      const healthCategory = facilityCategories.find((c) => c.id === 'health')
-      return { rows, point: rows[0]?.position || null, resolvedName: healthCategory ? healthCategory.name : null }
+      const matchedCategory = facilityCategories.find((c) => c.id === reference.id)
+      return { rows, point: rows[0]?.position || null, resolvedName: matchedCategory?.name || reference.name || reference.id, resolvedType: 'facility-category' }
     }
     const layer = gisLayers.find((l) => l.id === reference.id)
-    if (!layer) return { rows: [], point: null }
+    if (!layer) return { rows: [], point: null, resolvedName: reference.name || reference.id, resolvedType: 'gis-layer' }
     const data = await loadLayerFeatures(layer.id)
     const rows = toFeatureRows({ ...data, name: layer.id })
-    return { rows, point: rows[0]?.position || null }
+    return { rows, point: rows[0]?.position || null, resolvedName: layer.name, resolvedType: 'gis-layer' }
   }, [facilityCategories, gisLayers])
 
   const targetRows = useMemo(() => result?.targetRows || [], [result])
@@ -191,8 +193,54 @@ export default function SpatialAnalysis() {
         referenceRows: reference.rows,
         roads,
         facilitiesMap,
+        referenceLayerName: reference.resolvedName,
+        referenceLayerType: reference.resolvedType,
       })
-      setResult({ ...resultData, targetRows: targetLayerRows, referenceRows: reference.rows, referencePoint: reference.point })
+      
+      // If backend mode, recompute nearest references using actual reference features
+      // This fixes backend returning wrong nearestFacility (e.g., Hospital instead of Temple)
+      let finalResults = resultData.results
+      if (resultData.mode === 'backend' && reference.rows.length > 0) {
+        const referenceRows = reference.rows.filter(r => Array.isArray(r.position))
+        if (referenceRows.length > 0) {
+          finalResults = resultData.results.map(row => {
+            const nearest = nearestReference({ position: row.position }, referenceRows)
+            const nearestRef = nearest?.reference || null
+            return {
+              ...row,
+              nearestReference: nearestRef?.name || null,
+              nearestReferenceId: nearestRef?.id || null,
+              nearestReferencePosition: nearestRef?.position || null,
+              nearestReferenceGeometry: nearestRef?.geometry || null,
+              distanceKm: nearest ? Number((nearest.distanceM / 1000).toFixed(2)) : row.distanceKm,
+            }
+          })
+          if (import.meta.env.DEV) {
+            console.debug('[SPATIAL ANALYSIS PIPELINE]', {
+              stage: 'recomputed nearest references',
+              originalCount: resultData.results.filter(r => r.nearestFacility === 'Nalanda District Hospital').length,
+              recomputedCount: finalResults.filter(r => r.nearestReference && r.nearestReference !== 'Nalanda District Hospital').length,
+            })
+          }
+        }
+      }
+      
+      const fullResult = { ...resultData, results: finalResults, targetRows: targetLayerRows, referenceRows: reference.rows, referencePoint: reference.point, referenceLayerName: reference.resolvedName, referenceLayerType: reference.resolvedType }
+      if (import.meta.env.DEV) {
+        console.debug('[SPATIAL ANALYSIS PIPELINE]', {
+          stage: 'executeSpatialAnalysis returned',
+          targetLayer: queryToRun.targetLayer?.name,
+          referenceLayer: reference.resolvedName,
+          distanceKm: queryToRun.spatial?.distanceKm,
+          condition: queryToRun.spatial?.condition,
+          targetRowsCount: targetLayerRows.length,
+          referenceRowsCount: reference.rows.length,
+          resultsCount: finalResults.length,
+          summaryTotalFound: resultData.summary?.totalFound,
+        })
+      }
+      setResult(fullResult)
+      setExecutedQuery(queryToRun)
     } catch (error) {
       setRunError(error)
     } finally {
@@ -207,6 +255,7 @@ export default function SpatialAnalysis() {
         ? { ...current, filters }
         : { ...current, filters: [...filters, { id: `f-relax-${Date.now()}`, field: 'accessibility', operator: 'eq', value: accessibilityValue, logic: 'and' }] }
       setTimeout(() => runQuery(next), 0)
+      setExecutedQuery(null)
       return next
     })
   }, [runQuery])
@@ -214,13 +263,14 @@ export default function SpatialAnalysis() {
   const handleExport = useCallback((format) => {
     if (!result?.results?.length) return
     const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
-    const target = query.targetLayer?.id || 'results'
+    const execQuery = executedQuery || query
+    const target = execQuery.targetLayer?.id || 'results'
     if (format === 'csv') {
-      downloadBlob(resultsToCsv(result, query.outputFields), `spatial-analysis-${target}-${stamp}.csv`, 'text/csv')
+      downloadBlob(resultsToCsv(result, execQuery.outputFields), `spatial-analysis-${target}-${stamp}.csv`, 'text/csv')
     } else {
       downloadBlob(resultsToGeoJson(result), `spatial-analysis-${target}-${stamp}.geojson`, 'application/geo+json')
     }
-  }, [result, query])
+  }, [result, executedQuery, query])
 
   const handleSave = useCallback((form) => {
     if (savedQueriesCap !== 'supported') {
@@ -241,7 +291,7 @@ export default function SpatialAnalysis() {
             <Button size="md" variant="primary" onClick={() => runQuery(query)} loading={executing} disabled={validation.errors.length > 0}>
               {executing ? 'Finding...' : 'Find Results'}
             </Button>
-            <Button size="md" variant="outline" onClick={() => { setQuery(JSON.parse(JSON.stringify(DEMO_QUERY))); setResult(null); setRunError(null); setMode('simple') }}>
+            <Button size="md" variant="outline" onClick={() => { setQuery(JSON.parse(JSON.stringify(DEMO_QUERY))); setResult(null); setExecutedQuery(null); setRunError(null); setMode('simple') }}>
               <RefreshCw size={14} /> Reset
             </Button>
           </div>
@@ -331,7 +381,7 @@ export default function SpatialAnalysis() {
             {result && (
               <ResultsPanel
                 result={result}
-                query={query}
+                query={executedQuery || query}
                 loading={executing}
                 error={runError}
                 onRelaxFilter={handleRelaxFilter}

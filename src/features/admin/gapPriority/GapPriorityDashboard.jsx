@@ -16,7 +16,7 @@ import { useDistricts } from '../../../hooks/useMasterData'
 
 const SECTIONS = [
   { id: 'overview', label: 'Priority overview', icon: LayoutDashboard },
-  { id: 'map', label: 'Priority map', icon: MapPin },
+  // { id: 'map', label: 'Priority map', icon: MapPin },
   { id: 'rankings', label: 'Ranked locations', icon: BarChart2 },
 ]
 

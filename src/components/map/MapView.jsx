@@ -46,7 +46,7 @@ const MapView = forwardRef(function MapView({
   zoom = 10.4,
   facilities = [],
   autoFit = true,
-  colorBy = 'department', // 'department' | 'gap'
+  colorBy = 'department', // 'department' | 'gap' | 'spatial-analysis'
   onFacilityClick,
   onMapClick,          // propagated to parent for tool handling
   selectedId,
@@ -74,6 +74,8 @@ const MapView = forwardRef(function MapView({
   routeOriginKey = null, // route key of the current origin (popup "Start point" chip)
   // Reference point picking
   pickPoint = null,      // { lat, lng } | null — the picked reference point
+  // Spatial Analysis specific
+  spatialAnalysisResults = null, // { targetFacilities, referenceFacilities, fitToTargetOnly }
 }, ref) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)              // Leaflet map instance
@@ -265,7 +267,14 @@ const MapView = forwardRef(function MapView({
     const map = mapRef.current
     if (!map || !ready) return
     const valid = facilities.filter((item) => Array.isArray(item.position) && item.position.length >= 2)
-    if (import.meta.env.DEV) console.info('[GIS diagnostics] Leaflet facility markers', { inputCount: facilities.length, renderedMarkerCount: valid.length })
+    if (import.meta.env.DEV) {
+      console.debug('[SPATIAL ANALYSIS PIPELINE]', {
+        stage: 'MapView rendering facilities',
+        inputCount: facilities.length,
+        renderedMarkerCount: valid.length,
+        facilities: valid.map(f => ({ id: f.id, name: f.name, position: f.position, isTarget: f.isTarget, isReference: f.isReference, gapScore: f.gapScore })),
+      })
+    }
 
     const markers = createFacilityMarkers(valid, {
       colorBy,
@@ -310,14 +319,39 @@ const MapView = forwardRef(function MapView({
   }, [searchResults, ready, onSearchResultOpen, onSearchResultRoute])
 
   // Auto-fit to the visible facilities (current behaviour, kept identical)
+  // For Spatial Analysis, fit to target facilities (analysis results) when provided
   useEffect(() => {
     const map = mapRef.current
-    const valid = facilities.filter((item) => Array.isArray(item.position) && item.position.length >= 2)
-    if (!autoFit || !map || !ready || !valid.length) return
-    const bounds = L.latLngBounds(valid.map((item) => toLatLng(item.position)))
+    if (!map || !ready) return
+
+    let featuresToFit = []
+
+    if (spatialAnalysisResults?.targetFacilities?.length) {
+      // Spatial Analysis mode: fit to target facilities (analysis results)
+      const targetOnly = spatialAnalysisResults.fitToTargetOnly !== false
+      featuresToFit = targetOnly
+        ? spatialAnalysisResults.targetFacilities
+        : [...spatialAnalysisResults.targetFacilities, ...(spatialAnalysisResults.referenceFacilities || [])]
+      featuresToFit = featuresToFit.filter((item) => Array.isArray(item.position) && item.position.length >= 2)
+      if (import.meta.env.DEV) {
+        console.debug('[SPATIAL ANALYSIS PIPELINE]', {
+          stage: 'MapView autoFit',
+          mode: 'spatial-analysis',
+          fitToTargetOnly: spatialAnalysisResults.fitToTargetOnly !== false,
+          featuresToFitCount: featuresToFit.length,
+        })
+      }
+    } else if (autoFit) {
+      // Standard mode: fit to all facilities
+      featuresToFit = facilities.filter((item) => Array.isArray(item.position) && item.position.length >= 2)
+    }
+
+    if (!featuresToFit.length) return
+
+    const bounds = L.latLngBounds(featuresToFit.map((item) => toLatLng(item.position)))
     map.fitBounds(bounds, { padding: [48, 48], maxZoom: 14 })
-    if (import.meta.env.DEV) console.info('[GIS diagnostics] Leaflet map bounds', { visibleCount: valid.length })
-  }, [facilities, ready, autoFit])
+    if (import.meta.env.DEV) console.info('[GIS diagnostics] Leaflet map bounds', { visibleCount: featuresToFit.length })
+  }, [spatialAnalysisResults, facilities, ready, autoFit])
 
   // Road route overlay — the ONLY layer this effect manages.  Facility
   // markers, search-result pins, catalog layers and boundaries are untouched.

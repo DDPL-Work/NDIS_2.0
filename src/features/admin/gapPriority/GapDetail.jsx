@@ -147,7 +147,7 @@ export default function GapDetail({ gapData, onExplain }) {
       </div>
 
       {/* Component Breakdown — all from backend, never fabricated */}
-      {componentEntries.length > 0 ? (
+      {/* {componentEntries.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {componentEntries.map(([key, value]) => (
             <DimensionCard
@@ -164,10 +164,10 @@ export default function GapDetail({ gapData, onExplain }) {
           <p className="text-[13px] text-ink-500">No component breakdown available</p>
           <p className="text-[11px] text-ink-400 mt-1">The backend did not return dimension-level gap data.</p>
         </div>
-      )}
+      )} */}
 
       {/* Reason codes from backend */}
-      {gapData.reasonCodes && gapData.reasonCodes.length > 0 && (
+      {/* {gapData.reasonCodes && gapData.reasonCodes.length > 0 && (
         <div className="rounded-xl border border-ink-100 bg-white p-4">
           <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-500 mb-2">
             <Info size={13} /> Reason codes (from backend)
@@ -178,7 +178,7 @@ export default function GapDetail({ gapData, onExplain }) {
             ))}
           </div>
         </div>
-      )}
+      )} */}
     </div>
   )
 }

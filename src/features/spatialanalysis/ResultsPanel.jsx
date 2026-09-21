@@ -1,12 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import clsx from 'clsx'
-import { Map as MapIcon, Table2, LayoutDashboard, SearchX, ArrowUpDown, ArrowUp, ArrowDown, ExternalLink, AlertTriangle, Info } from 'lucide-react'
+import { Map as MapIcon, Table2, LayoutDashboard, SearchX, ArrowUpDown, ArrowUp, ArrowDown, ExternalLink, AlertTriangle, Info, MapPin, Building2, Shield, Circle } from 'lucide-react'
 import MapView from '../../components/map/MapView'
 import Modal from '../../components/ui/Modal'
 import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
 import EmptyState from '../../components/ui/EmptyState'
-import { GapScoreLegend } from '../../components/map/MapLegend'
+import { GapScoreLegend, SpatialAnalysisLegend } from '../../components/map/MapLegend'
 import { bufferPolygon } from '../../gis/engine/SpatialAnalysisEngine'
 import { resolveField } from './spatialAnalysisModel'
 
@@ -16,11 +16,23 @@ const TABS = [
   { key: 'summary', label: 'Summary', icon: LayoutDashboard },
 ]
 
-const COLUMNS = [
+function getReferenceColumnLabel(referenceLayerName, referenceLayerType) {
+  if (!referenceLayerName) return 'Nearest Reference'
+  const name = referenceLayerName.toLowerCase()
+  if (name.includes('police')) return 'Nearest Police Station'
+  if (name.includes('hospital') || name.includes('health') || name.includes('dispensary')) return 'Nearest Hospital'
+  if (name.includes('school') || name.includes('education')) return 'Nearest School'
+  if (name.includes('bank')) return 'Nearest Bank'
+  if (name.includes('facility')) return 'Nearest Facility'
+  if (referenceLayerType === 'point') return 'Distance to Point'
+  return `Nearest ${referenceLayerName}`
+}
+
+const COLUMNS = (referenceLayerName, referenceLayerType) => [
   { key: 'rank', label: '#', align: 'right' },
   { key: 'name', label: 'Name' },
   { key: 'population', label: 'Population', align: 'right' },
-  { key: 'nearestFacility', label: 'Nearest facility' },
+  { key: 'nearestReference', label: getReferenceColumnLabel(referenceLayerName, referenceLayerType) },
   { key: 'distanceKm', label: 'Distance (km)', align: 'right' },
   { key: 'accessibility', label: 'Accessibility' },
   { key: 'gapScore', label: 'Gap score', align: 'right' },
@@ -48,21 +60,146 @@ export default function ResultsPanel({
   const [tab, setTab] = useState('map')
   const [sort, setSort] = useState({ field: 'priorityScore', direction: 'desc' })
   const [detailRow, setDetailRow] = useState(null)
+  const [selectedResultId, setSelectedResultId] = useState(null)
+  const mapRef = useRef(null)
 
   const rows = result?.results || []
 
-  const facilities = useMemo(() => rows
+  // Development diagnostics to trace data flow
+  if (import.meta.env.DEV) {
+    useEffect(() => {
+      console.debug('[SPATIAL ANALYSIS PIPELINE]', {
+        stage: 'ResultsPanel received',
+        resultsCount: rows.length,
+        referenceRowsCount: referenceRows.length,
+        targetGeometryRowsCount: targetGeometryRows.length,
+        firstResult: rows[0] ? {
+          id: rows[0].id,
+          name: rows[0].name,
+          position: rows[0].position,
+          rank: rows[0].rank,
+          nearestReference: rows[0].nearestReference,
+          distanceKm: rows[0].distanceKm,
+          priorityScore: rows[0].priorityScore,
+        } : null,
+        allIds: rows.map(r => r.id),
+      })
+    }, [rows, referenceRows.length, targetGeometryRows.length])
+  }
+
+  // Sync selectedResultId with detailRow
+  useEffect(() => {
+    if (detailRow) {
+      setSelectedResultId(String(detailRow.id))
+    } else {
+      setSelectedResultId(null)
+    }
+  }, [detailRow])
+
+  // Handle table row click
+  const handleTableRowClick = (row) => {
+    setDetailRow(row)
+    setSelectedResultId(String(row.id))
+    // Fly to the feature on the map
+    if (mapRef.current && row.position) {
+      mapRef.current.flyTo([row.position[1], row.position[0]], 15, { duration: 0.8 })
+    }
+  }
+
+  // Handle map marker click
+  const handleMapFacilityClick = (facility) => {
+    const matchedRow = rows.find((r) => String(r.id) === String(facility.id))
+    if (matchedRow) {
+      setDetailRow(matchedRow)
+      setSelectedResultId(String(facility.id))
+    }
+  }
+
+  // Target results (the matched features from the analysis)
+  const targetFacilities = useMemo(() => {
+    const facilities = rows
+      .map((row) => ({
+        id: String(row.id),
+        name: row.name,
+        position: row.position,
+        gapScore: row.gapScore ?? 0,
+        population: row.population,
+        accessibility: row.accessibility,
+        distanceKm: row.distanceKm,
+        priorityScore: row.priorityScore,
+        isTarget: true,
+        nearestReference: row.nearestReference,
+      }))
+      .filter((f) => Array.isArray(f.position))
+
+    if (import.meta.env.DEV) {
+      console.debug('[SPATIAL ANALYSIS PIPELINE]', {
+        stage: 'ResultsPanel targetFacilities created',
+        totalRows: rows.length,
+        facilitiesWithPosition: facilities.length,
+        facilitiesWithoutPosition: rows.length - facilities.length,
+        missingPositionRows: rows.filter(r => !Array.isArray(r.position)).map(r => r.name),
+      })
+    }
+
+    return facilities
+  }, [rows])
+
+  // Reference features (the comparison layer features)
+  const referenceFacilities = useMemo(() => referenceRows
+    .filter((row) => Array.isArray(row.position))
     .map((row) => ({
-      id: String(row.id),
+      id: `ref-${row.id}`,
       name: row.name,
       position: row.position,
-      gapScore: row.gapScore ?? 0,
-      population: row.population,
-      accessibility: row.accessibility,
-      distanceKm: row.distanceKm,
-      priorityScore: row.priorityScore,
-    }))
-    .filter((f) => Array.isArray(f.position)), [rows])
+      gapScore: 0,
+      population: null,
+      accessibility: null,
+      distanceKm: null,
+      priorityScore: null,
+      isTarget: false,
+      isReference: true,
+    })), [referenceRows])
+
+  // Combined facilities for map rendering
+  const facilities = useMemo(() => [...targetFacilities, ...referenceFacilities], [targetFacilities, referenceFacilities])
+
+  // Build a lookup map for reference features by name for connection lines
+  const referenceFeatureMap = useMemo(() => {
+    const map = new Map()
+    referenceRows.forEach((row) => {
+      if (row.name && Array.isArray(row.position)) {
+        map.set(row.name, row.position)
+      }
+    })
+    return map
+  }, [referenceRows])
+
+  // Create connection lines from target to nearest reference
+  const connectionLines = useMemo(() => {
+    const lines = []
+    rows.forEach((row) => {
+      if (row.nearestReference && row.position && referenceFeatureMap.has(row.nearestReference)) {
+        const refPos = referenceFeatureMap.get(row.nearestReference)
+        lines.push({
+          type: 'Feature',
+          properties: {
+            targetName: row.name,
+            referenceName: row.nearestReference,
+            distanceKm: row.distanceKm,
+          },
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [row.position[0], row.position[1]],
+              [refPos[0], refPos[1]],
+            ],
+          },
+        })
+      }
+    })
+    return lines
+  }, [rows, referenceFeatureMap])
 
   const vectorLayers = useMemo(() => {
     const layers = []
@@ -83,13 +220,34 @@ export default function ResultsPanel({
       layers.push({
         layerName: 'Reference features',
         category: 'spatial-analysis',
+        style: (feature) => ({
+          color: '#ffffff',
+          weight: 2,
+          opacity: 1,
+          fillColor: '#a855f7',
+          fillOpacity: 0.9,
+          radius: 8,
+        }),
         features: referenceRows
           .filter((row) => Array.isArray(row.position))
           .map((row) => ({ type: 'Feature', properties: { name: row.name }, geometry: { type: 'Point', coordinates: row.position } })),
       })
     }
+    if (connectionLines.length) {
+      layers.push({
+        layerName: 'Nearest facility connections',
+        category: 'spatial-analysis',
+        style: () => ({
+          color: '#c0392b',
+          weight: 1.5,
+          opacity: 0.6,
+          dashArray: '4, 4',
+        }),
+        features: connectionLines,
+      })
+    }
     return layers
-  }, [referencePoint, query?.spatial?.distanceKm, referenceRows, targetGeometryRows])
+  }, [referencePoint, query?.spatial?.distanceKm, referenceRows, targetGeometryRows, connectionLines])
 
   const sortedRows = useMemo(() => {
     const direction = sort.direction === 'asc' ? 1 : -1
@@ -103,6 +261,25 @@ export default function ResultsPanel({
       return String(av).localeCompare(String(bv)) * direction
     })
   }, [rows, sort])
+
+  const referenceLayerName = result?.summary?.referenceLayer || result?.provenance?.referenceLayer || query?.spatial?.reference?.name || ''
+  const referenceLayerType = result?.summary?.referenceLayerType || result?.provenance?.referenceLayerType || query?.spatial?.reference?.type || ''
+  const targetLayerName = result?.summary?.targetLayer || result?.provenance?.targetLayer || query?.targetLayer?.name || ''
+  const distanceKm = query?.spatial?.distanceKm
+  const condition = query?.spatial?.condition
+  const columns = useMemo(() => COLUMNS(referenceLayerName, referenceLayerType), [referenceLayerName, referenceLayerType])
+
+  // Compute priority stats for legend
+  const priorityStats = useMemo(() => {
+    const stats = { High: 0, Medium: 0, Low: 0 }
+    rows.forEach((row) => {
+      const score = row.priorityScore ?? 0
+      if (score >= 70) stats.High++
+      else if (score >= 40) stats.Medium++
+      else stats.Low++
+    })
+    return stats
+  }, [rows])
 
   const toggleSort = (field) => {
     setSort((current) => (current.field === field
@@ -257,19 +434,33 @@ export default function ResultsPanel({
         <div className="card overflow-hidden">
           <div className="relative h-[460px]">
             <MapView
+              ref={mapRef}
               facilities={facilities}
-              colorBy="gap"
-              selectedId={detailRow ? String(detailRow.id) : null}
+              colorBy="spatial-analysis"
+              selectedId={selectedResultId}
               vectorLayers={vectorLayers}
-              onFacilityClick={(facility) => setDetailRow(rows.find((r) => String(r.id) === String(facility.id)) || null)}
+              onFacilityClick={handleMapFacilityClick}
+              spatialAnalysisResults={{
+                targetFacilities,
+                referenceFacilities,
+                fitToTargetOnly: true,
+              }}
             />
-            <div className="absolute right-2 top-2 z-[500]">
+            <div className="absolute right-2 top-2 z-[500] flex flex-col gap-2">
+              <SpatialAnalysisLegend
+                targetLayerLabel={targetLayerName}
+                referenceLayerLabel={referenceLayerName}
+                distanceKm={distanceKm}
+                condition={condition}
+                referenceLayerType={referenceLayerType}
+                priorityStats={priorityStats}
+              />
               <GapScoreLegend />
             </div>
           </div>
           <div className="flex items-center justify-between px-4 py-2 border-t border-ink-100">
             <p className="text-[12px] text-ink-500">
-              Markers coloured by the nearest facility gap score; polygons are the matched target features; the circle marks the {query?.spatial?.distanceKm || '?'} km reference radius.
+              Blue markers = {targetLayerName || 'Target'}; Purple markers = {referenceLayerName || 'Reference'}; Colored by gap score (green=well served, red=underserved). Buffer shows {distanceKm || '?'} km radius.
             </p>
             <button onClick={() => setDetailRow(rows[0] || null)} className="text-[12px] font-medium text-ink-700 hover:text-ink-900">Open top result →</button>
           </div>
@@ -283,7 +474,7 @@ export default function ResultsPanel({
             <table className="w-full text-left text-[13px]">
               <thead>
                 <tr className="border-b border-ink-100 text-[11.5px] uppercase tracking-wide text-ink-500">
-                  {COLUMNS.map((col) => (
+                  {columns.map((col) => (
                     <th key={col.key} className={clsx('px-3 py-2.5 font-semibold cursor-pointer select-none hover:text-ink-800', col.align === 'right' && 'text-right')} onClick={() => toggleSort(col.key)}>
                       <span className="inline-flex items-center gap-1">
                         {col.label}
@@ -296,12 +487,12 @@ export default function ResultsPanel({
                 </tr>
               </thead>
               <tbody>
-                {sortedRows.map((row) => (
-                  <tr key={String(row.id)} onClick={() => setDetailRow(row)} className="border-b border-ink-50 hover:bg-ink-50/60 cursor-pointer">
+                {sortedRows.map((row, index) => (
+                  <tr key={`${String(row.id)}-${index}`} onClick={() => handleTableRowClick(row)} className={clsx('border-b border-ink-50 hover:bg-ink-50/60 cursor-pointer', selectedResultId === String(row.id) && 'bg-blue-50')}>
                     <td className="px-3 py-2 text-right text-ink-400">{row.rank}</td>
                     <td className="px-3 py-2 font-medium text-ink-900">{row.name}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{Number(resolveField(row, 'population'))?.toLocaleString('en-IN') ?? '—'}</td>
-                    <td className="px-3 py-2 text-ink-600">{row.nearestFacility || '—'}</td>
+                    <td className="px-3 py-2 text-ink-600">{row.nearestReference || '—'}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{row.distanceKm != null ? `${row.distanceKm} km` : '—'}</td>
                     <td className="px-3 py-2"><AccessibilityBadge value={row.accessibility} /></td>
                     <td className="px-3 py-2 text-right tabular-nums">{row.gapScore != null ? row.gapScore.toFixed(2) : '—'}</td>
@@ -350,7 +541,7 @@ export default function ResultsPanel({
             </dl>
           </div>
 
-          <div className="card p-4">
+          {/* <div className="card p-4">
             <h4 className="text-[13.5px] font-semibold text-ink-900 mb-2">Derived fields & provenance</h4>
             <ul className="space-y-1 text-[12.5px] text-ink-600 list-disc ml-5">
               {(result.provenance?.computedFields || []).map((field, i) => <li key={i}>{field}</li>)}
@@ -359,7 +550,7 @@ export default function ResultsPanel({
               <li>Backend query endpoint: {result.backendQueryEndpoint || result.provenance?.backendQueryEndpoint || '—'} (client engine executes the typed contract when not deployed)</li>
               <li>Generated: {result.provenance?.generatedAt || '—'}</li>
             </ul>
-          </div>
+          </div> */}
         </div>
       )}
 
@@ -375,7 +566,7 @@ export default function ResultsPanel({
             </div>
             <dl className="grid grid-cols-1 gap-x-6 gap-y-1.5 text-[13px] sm:grid-cols-2">
               <div className="flex justify-between gap-4"><dt className="text-ink-500">Population</dt><dd className="text-ink-800 font-medium">{Number(resolveField(detailRow, 'population'))?.toLocaleString('en-IN') ?? '—'}</dd></div>
-              <div className="flex justify-between gap-4"><dt className="text-ink-500">Nearest facility</dt><dd className="text-ink-800 font-medium">{detailRow.nearestFacility || '—'}</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-ink-500">{getReferenceColumnLabel(detailRow.referenceLayerName, detailRow.referenceLayerType)}</dt><dd className="text-ink-800 font-medium">{detailRow.nearestReference || '—'}</dd></div>
               <div className="flex justify-between gap-4"><dt className="text-ink-500">Distance to reference</dt><dd className="text-ink-800 font-medium">{detailRow.distanceKm != null ? `${detailRow.distanceKm} km` : '—'}</dd></div>
               <div className="flex justify-between gap-4"><dt className="text-ink-500">Road distance</dt><dd className="text-ink-800 font-medium">{detailRow.roadDistanceKm != null ? `${detailRow.roadDistanceKm} km` : '—'}</dd></div>
               <div className="flex justify-between gap-4 sm:col-span-2"><dt className="text-ink-500">Accessibility basis</dt><dd className="text-ink-800 font-medium text-right">{detailRow.accessibilityBasis || '—'}</dd></div>
