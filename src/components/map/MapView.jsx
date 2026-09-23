@@ -3,13 +3,13 @@
 // same toolbar tools (radius, measure, cluster), basemap switching, locate-me
 // pulse marker and PNG snapshot export.  Facilities are rendered as
 // L.marker([latitude, longitude]) from backend [longitude, latitude].
-import { useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react'
+import { useEffect, useRef, useState, useImperativeHandle, forwardRef, useCallback } from 'react'
 import L from 'leaflet'
 import { area as geoJsonArea } from '@turf/turf'
 import 'leaflet/dist/leaflet.css'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
-import { MAP_TOOLS, attributionFor } from '../../hooks/useMapTools'
+import { MAP_TOOLS, MEASURE_STATES, attributionFor } from '../../hooks/useMapTools'
 import { createFacilityMarkers, createCatalogLayer, createSearchResultMarkers } from '../../services/LeafletLayerService'
 import { ensureLeafletPlugins } from '../../services/leafletPlugins'
 import { distanceMeters } from '../../utils/geo'
@@ -18,6 +18,55 @@ const DEFAULT_TILES = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
 const toLatLng = (position) => [position[1], position[0]]
 
 const MEASURE_COLOR = '#8a4fc0'
+const VERTEX_RADIUS = 6
+const EDGE_HIT_TOLERANCE = 12 // pixels for edge interaction
+
+// Distance from point to line segment in map pixels
+function distanceToSegmentPixels(point, segStart, segEnd, map) {
+  const p = map.latLngToContainerPoint(L.latLng(point[1], point[0]))
+  const p1 = map.latLngToContainerPoint(L.latLng(segStart[1], segStart[0]))
+  const p2 = map.latLngToContainerPoint(L.latLng(segEnd[1], segEnd[0]))
+  const dx = p2.x - p1.x
+  const dy = p2.y - p1.y
+  const len2 = dx * dx + dy * dy
+  if (len2 === 0) return Math.hypot(p.x - p1.x, p.y - p1.y)
+  let t = ((p.x - p1.x) * dx + (p.y - p1.y) * dy) / len2
+  t = Math.max(0, Math.min(1, t))
+  const projX = p1.x + t * dx
+  const projY = p1.y + t * dy
+  return Math.hypot(p.x - projX, p.y - projY)
+}
+
+// Find closest segment index for vertex insertion
+function findClosestSegmentForInsert(points, containerPoint, map, maxDistancePx = EDGE_HIT_TOLERANCE) {
+  if (!points || points.length < 2) return null
+  let closestIndex = null
+  let closestDist = maxDistancePx
+  for (let i = 0; i < points.length - 1; i++) {
+    const dist = distanceToSegmentPixels(containerPoint, points[i], points[i + 1], map)
+    if (dist < closestDist) {
+      closestDist = dist
+      closestIndex = i
+    }
+  }
+  return closestIndex
+}
+
+// Find closest vertex index for dragging
+function findClosestVertexForDrag(points, containerPoint, map, maxDistancePx = VERTEX_RADIUS + 4) {
+  if (!points || points.length === 0) return null
+  let closestIndex = null
+  let closestDist = maxDistancePx
+  for (let i = 0; i < points.length; i++) {
+    const vertexPoint = map.latLngToContainerPoint(L.latLng(points[i][1], points[i][0]))
+    const dist = Math.hypot(containerPoint.x - vertexPoint.x, containerPoint.y - vertexPoint.y)
+    if (dist < closestDist) {
+      closestDist = dist
+      closestIndex = i
+    }
+  }
+  return closestIndex
+}
 
 // Google-Maps-style distance pill label.
 function measureLabelHtml(text) {
@@ -65,6 +114,7 @@ const MapView = forwardRef(function MapView({
   measureDistKm = null,
   measureAreaSqm = null,
   measureMode = 'distance',
+  measureState = MEASURE_STATES.IDLE,
   clusterEnabled = false,
   basemapUrl,
   departmentColors = {},
@@ -72,6 +122,12 @@ const MapView = forwardRef(function MapView({
   route = null,          // { coordinates, origin, destination, mode } | null — exactly two endpoints
   onFacilityRouteTo,     // "Route to here" from a facility marker popup
   routeOriginKey = null, // route key of the current origin (popup "Start point" chip)
+  // Measurement editing callbacks
+  onDeleteVertex,
+  onStartDragVertex,
+  onDragVertex,
+  onEndDragVertex,
+  onEnterEditMode,
   // Reference point picking
   pickPoint = null,      // { lat, lng } | null — the picked reference point
   // Spatial Analysis specific
@@ -83,7 +139,15 @@ const MapView = forwardRef(function MapView({
   const facilitiesLayerRef = useRef(null)  // layerGroup | markerClusterGroup
   const selectedRingRef = useRef(null)
   const radiusRef = useRef(null)
-  const measureRef = useRef({ line: null, dots: null, label: null, hoverLine: null, hoverLabel: null })
+  const measureRef = useRef({ 
+    line: null, 
+    dots: null, 
+    label: null, 
+    hoverLine: null, 
+    hoverLabel: null,
+    vertexHandles: null,
+    edgeLayer: null
+  })
   const heatRef = useRef(null)
   const vectorLayerRef = useRef(null)
   const locMarkerRef = useRef(null)
@@ -241,15 +305,22 @@ const MapView = forwardRef(function MapView({
   // Leaflet vector layers can consume the map's synthetic click event, so use
   // the map container's capture phase and translate the screen point through
   // Leaflet. This remains within the Leaflet/React lifecycle.
+  // When measurement tool is active, stop propagation to prevent GIS feature interaction.
   useEffect(() => {
     const map = mapRef.current
     const container = map?.getContainer()
     if (!map || !container) return
+    const isMeasuring = activeTool === MAP_TOOLS.MEASURE || activeTool === MAP_TOOLS.MEASURE_AREA
     const handler = (event) => {
       if (activeTool === MAP_TOOLS.NONE) return
       if (event.target.closest?.('.leaflet-control, .leaflet-popup')) return
       const latlng = map.mouseEventToLatLng(event)
       onMapClick?.({ lng: latlng.lng, lat: latlng.lat })
+      // Prevent click from reaching GIS layers when measuring
+      if (isMeasuring) {
+        event.stopPropagation()
+        event.preventDefault()
+      }
     }
     container.addEventListener('click', handler, true)
     return () => container.removeEventListener('click', handler, true)
@@ -470,37 +541,159 @@ const MapView = forwardRef(function MapView({
     }
   }, [pickPoint, ready])
 
-  // Measure overlay — multi-point Google-Maps-style path: dashed polyline
+// Measure overlay — multi-point Google-Maps-style path: dashed polyline
   // through every vertex, a dot per vertex, and a distance pill above the last
   // vertex once the path is complete.
+  // Includes draggable vertex handles and invisible edge interaction layer for
+  // segment clicks (insert vertex) when in editing mode.
   useEffect(() => {
     const map = mapRef.current
     if (!map || !ready) return
-    const { line, dots, label } = measureRef.current
+    const { line, dots, label, vertexHandles, edgeLayer } = measureRef.current
     if (line) map.removeLayer(line)
     if (dots) map.removeLayer(dots)
     if (label) map.removeLayer(label)
+    if (vertexHandles) map.removeLayer(vertexHandles)
+    if (edgeLayer) map.removeLayer(edgeLayer)
     measureRef.current.line = null
     measureRef.current.dots = null
     measureRef.current.label = null
+    measureRef.current.vertexHandles = null
+    measureRef.current.edgeLayer = null
+
+    const isEditing = measureState === MEASURE_STATES.EDITING || measureState === MEASURE_STATES.COMPLETED
+    const isDrawing = activeTool === MAP_TOOLS.MEASURE || activeTool === MAP_TOOLS.MEASURE_AREA
 
     if (measurePoints.length >= 1) {
-      const dotsLayer = L.layerGroup(measurePoints.map((point) => L.circleMarker(toLatLng(point), {
-        radius: 5, color: MEASURE_COLOR, weight: 2, fillColor: MEASURE_COLOR, fillOpacity: 1,
-      })))
-      map.addLayer(dotsLayer)
-      measureRef.current.dots = dotsLayer
+      // Vertex handles (draggable when editing)
+      const vertexLayers = measurePoints.map((point, index) => {
+        const marker = L.circleMarker(toLatLng(point), {
+          radius: VERTEX_RADIUS,
+          color: MEASURE_COLOR,
+          weight: 2,
+          fillColor: isEditing ? MEASURE_COLOR : '#ffffff',
+          fillOpacity: 1,
+          className: 'measure-vertex-handle',
+        })
+        
+        if (isEditing) {
+          // Make vertex draggable
+          let isDragging = false
+          let dragStartPoint = null
+          
+          marker.on('mousedown', (e) => {
+            if (!isEditing) return
+            L.DomEvent.stopPropagation(e.originalEvent)
+            isDragging = true
+            dragStartPoint = { x: e.containerPoint.x, y: e.containerPoint.y }
+            map.dragging.disable()
+            onStartDragVertex?.(index)
+          })
+          
+          map.on('mousemove', (e) => {
+            if (!isDragging) return
+            const newLngLat = map.containerPointToLatLng(e.containerPoint)
+            onDragVertex?.(index, newLngLat)
+          })
+          
+          map.on('mouseup', () => {
+            if (!isDragging) return
+            isDragging = false
+            map.dragging.enable()
+            onEndDragVertex?.()
+          })
+          
+          // Visual feedback
+          marker.on('mouseover', () => {
+            if (isEditing) marker.setStyle({ radius: VERTEX_RADIUS + 2, weight: 3 })
+          })
+          marker.on('mouseout', () => {
+            if (isEditing) marker.setStyle({ radius: VERTEX_RADIUS, weight: 2 })
+          })
+          
+          // Right-click to delete vertex
+          marker.on('contextmenu', (e) => {
+            L.DomEvent.preventDefault(e.originalEvent)
+            L.DomEvent.stopPropagation(e.originalEvent)
+            if (isEditing && measurePoints.length > (measureMode === 'area' ? 3 : 2)) {
+              onDeleteVertex?.(index)
+            }
+          })
+        }
+        
+        return marker
+      })
+      
+      const vertexLayerGroup = L.layerGroup(vertexLayers)
+      map.addLayer(vertexLayerGroup)
+      measureRef.current.vertexHandles = vertexLayerGroup
     }
+
     if (measurePoints.length >= 2) {
+      // Main measurement line/polygon
       if (measureMode === 'area' && measurePoints.length >= 3) {
         measureRef.current.line = L.polygon(measurePoints.map(toLatLng), {
-          color: MEASURE_COLOR, weight: 2, fillColor: MEASURE_COLOR, fillOpacity: 0.12,
+          color: MEASURE_COLOR,
+          weight: 2,
+          fillColor: MEASURE_COLOR,
+          fillOpacity: 0.12,
+          className: 'measure-line',
         }).addTo(map)
       } else {
         measureRef.current.line = L.polyline(measurePoints.map(toLatLng), {
-          color: MEASURE_COLOR, weight: 2, dashArray: '4 2',
+          color: MEASURE_COLOR,
+          weight: 2,
+          dashArray: '4 2',
+          className: 'measure-line',
         }).addTo(map)
       }
+
+      // Invisible edge interaction layer for segment clicks (insert vertex)
+      if (isEditing) {
+        const edgeLines = []
+        for (let i = 0; i < measurePoints.length - 1; i++) {
+          const edgeLine = L.polyline([toLatLng(measurePoints[i]), toLatLng(measurePoints[i + 1])], {
+            color: 'transparent',
+            weight: EDGE_HIT_TOLERANCE * 2,
+            opacity: 0,
+            className: 'measure-edge-hit',
+            interactive: true,
+          })
+          
+          edgeLine.on('click', (e) => {
+            L.DomEvent.stopPropagation(e.originalEvent)
+            // Convert click to map coordinate and add vertex
+            const latlng = e.latlng
+            onMapClick?.({ lng: latlng.lng, lat: latlng.lat })
+          })
+          
+          edgeLines.push(edgeLine)
+        }
+        
+        if (measureMode === 'area' && measurePoints.length >= 3) {
+          // Add closing edge for polygon
+          const closingEdge = L.polyline([toLatLng(measurePoints[measurePoints.length - 1]), toLatLng(measurePoints[0])], {
+            color: 'transparent',
+            weight: EDGE_HIT_TOLERANCE * 2,
+            opacity: 0,
+            className: 'measure-edge-hit',
+            interactive: true,
+          })
+          
+          closingEdge.on('click', (e) => {
+            L.DomEvent.stopPropagation(e.originalEvent)
+            const latlng = e.latlng
+            onMapClick?.({ lng: latlng.lng, lat: latlng.lat })
+          })
+          
+          edgeLines.push(closingEdge)
+        }
+        
+        const edgeLayerGroup = L.layerGroup(edgeLines)
+        map.addLayer(edgeLayerGroup)
+        measureRef.current.edgeLayer = edgeLayerGroup
+      }
+
       const labelValue = measureMode === 'area' ? formatArea(measureAreaSqm) : formatMeasure(measureDistKm)
       if (labelValue) {
         const last = toLatLng(measurePoints[measurePoints.length - 1])
@@ -518,17 +711,19 @@ const MapView = forwardRef(function MapView({
         }).addTo(map)
       }
     }
-  }, [measurePoints, measureDistKm, measureAreaSqm, measureMode, ready])
+  }, [measurePoints, measureDistKm, measureAreaSqm, measureMode, measureState, activeTool, ready, onMapClick, onStartDragVertex, onDragVertex, onEndDragVertex, onDeleteVertex])
 
-  // Rubber-band preview: while the measure tool is active with at least one
+// Rubber-band preview: while the measure tool is active with at least one
   // vertex, a dashed segment follows the cursor from the last vertex and the
   // running total distance rides along in a pill — exactly like Google Maps.
   // Layers are mutated in place (no React state) so mousemove stays cheap.
+  // Only active during DRAWING state, not EDITING.
   useEffect(() => {
     const map = mapRef.current
-    const isMeasuring = activeTool === MAP_TOOLS.MEASURE || activeTool === MAP_TOOLS.MEASURE_AREA
+    const isDrawing = (activeTool === MAP_TOOLS.MEASURE || activeTool === MAP_TOOLS.MEASURE_AREA) 
+      && measureState === MEASURE_STATES.DRAWING
     const measurement = measureRef.current
-    if (!map || !ready || !isMeasuring) return
+    if (!map || !ready || !isDrawing) return
 
     const onMove = (event) => {
       const points = measurePoints
@@ -567,7 +762,7 @@ const MapView = forwardRef(function MapView({
       if (hoverLine) { map.removeLayer(hoverLine); measurement.hoverLine = null }
       if (hoverLabel) { map.removeLayer(hoverLabel); measurement.hoverLabel = null }
     }
-  }, [activeTool, measurePoints, measureDistKm, ready])
+  }, [activeTool, measurePoints, measureDistKm, measureState, ready])
 
   // Heat/hotspot overlay
   useEffect(() => {

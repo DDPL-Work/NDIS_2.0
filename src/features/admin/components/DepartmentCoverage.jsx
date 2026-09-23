@@ -6,7 +6,7 @@ import Icon from '../../../components/ui/Icon'
 import Button from '../../../components/ui/Button'
 import Skeleton from '../../../components/ui/Skeleton'
 import DepartmentTrend from '../../../components/charts/DepartmentTrend'
-import { formatNumber } from '../../../utils/format'
+import { formatNumber, formatScorePercent } from '../../../utils/format'
 
 // "Department coverage" — real facility counts, open grievances, facility gap
 // scores and complaint trend per sector (aggregated by useDepartmentCoverage).
@@ -71,7 +71,7 @@ function DepartmentCoverageRow({ row }) {
   return (
     <Link
       to={`/department/${row.id}`}
-      aria-label={`${row.name}, ${counts}${row.gapScore == null ? '' : `, average gap score ${row.gapScore.toFixed(2)}`}`}
+      aria-label={`${row.name}, ${counts}${row.gapScore == null ? '' : `, average gap score ${formatScorePercent(row.gapScore)}`}`}
       className="flex items-center gap-4 py-3 px-2 rounded-xl hover:bg-ink-50 transition-colors group"
     >
       <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-white" style={{ background: row.color }}>

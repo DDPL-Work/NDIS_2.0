@@ -59,7 +59,7 @@ export function buildAnalyticsModel({ departments = [], facilityGroups = [] }) {
       geoTaggedPct: facilities.length ? geoTaggedPct(facilities) : null,
       // Coverage = (1 − avg gap) — same definition used by the KPI, the
       // budget-adjacent cards and this matrix.
-      coveragePct: row.gapScore == null ? null : Math.round((1 - row.gapScore) * 100),
+      coveragePct: row.gapScore == null ? null : Math.round(100 - row.gapScore),
       // Budget utilization is a documented backend gap → null, not 0, so the
       // UI can show "not available" instead of pretending.
       budgetUsedPct: null,

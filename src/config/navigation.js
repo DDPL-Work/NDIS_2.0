@@ -30,6 +30,44 @@ export const ADMIN_NAV = [
   { to: '/admin/state-rollup', label: 'Cross-District KPIs', icon: 'Globe2', roles: [ROLES.STATE_ADMIN] },
 ]
 
+// The district executive workspace intentionally groups navigation by the
+// decisions a DM makes.  These entries reuse the established /admin route
+// tree; there is no second, parallel "DM" application.
+export const DM_NAV_SECTIONS = [
+  {
+    label: 'Executive',
+    items: [
+      { to: '/admin/collector-dashboard', label: 'Dashboard', icon: 'LayoutDashboard', end: true },
+      { to: '/admin/situation-matrix', label: 'Decision Map', icon: 'Map' },
+    ],
+  },
+  {
+    label: 'District Intelligence',
+    items: [
+      { to: '/admin/gap-priority', label: 'Priority & Gaps', icon: 'Target' },
+      { to: '/admin/complaints-oversight', label: 'Complaints', icon: 'AlertTriangle' },
+      { to: '/admin/revenue', label: 'Revenue & Property', icon: 'Landmark' },
+      { to: '/admin/spatial-analysis', label: 'Spatial analysis', icon: 'Filter' },
+    ],
+  },
+  {
+    label: 'Action & Workflow',
+    items: [
+      // { to: '/admin/approvals', label: 'Interventions / DPR', icon: 'ClipboardCheck' },
+      { to: '/admin/schedule-tasks', label: 'My Tasks & Schedule', icon: 'Calendar' },
+      // { to: '/admin/grievances', label: 'Escalations', icon: 'Siren' },
+    ],
+  },
+  {
+    label: 'Analytics',
+    items: [{ to: '/admin/reports', label: 'Reports & Analytics', icon: 'FileDown' }],
+  },
+  // {
+  //   label: 'System',
+  //   items: [{ to: '/admin/notifications', label: 'Notifications', icon: 'Bell' }],
+  // },
+]
+
 export const LINEDEPT_NAV = [
   { to: '/linedept', label: 'Department Dashboard', icon: 'LayoutDashboard', end: true },
   { to: '/linedept/complaints-queue', label: 'Assigned Complaints', icon: 'Inbox' },

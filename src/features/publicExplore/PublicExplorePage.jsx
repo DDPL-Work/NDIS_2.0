@@ -445,6 +445,9 @@ export default function PublicExplorePage() {
             radiusKm={tools.radiusKm}
             measurePoints={tools.measurePoints}
             measureDistKm={tools.measureDistKm}
+            measureAreaSqm={tools.measureAreaSqm}
+            measureMode={tools.measureMode}
+            measureState={tools.measureState}
             clusterEnabled={tools.clusterEnabled}
             basemapUrl={tools.currentBasemap.url}
             departmentColors={departmentColors}
@@ -453,6 +456,11 @@ export default function PublicExplorePage() {
             route={routing.route}
             routeOriginKey={routing.routeOriginKey}
             onFacilityRouteTo={handleFacilityRouteTo}
+            onDeleteVertex={tools.deleteVertex}
+            onStartDragVertex={tools.startDragVertex}
+            onDragVertex={tools.dragVertex}
+            onEndDragVertex={tools.endDragVertex}
+            onEnterEditMode={tools.enterEditMode}
           />
 
           <div className="absolute left-6 bottom-6 z-[120]">
@@ -551,10 +559,16 @@ export default function PublicExplorePage() {
               radiusCenter={tools.radiusCenter}
               onClearRadius={tools.clearRadius}
               measureDistKm={tools.measureDistKm}
+              measureAreaSqm={tools.measureAreaSqm}
               measurePoints={tools.measurePoints}
+              measureMode={tools.measureMode}
+              measureState={tools.measureState}
               onClearMeasure={tools.clearMeasure}
               onRemoveMeasurePoint={tools.removeLastMeasurePoint}
               onFinishMeasure={tools.finishMeasure}
+              onUndoMeasure={tools.undoMeasure}
+              onDeleteVertex={tools.deleteVertex}
+              onEnterEditMode={tools.enterEditMode}
               onFitDistrict={() => mapRef.current?.flyTo(district.center, district.zoom)}
               onMyLocation={handleLocateMe}
               onSnapshot={() => mapRef.current?.snapshot()}

@@ -1,6 +1,7 @@
 import { ArrowLeftRight, Bookmark, ExternalLink, Flag, MapPin, Navigation, Route, X } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import { formatCoord } from '../../utils/geo'
+import { formatScorePercent } from '../../utils/format'
 
 const STATUS_TONE = { active: 'positive', operational: 'positive', resolved: 'positive', closed: 'positive', inactive: 'neutral', scheduled: 'neutral', delayed: 'alert', missed: 'alert', assigned: 'info', urgent: 'alert' }
 
@@ -58,7 +59,7 @@ export default function GISFeaturePanel({ item, bookmarked = false, onClose, onB
         {item.condition && <div className="flex items-center justify-between gap-3"><Info label="Condition" /><span className="capitalize">{item.condition}</span></div>}
         {item.priority && <div className="flex items-center justify-between gap-3"><Info label="Priority" /><span className="capitalize">{item.priority}</span></div>}
         {item.lifecycleState && <div className="flex items-center justify-between gap-3"><Info label="Lifecycle" /><span className="capitalize">{item.lifecycleState}</span></div>}
-        {item.gapScore != null && <div className="flex items-center justify-between gap-3"><Info label="Gap score" /><span>{(Number(item.gapScore) * 100).toFixed(0)}%</span></div>}
+        {item.gapScore != null && <div className="flex items-center justify-between gap-3"><Info label="Gap score" /><span>{formatScorePercent(item.gapScore, 0)}</span></div>}
 
         <SectionTitle label="Reference" />
         <div className="flex items-center justify-between gap-3"><Info label="ID" /><span className="kbd-mono text-[10px] text-ink-500">{item.id}</span></div>

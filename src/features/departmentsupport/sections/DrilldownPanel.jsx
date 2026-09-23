@@ -11,6 +11,7 @@ import FacilityActionMenu from '../../admin/facilityActions/FacilityActionMenu'
 import ProposeInterventionModal from '../../admin/facilityActions/ProposeInterventionModal'
 import ScheduleInspectionModal from '../../admin/facilityActions/ScheduleInspectionModal'
 import EscalateIssueModal from '../../admin/facilityActions/EscalateIssueModal'
+import { formatScorePercent } from '@utils/format'
 
 const bandTone = (band) => (band === 'P1' ? 'negative' : band === 'P2' ? 'warning' : band === 'P3' ? 'info' : 'neutral')
 
@@ -44,7 +45,7 @@ export default function DrilldownPanel({ entity, config, onClose, onAction }) {
           <div className="grid gap-1.5 text-[12.5px] text-ink-600">
             <p className="flex items-center gap-1.5"><MapPin size={13} className="text-ink-400" /> {entity.village || entity.block || 'Location unknown'} {Array.isArray(entity.position) ? `· ${entity.position[1].toFixed(4)}, ${entity.position[0].toFixed(4)}` : ''}</p>
             {populationServed && <p className="flex items-center gap-1.5"><Users size={13} className="text-ink-400" /> Nearest census population: <span className="font-semibold text-ink-900">{(populationServed.population).toLocaleString()}</span> <span className="text-ink-400">({populationServed.blockName})</span></p>}
-            <p className="flex items-center gap-1.5"><Scale size={13} className="text-ink-400" /> Coverage gap score: <span className="font-semibold text-ink-900">{Math.round((entity.gapScore || 0) * 100)}%</span> <span className="text-ink-400">(Phase 1 coverage-isolation heuristic)</span></p>
+            <p className="flex items-center gap-1.5"><Scale size={13} className="text-ink-400" /> Coverage gap score: <span className="font-semibold text-ink-900">{formatScorePercent(entity.gapScore || 0, 0)}</span> <span className="text-ink-400">(Phase 1 coverage-isolation heuristic)</span></p>
             {exposure && (
               <p className="flex items-center gap-1.5">
                 <ShieldAlert size={13} className={exposure.exposed ? 'text-alert-500' : 'text-ink-400'} />

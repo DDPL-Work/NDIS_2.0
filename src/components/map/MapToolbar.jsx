@@ -6,9 +6,10 @@ import { useState } from 'react'
 import {
   Layers, Ruler, Circle, Navigation, Camera,
   Maximize2, Radio, ChevronDown, X, MoreHorizontal,
+  RotateCcw, Trash2, Edit3,
 } from 'lucide-react'
 import clsx from 'clsx'
-import { MAP_TOOLS, BASEMAPS } from '../../hooks/useMapTools'
+import { MAP_TOOLS, MEASURE_STATES, BASEMAPS } from '../../hooks/useMapTools'
 
 const TOOL_BTNS = [
   { tool: MAP_TOOLS.RADIUS, icon: Circle, label: 'Draw radius (3km)', shortLabel: 'Radius' },
@@ -24,6 +25,14 @@ function formatMeasure(km) {
   return `${Math.round(km)} km`
 }
 
+function formatArea(squareMeters) {
+  if (squareMeters == null || !Number.isFinite(squareMeters)) return null
+  if (squareMeters >= 1000000) return `${(squareMeters / 1000000).toFixed(2)} km²`
+  if (squareMeters >= 10000) return `${Math.round(squareMeters).toLocaleString('en-IN')} m²`
+  if (squareMeters >= 1) return `${squareMeters.toFixed(2)} m²`
+  return `${(squareMeters * 10.7639).toFixed(2)} sq ft`
+}
+
 export default function MapToolbar({
   activeTool,
   onSelectTool,
@@ -36,10 +45,16 @@ export default function MapToolbar({
   radiusCenter,
   onClearRadius,
   measureDistKm,
+  measureAreaSqm,
   measurePoints,
+  measureMode,
+  measureState,
   onClearMeasure,
   onRemoveMeasurePoint,
   onFinishMeasure,
+  onUndoMeasure,
+  onDeleteVertex,
+  onEnterEditMode,
   onFitDistrict,
   onMyLocation,
   onSnapshot,
@@ -235,44 +250,127 @@ export default function MapToolbar({
       )}
 
       {/* Measure result — Google-Maps-style multi-point path */}
-      {activeTool === MAP_TOOLS.MEASURE && (
+      {(activeTool === MAP_TOOLS.MEASURE || activeTool === MAP_TOOLS.MEASURE_AREA) && (
         <div className="card !p-3 shadow-lg animate-fade-in text-[11.5px] min-w-44">
           <div className="flex items-center justify-between mb-1">
-            <span className="font-semibold text-ink-800">Distance measure</span>
+            <span className="font-semibold text-ink-800">
+              {activeTool === MAP_TOOLS.MEASURE_AREA ? 'Area measure' : 'Distance measure'}
+            </span>
             {measurePoints.length > 0 && (
               <button onClick={onClearMeasure} title="Clear measurement" className="text-ink-400 hover:text-ink-700">
                 <X size={12} />
               </button>
             )}
           </div>
-          {measureDistKm !== null && measurePoints.length >= 2 ? (
-            <p className="text-leaf-700 font-semibold">{formatMeasure(measureDistKm)}</p>
+          {(measureMode === 'area' ? measureAreaSqm : measureDistKm) !== null && measurePoints.length >= (measureMode === 'area' ? 3 : 2) ? (
+            <p className="text-leaf-700 font-semibold">
+              {measureMode === 'area' ? formatArea(measureAreaSqm) : formatMeasure(measureDistKm)}
+            </p>
           ) : (
             <p className="text-ink-400">
               {measurePoints.length === 0
                 ? 'Click the map to start.'
-                : 'Keep clicking to add points.'}
+                : measurePoints.length === 1
+                  ? 'Click to add second point.'
+                  : measureMode === 'area' && measurePoints.length === 2
+                    ? 'Click to add third point for area.'
+                    : 'Keep clicking to add points.'}
             </p>
           )}
           {measurePoints.length > 0 && (
-            <div className="mt-2 flex gap-1.5">
-              <button
-                onClick={onRemoveMeasurePoint}
-                title="Remove last point"
-                className="flex-1 rounded-lg border border-ink-200 px-2 py-1 text-[11px] font-medium text-ink-700 hover:bg-ink-50 transition-colors"
-              >
-                Remove point
-              </button>
-              <button
-                onClick={onFinishMeasure}
-                title="Finish measurement"
-                className="flex-1 rounded-lg bg-ink-900 px-2 py-1 text-[11px] font-medium text-white hover:bg-ink-950 transition-colors"
-              >
-                Done
-              </button>
+            <div className="mt-2 flex gap-1.5 flex-wrap">
+              {/* Drawing mode buttons */}
+              {measureState === MEASURE_STATES.DRAWING && (
+                <>
+                  <button
+                    onClick={onRemoveMeasurePoint}
+                    title="Remove last point"
+                    disabled={measurePoints.length <= (measureMode === 'area' ? 3 : 2)}
+                    className={clsx(
+                      'flex-1 rounded-lg border border-ink-200 px-2 py-1 text-[11px] font-medium transition-colors',
+                      measurePoints.length <= (measureMode === 'area' ? 3 : 2)
+                        ? 'text-ink-300 cursor-not-allowed'
+                        : 'text-ink-700 hover:bg-ink-50'
+                    )}
+                  >
+                    Remove point
+                  </button>
+                  <button
+                    onClick={onUndoMeasure}
+                    title="Undo last action"
+                    disabled={measurePoints.length === 0}
+                    className={clsx(
+                      'flex-1 rounded-lg border border-ink-200 px-2 py-1 text-[11px] font-medium transition-colors',
+                      measurePoints.length === 0
+                        ? 'text-ink-300 cursor-not-allowed'
+                        : 'text-ink-700 hover:bg-ink-50'
+                    )}
+                  >
+                    <RotateCcw size={12} className="inline-block mr-1" /> Undo
+                  </button>
+                  <button
+                    onClick={onFinishMeasure}
+                    title="Finish measurement"
+                    disabled={measurePoints.length < (measureMode === 'area' ? 3 : 2)}
+                    className={clsx(
+                      'flex-1 rounded-lg px-2 py-1 text-[11px] font-medium transition-colors',
+                      measurePoints.length < (measureMode === 'area' ? 3 : 2)
+                        ? 'bg-ink-300 text-ink-500 cursor-not-allowed'
+                        : 'bg-ink-900 text-white hover:bg-ink-950'
+                    )}
+                  >
+                    Done
+                  </button>
+                </>
+              )}
+              
+              {/* Completed/Editing mode buttons */}
+              {(measureState === MEASURE_STATES.COMPLETED || measureState === MEASURE_STATES.EDITING) && (
+                <>
+                  <button
+                    onClick={onEnterEditMode}
+                    title={measureState === MEASURE_STATES.EDITING ? 'Exit edit mode' : 'Edit vertices'}
+                    className={clsx(
+                      'flex-1 rounded-lg px-2 py-1 text-[11px] font-medium transition-colors',
+                      measureState === MEASURE_STATES.EDITING
+                        ? 'bg-saffron-500 text-white hover:bg-saffron-600'
+                        : 'bg-ink-100 text-ink-700 hover:bg-ink-200'
+                    )}
+                  >
+                    <Edit3 size={12} className="inline-block mr-1" />
+                    {measureState === MEASURE_STATES.EDITING ? 'Done editing' : 'Edit vertices'}
+                  </button>
+                  <button
+                    onClick={onUndoMeasure}
+                    title="Undo last action"
+                    disabled={measurePoints.length === 0}
+                    className={clsx(
+                      'flex-1 rounded-lg border border-ink-200 px-2 py-1 text-[11px] font-medium transition-colors',
+                      measurePoints.length === 0
+                        ? 'text-ink-300 cursor-not-allowed'
+                        : 'text-ink-700 hover:bg-ink-50'
+                    )}
+                  >
+                    <RotateCcw size={12} className="inline-block mr-1" /> Undo
+                  </button>
+                  <button
+                    onClick={onClearMeasure}
+                    title="Clear measurement"
+                    className="flex-1 rounded-lg border border-alert-200 px-2 py-1 text-[11px] font-medium text-alert-600 hover:bg-alert-50 transition-colors"
+                  >
+                    <Trash2 size={12} className="inline-block mr-1" /> Clear
+                  </button>
+                </>
+              )}
             </div>
           )}
-          <p className="text-ink-400 mt-2">Click to add points · double-click to finish.</p>
+          <p className="text-ink-400 mt-2">
+            {measureState === MEASURE_STATES.DRAWING
+              ? 'Click to add points · double-click to finish.'
+              : measureState === MEASURE_STATES.EDITING
+                ? 'Drag vertices to move · click edges to insert · right-click vertex to delete.'
+                : 'Click "Edit vertices" to modify.'}
+          </p>
         </div>
       )}
     </div>

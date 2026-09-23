@@ -174,7 +174,7 @@ export default function PropertyPopup({ feature, onClose, onPay, onReceipt, onPa
   return (
     <div className="property-popup flex flex-col w-[min(360px,calc(100vw-24px))] max-h-[min(400px,calc(100dvh-100px))] max-h-[min(400px,calc(100vh-100px))] rounded-xl overflow-hidden ">
       {/* Header - Fixed */}
-      <header className="flex-shrink-0 px-3 py-2 border-b border-ink-200 bg-white flex items-center justify-between">
+      <header className="flex-shrink-0 px-3 py-1 border-b border-ink-200 bg-white flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-5 h-5 bg-blue-100 rounded-lg flex items-center justify-center">
             <Home className="w-3 h-3 text-blue-600" />

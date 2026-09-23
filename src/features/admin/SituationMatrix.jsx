@@ -173,7 +173,7 @@ export default function SituationMatrix() {
       <div className="flex flex-1 min-h-[540px] flex-col gap-3 lg:flex-row">
         {/* Map area */}
         <div className="relative min-h-[540px] flex-1 min-w-0 overflow-hidden rounded-xl2 border border-ink-100 bg-white shadow-card">
-          <MapView
+<MapView
             ref={mapRef}
             center={district?.center}
             zoom={district?.zoom}
@@ -185,7 +185,7 @@ export default function SituationMatrix() {
             heatPoints={hotspots}
             className="h-full"
             onFacilityClick={handleFacilityClick}
-            onMapClick={handleMapClick}
+            onMapClick={tools.handleMapClick}
             selectedId={selectedFacility?.id}
             searchResults={spatialResults?.results || []}
             onSearchResultOpen={handleFacilityClick}
@@ -196,9 +196,17 @@ export default function SituationMatrix() {
             radiusKm={tools.radiusKm}
             measurePoints={tools.measurePoints}
             measureDistKm={tools.measureDistKm}
+            measureAreaSqm={tools.measureAreaSqm}
+            measureMode={tools.measureMode}
+            measureState={tools.measureState}
             clusterEnabled={tools.clusterEnabled}
             basemapUrl={tools.currentBasemap.url}
             route={routing.route}
+            onDeleteVertex={tools.deleteVertex}
+            onStartDragVertex={tools.startDragVertex}
+            onDragVertex={tools.dragVertex}
+            onEndDragVertex={tools.endDragVertex}
+            onEnterEditMode={tools.enterEditMode}
           />
 
           <div className="absolute right-3 top-3 z-20 w-[min(340px,calc(100%-1.5rem))] md:right-16">
@@ -300,10 +308,16 @@ export default function SituationMatrix() {
               radiusCenter={tools.radiusCenter}
               onClearRadius={tools.clearRadius}
               measureDistKm={tools.measureDistKm}
+              measureAreaSqm={tools.measureAreaSqm}
               measurePoints={tools.measurePoints}
+              measureMode={tools.measureMode}
+              measureState={tools.measureState}
               onClearMeasure={tools.clearMeasure}
               onRemoveMeasurePoint={tools.removeLastMeasurePoint}
               onFinishMeasure={tools.finishMeasure}
+              onUndoMeasure={tools.undoMeasure}
+              onDeleteVertex={tools.deleteVertex}
+              onEnterEditMode={tools.enterEditMode}
               onFitDistrict={handleFitDistrict}
               onMyLocation={() => mapRef.current?.locateUser()}
               onSnapshot={() => mapRef.current?.snapshot()}

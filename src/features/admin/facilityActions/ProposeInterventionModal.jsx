@@ -13,6 +13,8 @@ import ActionSuccessModal from './ActionSuccessModal'
 import { INTERVENTION_CATEGORIES, TIMELINE_OPTIONS } from './constants'
 import { validateProposal, hasErrors } from './facilityActionValidation'
 import { buildProblemStatement } from './facilityActionMapper'
+import { formatScorePercent } from '../../../utils/format'
+
 
 const emptyForm = () => ({
   interventionType: '',
@@ -52,15 +54,15 @@ export default function ProposeInterventionModal({ open, onClose, facility }) {
       return
     }
     setErrors({})
-    const payload = {
-      facility_name: facility.name,
-      facility_type: facility.category || facility.categoryLabel || '',
-      intervention_type: form.interventionType || '',
-      description: form.description || '',
-      estimated_cost: form.estimatedCost ? Number(form.estimatedCost) : null,
-      expected_timeline: form.timeline || null,
-      coverage_gap_score: facility.gapScore != null ? Math.round(facility.gapScore * 100) : null,
-    }
+const payload = {
+        facility_name: facility.name,
+        facility_type: facility.category || facility.categoryLabel || '',
+        intervention_type: form.interventionType || '',
+        description: form.description || '',
+        estimated_cost: form.estimatedCost ? Number(form.estimatedCost) : null,
+        expected_timeline: form.timeline || null,
+        coverage_gap_score: facility.gapScore != null ? Math.round(facility.gapScore) : null,
+      }
     createIntervention.mutate(payload, {
       onSuccess: (data) => {
         setResult(data)
@@ -190,7 +192,7 @@ export default function ProposeInterventionModal({ open, onClose, facility }) {
               {facility?.gapScore != null && (
                 <div className="flex justify-between px-3 py-2">
                   <span className="text-ink-500">Gap score</span>
-                  <span className="text-ink-800 font-medium">{Math.round(facility.gapScore * 100)}%</span>
+                  <span className="text-ink-800 font-medium">{formatScorePercent(facility.gapScore, 0)}</span>
                 </div>
               )}
               {facility?.district && (

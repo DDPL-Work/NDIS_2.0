@@ -2,6 +2,7 @@
 // frontend model. Handles missing fields gracefully. No fabricated values.
 
 import { PRIORITY_BAND_LABELS } from './constants'
+import { formatScorePercent } from '../../../utils/format'
 
 /**
  * Map a raw facility object (from backend or department model) into the
@@ -64,8 +65,8 @@ export function buildProblemStatement(facility) {
   if (facility.recommendedAction) parts.push(facility.recommendedAction)
   if (facility.problemStatement) parts.push(facility.problemStatement)
   if (facility.reason) parts.push(facility.reason)
-  if (facility.gapScore != null && facility.gapScore >= 0.66) {
-    parts.push(`High coverage gap score (${Math.round(facility.gapScore * 100)}%).`)
+  if (facility.gapScore != null && facility.gapScore >= 66) {
+    parts.push(`High coverage gap score (${formatScorePercent(facility.gapScore, 0)}).`)
   }
   return parts.join(' ').trim()
 }
@@ -86,8 +87,8 @@ export function buildInspectionPurpose(facility) {
 export function buildEscalationReason(facility) {
   if (!facility) return ''
   const parts = []
-  if (facility.gapScore != null && facility.gapScore >= 0.66) {
-    parts.push(`High operational deficit identified (gap score: ${Math.round(facility.gapScore * 100)}%).`)
+  if (facility.gapScore != null && facility.gapScore >= 66) {
+    parts.push(`High operational deficit identified (gap score: ${formatScorePercent(facility.gapScore, 0)}).`)
   }
   if (facility.hazardSafe === false) {
     parts.push('Facility is at risk from environmental hazards.')

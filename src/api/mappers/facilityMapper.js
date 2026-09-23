@@ -70,7 +70,7 @@ function computeCoverageGaps(mapped) {
       neighbours -= 1 // do not count the facility itself
       const coverageFactor = Math.min(1, neighbours / 3)
       const isolation = Math.min(1, nearest / ISOLATION_CELLS)
-      const gapScore = Math.round((0.5 * (1 - coverageFactor) + 0.5 * isolation) * 100) / 100
+      const gapScore = Math.round((0.5 * (1 - coverageFactor) + 0.5 * isolation) * 100)
       cells.get(keys[i]).forEach((offset) => { scored[offset].gapScore = gapScore })
     }
   }

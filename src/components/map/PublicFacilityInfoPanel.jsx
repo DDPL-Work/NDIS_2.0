@@ -53,7 +53,7 @@ export default function PublicFacilityInfoPanel({ facility, onClose }) {
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-400">Coverage score</p>
                 <p className="text-[13px] font-semibold text-ink-900 mt-0.5">
-                  {facility.gapScore >= 0.66 ? 'High deficit' : facility.gapScore >= 0.33 ? 'Moderate' : 'Well served'}
+                  {facility.gapScore >= 66 ? 'High deficit' : facility.gapScore >= 33 ? 'Moderate' : 'Well served'}
                 </p>
               </div>
             </div>

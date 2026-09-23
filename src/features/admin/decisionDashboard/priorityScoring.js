@@ -38,8 +38,8 @@ export function normalizeStatus(status) {
   return STATUS_MAP[upper] || raw.toLowerCase()
 }
 
-export const GAP_CRITICAL = 0.66
-export const GAP_EXTREME = 0.8
+export const GAP_CRITICAL = 66
+export const GAP_EXTREME = 80
 
 export const GAP_TIERS = {
   critical: { label: 'Critical', tone: 'alert' },
@@ -416,7 +416,7 @@ export function computeKpis({ facilities = [], complaints = [], proposals = [], 
         key: 'critical_gaps',
         label: 'Critical gaps',
         value: criticalGaps,
-        sub: `${facilities.filter((f) => f.gapScore >= GAP_EXTREME).length} extreme (≥ ${Math.round(GAP_EXTREME * 100)}%)`,
+        sub: `${facilities.filter((f) => f.gapScore >= GAP_EXTREME).length} extreme (≥ ${Math.round(GAP_EXTREME)}%)`,
         tone: 'alert',
         source: 'GET /api/facilities/',
         definition: `facilities with gapScore ≥ ${GAP_CRITICAL}; gapScore = 50% (1 − same-category coverage) + 50% isolation (client spatial heuristic)`,

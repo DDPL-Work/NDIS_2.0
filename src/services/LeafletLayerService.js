@@ -121,6 +121,8 @@ export function colorForId(id) {
   return `hsl(${FALLBACK_HUES[Math.abs(hash) % FALLBACK_HUES.length]} 58% 42%)`
 }
 
+import { formatScorePercent } from '../utils/format'
+
 export function facilityColor(facility, { colorBy = 'department', departmentColors = {} } = {}) {
   // Spatial Analysis mode: distinguish target vs reference facilities
   if (colorBy === 'spatial-analysis') {
@@ -128,14 +130,14 @@ export function facilityColor(facility, { colorBy = 'department', departmentColo
       // Reference/comparison facilities (e.g., Police Stations) - purple
       return '#a855f7'
     }
-    // Target facilities (e.g., Banks) - color by gap score
-    if (facility.gapScore >= 0.66) return '#c0392b'      // High gap - red
-    if (facility.gapScore >= 0.33) return '#e07a2c'    // Medium gap - orange
+    // Target facilities (e.g., Banks) - color by gap score (0-100 scale)
+    if (facility.gapScore >= 66) return '#c0392b'      // High gap - red
+    if (facility.gapScore >= 33) return '#e07a2c'    // Medium gap - orange
     return '#1f7a54'                                    // Low gap - green
   }
   if (colorBy === 'gap') {
-    if (facility.gapScore >= 0.66) return '#c0392b'
-    if (facility.gapScore >= 0.33) return '#e07a2c'
+    if (facility.gapScore >= 66) return '#c0392b'
+    if (facility.gapScore >= 33) return '#e07a2c'
     return '#1f7a54'
   }
   return departmentColors[String(facility.departmentId)] || colorForId(facility.departmentId)
@@ -151,8 +153,8 @@ export function facilityColor(facility, { colorBy = 'department', departmentColo
 // shows a static "Start point" chip instead.
 export function facilityPopupHtml(facility, { routeOriginKey = null, enabled = false } = {}) {
   const gap = Number.isFinite(facility.gapScore) ? facility.gapScore : null
-  const gapLabel = gap !== null ? ` · Gap ${Math.round(gap * 100)}%` : ''
-  const gapColor = gap > 0.66 ? '#c0392b' : gap > 0.33 ? '#e07a2c' : '#1f7a54'
+  const gapLabel = gap !== null ? ` · Gap ${formatScorePercent(gap)}` : ''
+  const gapColor = gap > 66 ? '#c0392b' : gap > 33 ? '#e07a2c' : '#1f7a54'
   const isOrigin = routeOriginKey != null && String(routeOriginKey) === `facility:${String(facility.id)}`
   const actionRow = enabled ? routeActionHtml({ isOrigin, includeDetails: true }) : ''
   return `

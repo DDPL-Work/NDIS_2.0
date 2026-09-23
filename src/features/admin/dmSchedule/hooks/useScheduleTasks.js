@@ -1,9 +1,11 @@
 import { useMemo } from 'react'
 import { useInspectionSchedules } from './useInspectionSchedules'
 import { useInterventionProposals } from './useInterventionProposals'
+import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '../../../../app/store/authStore'
 import { buildScheduleTask, computeKpis } from '../utils/taskNormalizer'
 import { FILTER_PRESETS } from '../constants'
+import { backendComplaintApi } from '../../../../api/complaintApi'
 
 export function useScheduleTasks() {
   const districtId = useAuthStore((s) => s.user?.districtId)
@@ -12,14 +14,22 @@ export function useScheduleTasks() {
 
   const inspectionsQuery = useInspectionSchedules(filters)
   const interventionsQuery = useInterventionProposals(filters)
+  // Escalations are complaint workflow records, not locally invented tasks.
+  // The API adapter maps the backend's exact ESCALATED status vocabulary.
+  const escalationsQuery = useQuery({
+    queryKey: ['dm', 'schedule', 'escalations', filters],
+    queryFn: () => backendComplaintApi.list({ ...filters, state: 'escalated' }),
+    staleTime: 30_000,
+  })
 
-  const loading = inspectionsQuery.isLoading || interventionsQuery.isLoading
-  const isFetching = inspectionsQuery.isFetching || interventionsQuery.isFetching
+  const loading = inspectionsQuery.isLoading || interventionsQuery.isLoading || escalationsQuery.isLoading
+  const isFetching = inspectionsQuery.isFetching || interventionsQuery.isFetching || escalationsQuery.isFetching
 
   // Error isolation — one failed endpoint must not destroy the entire task list
   const errors = []
   if (inspectionsQuery.error) errors.push(inspectionsQuery.error)
   if (interventionsQuery.error) errors.push(interventionsQuery.error)
+  if (escalationsQuery.error) errors.push(escalationsQuery.error)
 
   const tasks = useMemo(() => {
     if (loading) return []
@@ -27,13 +37,14 @@ export function useScheduleTasks() {
     // Use whatever data succeeded — do not require both to succeed
     const rawInspections = inspectionsQuery.data || []
     const rawInterventions = interventionsQuery.data || []
+    const rawEscalations = escalationsQuery.data || []
 
     return buildScheduleTask({
       interventions: rawInterventions,
       inspections: rawInspections,
-      escalations: [],
+      escalations: rawEscalations,
     })
-  }, [loading, inspectionsQuery.data, interventionsQuery.data])
+  }, [loading, inspectionsQuery.data, interventionsQuery.data, escalationsQuery.data])
 
   const kpis = useMemo(() => computeKpis(tasks), [tasks])
 
@@ -47,9 +58,11 @@ export function useScheduleTasks() {
     refetch: () => {
       inspectionsQuery.refetch()
       interventionsQuery.refetch()
+      escalationsQuery.refetch()
     },
     inspections: inspectionsQuery.data || [],
     interventions: interventionsQuery.data || [],
+    escalations: escalationsQuery.data || [],
   }
 }
 

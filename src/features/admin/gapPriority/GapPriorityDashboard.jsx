@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { RefreshCw, LayoutDashboard, BarChart2, MapPin } from 'lucide-react'
+import { RefreshCw, LayoutDashboard, BarChart2 } from 'lucide-react'
 import PageHeader from '../../../components/ui/PageHeader'
 import Button from '../../../components/ui/Button'
 import Tabs from '../../../components/ui/Tabs'
@@ -24,7 +24,9 @@ export default function GapPriorityDashboard() {
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
   const role = user?.role || user?.roles?.[0] || 'dm'
-  const districtId = user?.districtId || 'nalanda'
+  // District scope is resolved from the authenticated session.  Do not
+  // substitute a pilot district when the identity is incomplete.
+  const districtId = user?.districtId ?? null
   const { data: districts } = useDistricts()
   const district = (districts || []).find((d) => String(d.id) === String(districtId))
 
@@ -36,7 +38,6 @@ export default function GapPriorityDashboard() {
 
   // Data states — all from backend
   const [overview, setOverview] = useState(null)
-  const [rankings, setRankings] = useState([])
   const [modelMetadata, setModelMetadata] = useState(null)
   const [filters, setFilters] = useState({ department: '', priority: '' })
 
@@ -50,10 +51,9 @@ export default function GapPriorityDashboard() {
       if (filters.priority) params.priority = filters.priority
 
       // Primary call: GET /gap-priority/ — returns overview + results
-      const data = await backendGapApi.list(params)
+      const data = await backendGapApi.list(districtId ? { ...params, district: districtId } : params)
 
       setOverview(data.overview)
-      setRankings(data.results)
 
       // Also load model metadata
       const meta = await backendGapApi.modelMetadata(districtId)
@@ -120,17 +120,17 @@ export default function GapPriorityDashboard() {
     const componentList = Object.entries(components).map(([key, value]) => ({
       label: key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
       rawValue: value,
-      normalizedValue: typeof value === 'number' ? value / 100 : null,
+      normalizedValue: typeof value === 'number' ? value : null,
       weight: weightsUsed[key] ?? null,
       contribution: typeof value === 'number' && weightsUsed[key] != null
-        ? (value / 100) * weightsUsed[key]
+        ? value * weightsUsed[key]
         : null,
       source: gap.modelVersion || 'Backend',
     }))
     return {
       components: componentList,
       overall: {
-        normalizedValue: entity.gapScore != null ? entity.gapScore / 100 : null,
+        normalizedValue: entity.gapScore != null ? entity.gapScore : null,
         modelVersion: gap.modelVersion || entity.modelVersion || null,
         calculatedAt: gap.calculatedAt || null,
       },

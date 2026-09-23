@@ -3,6 +3,7 @@
 
 import Badge from '../../../components/ui/Badge'
 import { PRIORITY_BAND_TONES } from './constants'
+import { formatScorePercent } from '../../../utils/format'
 
 export default function FacilityActionSummary({ facility }) {
   if (!facility) return null
@@ -23,7 +24,7 @@ export default function FacilityActionSummary({ facility }) {
           <div><span className="text-ink-500">Location: </span><span className="text-ink-800 font-medium">{[facility.village, facility.block, facility.district].filter(Boolean).join(', ')}</span></div>
         )}
         {facility.gapScore != null && (
-          <div><span className="text-ink-500">Gap score: </span><span className="text-ink-800 font-medium">{Math.round(facility.gapScore * 100)}%</span></div>
+          <div><span className="text-ink-500">Gap score: </span><span className="text-ink-800 font-medium">{formatScorePercent(facility.gapScore, 0)}</span></div>
         )}
         {facility.department && (
           <div><span className="text-ink-500">Department: </span><span className="text-ink-800 font-medium">{facility.department}</span></div>

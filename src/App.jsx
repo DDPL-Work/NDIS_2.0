@@ -11,7 +11,7 @@ import { PortalProvider } from './context/PortalContext'
 const PublicLandingPage = lazy(() => import('./features/landing/PublicLandingPage'))
 const PublicExplorePage = lazy(() => import('./features/publicExplore/PublicExplorePage'))
 
-import { CITIZEN_NAV, ADMIN_NAV, ENGINEER_NAV } from './config/navigation'
+import { CITIZEN_NAV, ADMIN_NAV, DM_NAV_SECTIONS, ENGINEER_NAV } from './config/navigation'
 import { ROLES } from './config/constants'
 import CitizenTourHost from './components/tour/CitizenTourHost'
 
@@ -134,7 +134,15 @@ function CitizenShell() {
 
 function AdminShell() {
   const nav = useFilteredNav(ADMIN_NAV)
-  return <AppShell navItems={nav} portalLabel="Executive Admin" portalIcon="Gavel" accentClassName="bg-ink-900" title="Executive Command Center" subtitle="Location-based district decisions" showDistrict showDepartment={false} />
+  const role = useAuthStore((s) => s.user?.role)
+  const dmRoles = [ROLES.DISTRICT_COLLECTOR, ROLES.DM, ROLES.ADM]
+  const sections = dmRoles.includes(role)
+    ? DM_NAV_SECTIONS.map((section) => ({
+        ...section,
+        items: section.items.filter((item) => !item.roles || item.roles.includes(role)),
+      }))
+    : undefined
+  return <AppShell navItems={nav} sections={sections} portalLabel="Executive Command Center" portalIcon="Gavel" accentClassName="bg-ink-900" title="Executive Command Center" subtitle="District intelligence, decisions and action tracking" showDistrict districtReadOnly={dmRoles.includes(role)} showDepartment={false} />
 }
 
 function DepartmentPage({ permission, children }) {

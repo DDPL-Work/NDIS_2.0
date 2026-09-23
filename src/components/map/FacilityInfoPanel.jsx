@@ -8,7 +8,7 @@ import { X, MapPin, AlertTriangle, ShieldCheck, ClipboardCheck, ArrowRight } fro
 import GapScoreRing from '../ui/GapScoreRing'
 import StatusBadge from '../ui/StatusBadge'
 import Badge from '../ui/Badge'
-import { formatDate } from '../../utils/format'
+import { formatDate, formatScorePercent } from '../../utils/format'
 import { mapFacilityForAction, mapPriorityForAction } from '../../features/admin/facilityActions/facilityActionMapper'
 import FacilityActionMenu from '../../features/admin/facilityActions/FacilityActionMenu'
 import ProposeInterventionModal from '../../features/admin/facilityActions/ProposeInterventionModal'
@@ -53,7 +53,7 @@ export default function FacilityInfoPanel({ facility, grievances = [], onClose, 
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-400">Gap score</p>
               <p className="text-[13px] font-semibold text-ink-900 mt-0.5">
-                {facility.gapScore >= 0.66 ? 'High deficit' : facility.gapScore >= 0.33 ? 'Moderate' : 'Well served'}
+                {facility.gapScore >= 66 ? 'High deficit' : facility.gapScore >= 33 ? 'Moderate' : 'Well served'}
               </p>
             </div>
           </div>

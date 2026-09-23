@@ -82,9 +82,17 @@ export default function LineDeptOverview() {
                   radiusKm={tools.radiusKm}
                   measurePoints={tools.measurePoints}
                   measureDistKm={tools.measureDistKm}
+                  measureAreaSqm={tools.measureAreaSqm}
+                  measureMode={tools.measureMode}
+                  measureState={tools.measureState}
                   clusterEnabled={tools.clusterEnabled}
                   basemapUrl={tools.currentBasemap.url}
                   className="h-full"
+                  onDeleteVertex={tools.deleteVertex}
+                  onStartDragVertex={tools.startDragVertex}
+                  onDragVertex={tools.dragVertex}
+                  onEndDragVertex={tools.endDragVertex}
+                  onEnterEditMode={tools.enterEditMode}
                 />
 
                 <div className="absolute bottom-4 right-4 z-10">
@@ -100,10 +108,16 @@ export default function LineDeptOverview() {
                     radiusCenter={tools.radiusCenter}
                     onClearRadius={tools.clearRadius}
                     measureDistKm={tools.measureDistKm}
+                    measureAreaSqm={tools.measureAreaSqm}
                     measurePoints={tools.measurePoints}
+                    measureMode={tools.measureMode}
+                    measureState={tools.measureState}
                     onClearMeasure={tools.clearMeasure}
                     onRemoveMeasurePoint={tools.removeLastMeasurePoint}
                     onFinishMeasure={tools.finishMeasure}
+                    onUndoMeasure={tools.undoMeasure}
+                    onDeleteVertex={tools.deleteVertex}
+                    onEnterEditMode={tools.enterEditMode}
                     onFitDistrict={() => mapRef.current?.flyTo(district.center, district.zoom)}
                     onMyLocation={() => mapRef.current?.locateUser()}
                     onSnapshot={() => mapRef.current?.snapshot()}

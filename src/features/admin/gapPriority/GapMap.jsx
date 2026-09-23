@@ -5,6 +5,7 @@ import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 import clsx from 'clsx'
 import { backendGapApi } from '../../../api/gapApi'
+import { formatScorePercent } from '../../../utils/format'
 import { ensureLeafletPlugins } from '../../../services/leafletPlugins'
 
 const PRIORITY_COLORS = {
@@ -172,7 +173,7 @@ export default function GapMap({ districtId, center = [25.1372, 85.4434], zoom =
           </div>
           <div style="font-weight:600;font-size:13px;color:#0b3558;margin-bottom:4px;">${escapeHtml(m.name || 'Unnamed')}</div>
           <div style="font-size:11px;color:#546882;margin-bottom:4px;">${escapeHtml(m.department_name || '')}</div>
-          <div style="font-size:11px;color:#546882;margin-bottom:8px;">Gap score: ${m.gap_score != null ? Number(m.gap_score).toFixed(1) : '—'}</div>
+          <div style="font-size:11px;color:#546882;margin-bottom:8px;">Gap score: ${m.gap_score != null ? formatScorePercent(m.gap_score) : '—'}</div>
           ${m.reason ? `<div style="font-size:11px;color:#27364a;margin-bottom:8px;padding:6px;background:#f0f4f8;border-radius:4px;">${escapeHtml(m.reason)}</div>` : ''}
           ${m.recommended_action ? `<div style="font-size:11px;color:#0b3558;margin-bottom:8px;padding:6px;background:#e8f4fd;border-radius:4px;font-weight:500;">${escapeHtml(m.recommended_action)}</div>` : ''}
           <button data-action="details" data-id="${m.id}" style="width:100%;background:#0b3558;color:white;border:none;border-radius:6px;padding:6px;font-size:11px;font-weight:600;cursor:pointer;">View Details</button>

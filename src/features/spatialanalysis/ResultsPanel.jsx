@@ -9,6 +9,7 @@ import EmptyState from '../../components/ui/EmptyState'
 import { GapScoreLegend, SpatialAnalysisLegend } from '../../components/map/MapLegend'
 import { bufferPolygon } from '../../gis/engine/SpatialAnalysisEngine'
 import { resolveField } from './spatialAnalysisModel'
+import { formatScorePercent } from '../../utils/format'
 
 const TABS = [
   { key: 'map', label: 'Map', icon: MapIcon },
@@ -495,8 +496,8 @@ export default function ResultsPanel({
                     <td className="px-3 py-2 text-ink-600">{row.nearestReference || '—'}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{row.distanceKm != null ? `${row.distanceKm} km` : '—'}</td>
                     <td className="px-3 py-2"><AccessibilityBadge value={row.accessibility} /></td>
-                    <td className="px-3 py-2 text-right tabular-nums">{row.gapScore != null ? row.gapScore.toFixed(2) : '—'}</td>
-                    <td className="px-3 py-2 text-right tabular-nums font-semibold text-ink-900">{row.priorityScore?.toFixed(2) ?? '—'}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{row.gapScore != null ? formatScorePercent(row.gapScore) : '—'}</td>
+                    <td className="px-3 py-2 text-right tabular-nums font-semibold text-ink-900">{row.priorityScore != null ? formatScorePercent(row.priorityScore) : '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -560,8 +561,8 @@ export default function ResultsPanel({
           <div className="p-4 space-y-3">
             <div className="flex flex-wrap gap-2">
               <AccessibilityBadge value={detailRow.accessibility} />
-              <Badge tone="neutral">Priority {detailRow.priorityScore?.toFixed(2) ?? '—'}</Badge>
-              <Badge tone="info">Gap {detailRow.gapScore?.toFixed(2) ?? '—'}</Badge>
+              <Badge tone="neutral">Priority {detailRow.priorityScore != null ? formatScorePercent(detailRow.priorityScore) : '—'}</Badge>
+              <Badge tone="info">Gap {detailRow.gapScore != null ? formatScorePercent(detailRow.gapScore) : '—'}</Badge>
               {detailRow.rank && <Badge tone="neutral">Rank #{detailRow.rank}</Badge>}
             </div>
             <dl className="grid grid-cols-1 gap-x-6 gap-y-1.5 text-[13px] sm:grid-cols-2">

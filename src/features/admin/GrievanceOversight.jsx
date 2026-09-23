@@ -20,7 +20,7 @@ const TABS = [
 ]
 
 export default function GrievanceOversight() {
-  const [tab, setTab] = useState('escalated')
+  const [tab, setTab] = useState('all')
   const [deptFilter, setDeptFilter] = useState('all')
 
   // Backend /api/departments/ (numeric ids) when available so the filter

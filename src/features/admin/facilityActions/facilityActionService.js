@@ -35,7 +35,7 @@ export async function createProposal({ facility, form }) {
       description: form.description || '',
       estimated_cost: form.estimatedCost ? Number(form.estimatedCost) : null,
       expected_timeline: form.timeline || null,
-      coverage_gap_score: facility.gapScore != null ? Math.round(facility.gapScore * 100) : null,
+      coverage_gap_score: facility.gapScore != null ? Math.round(facility.gapScore) : null,
     }
     const intervention = await backendInterventionApi.create(payload)
     return { success: true, data: intervention }
@@ -88,7 +88,7 @@ export async function escalateIssue({ facility, form }) {
       problem_statement: form.reason || form.additionalMessage || 'Facility escalation from DM.',
       recommended_action: form.reason || '',
       priority: facility.priority?.band || null,
-      gap_score: facility.gapScore != null ? Math.round(facility.gapScore * 100) : null,
+      gap_score: facility.gapScore != null ? Math.round(facility.gapScore) : null,
     }
     const proposal = await backendProposalApi.create(payload)
     return { success: true, data: proposal, type: 'proposal' }

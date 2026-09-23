@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
-import { Menu, Bell, LogOut, ChevronDown, Globe, HelpCircle, MapPin, Search } from 'lucide-react'
+import { Menu, Bell, LogOut, ChevronDown, Globe, HelpCircle, MapPin } from 'lucide-react'
 import Select from '../ui/Select'
 import Badge from '../ui/Badge'
 import NotificationDrawer from '../ui/NotificationDrawer'
@@ -64,7 +64,7 @@ function UserMenu() {
   )
 }
 
-export default function Topbar({ title, subtitle, showDistrict = true, showDepartment = false, onMenuClick }) {
+export default function Topbar({ title, subtitle, showDistrict = true, districtReadOnly = false, showDepartment = false, onMenuClick }) {
   const user = useAuthStore((s) => s.user)
   const setDistrict = useAuthStore((s) => s.setDistrict)
   const setDepartment = useAuthStore((s) => s.setDepartment)
@@ -160,12 +160,16 @@ export default function Topbar({ title, subtitle, showDistrict = true, showDepar
           {showDistrict && (
             <div className="hidden md:flex items-center gap-1.5 pl-1">
               <MapPin size={13} className="text-ink-400" />
-              <Select
-                small
-                value={user?.districtId}
-                onChange={setDistrict}
-                options={districtOptions}
-              />
+              {districtReadOnly ? (
+                <Badge tone="info">{user?.district?.label || user?.districtName || 'Authorized district'}</Badge>
+              ) : (
+                <Select
+                  small
+                  value={user?.districtId}
+                  onChange={setDistrict}
+                  options={districtOptions}
+                />
+              )}
             </div>
           )}
 
