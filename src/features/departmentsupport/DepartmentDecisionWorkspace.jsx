@@ -167,13 +167,13 @@ export default function DepartmentDecisionWorkspace({ departmentId, adminView = 
           Loading backend indicators from {backendIndicators.source || 'department API'}…
         </div>
       )}
-      {!backendIndicators.loading && backendIndicators.status === 'loaded' && (
+      {/* {!backendIndicators.loading && backendIndicators.status === 'loaded' && (
         <div className="flex items-center gap-2 rounded-xl border border-leaf-200 bg-leaf-50/70 px-4 py-2.5 text-[12.5px] text-leaf-800">
           <Database size={14} className="shrink-0" />
           Backend indicators loaded from <strong>{backendIndicators.source}</strong> — {backendIndicators.groups.filter((g) => g.status === 'loaded').length} of {backendIndicators.groups.length} endpoints returned data.
           {backendIndicators.updatedAt && <span className="text-leaf-600 ml-1">Updated {new Date(backendIndicators.updatedAt).toLocaleTimeString()}</span>}
         </div>
-      )}
+      )} */}
       {!backendIndicators.loading && backendIndicators.status === 'empty' && (
         <div className="flex items-center gap-2 rounded-xl border border-saffron-200 bg-saffron-50/70 px-4 py-2.5 text-[12.5px] text-saffron-800">
           <Database size={14} className="shrink-0" />

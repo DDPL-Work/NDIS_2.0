@@ -51,9 +51,15 @@ export const DM_NAV_SECTIONS = [
     ],
   },
   {
+    label: 'Departments',
+    items: [
+      { to: '/admin/department/general', label: 'Department delivery', icon: 'Building2' },
+    ],
+  },
+  {
     label: 'Action & Workflow',
     items: [
-      // { to: '/admin/approvals', label: 'Interventions / DPR', icon: 'ClipboardCheck' },
+      { to: '/admin/approvals', label: 'Interventions / DPR', icon: 'ClipboardCheck' },
       { to: '/admin/schedule-tasks', label: 'My Tasks & Schedule', icon: 'Calendar' },
       // { to: '/admin/grievances', label: 'Escalations', icon: 'Siren' },
     ],
