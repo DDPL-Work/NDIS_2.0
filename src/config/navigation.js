@@ -78,7 +78,7 @@ export const LINEDEPT_NAV = [
   { to: '/linedept', label: 'Department Dashboard', icon: 'LayoutDashboard', end: true },
   { to: '/linedept/complaints-queue', label: 'Assigned Complaints', icon: 'Inbox' },
   { to: '/linedept/gis', label: 'Department GIS', icon: 'Map' },
-  { to: '/linedept/schema-config', label: 'Assets', icon: 'Settings2' },
+  { to: '/linedept/schema-config', label: 'Assets', icon: 'Settings2' },  
   { to: '/linedept/proposals', label: 'Workflow', icon: 'FilePlus2' },
   { to: '/linedept/data-upload', label: 'CSV Upload', icon: 'UploadCloud' },
   { to: '/linedept/reports', label: 'Reports', icon: 'FileDown' },

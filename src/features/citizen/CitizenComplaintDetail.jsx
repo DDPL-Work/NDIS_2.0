@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react'
-import { ArrowLeft, CheckCircle2, Star, RefreshCw, RotateCcw, Clock, Download } from 'lucide-react'
+import { useState, useMemo, useEffect } from 'react'
+import { ArrowLeft, CheckCircle2, Star, RefreshCw, RotateCcw, Clock, Download, ShieldCheck } from 'lucide-react'
 import clsx from 'clsx'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -7,27 +7,28 @@ import Modal from '../../components/ui/Modal'
 import { useAsync } from '../../hooks/useAsync'
 import { useComplaintEngine } from '../../app/store/complaintEngine'
 import { ComplaintRepository } from '../../gis/repositories/ComplaintRepository'
+import { complaintApprovalService } from '../../services/complaintApprovalService'
 import { formatDateTime } from '../../utils/format'
 
 const TABS = ['Overview', 'Timeline', 'Photos', 'Messages', 'Feedback']
 
-const chatLabel = (state) => ({
-  submitted: 'Submitted',
-  assigned: 'Assigned',
-  accepted: 'Accepted',
-  inspection_started: 'Inspection',
-  evidence_uploaded: 'Evidence uploaded',
-  resolved: 'Waiting for Your Review',
-  verification_pending: 'Waiting for Your Review',
-  closed: 'Closed',
-  escalated: 'Escalated',
-  reopened: 'Reopened',
-  transferred: 'Transferred',
-  rejected: 'Rejected',
-}[state] || 'In Progress')
-
-const canFeedback = (state) => ['resolved', 'verification_pending'].includes(state)
-const canReopen = (state) => ['closed', 'resolved', 'verification_pending'].includes(state)
+const chatLabel = (state, isDeptApproved = true) => {
+  if (['resolved', 'verification_pending', 'citizen_confirmation'].includes(state)) {
+    return isDeptApproved ? 'Waiting for Your Review' : 'Pending Dept Approval'
+  }
+  return {
+    submitted: 'Submitted',
+    assigned: 'Assigned',
+    accepted: 'Accepted',
+    inspection_started: 'Inspection',
+    evidence_uploaded: 'Evidence uploaded',
+    closed: 'Closed',
+    escalated: 'Escalated',
+    reopened: 'Reopened',
+    transferred: 'Transferred',
+    rejected: 'Rejected',
+  }[state] || 'In Progress'
+}
 
 export default function CitizenComplaintDetail({ complaintId, onClose, fullscreen = false }) {
   const [tab, setTab] = useState('Overview')
@@ -44,6 +45,35 @@ export default function CitizenComplaintDetail({ complaintId, onClose, fullscree
   const detail = useAsync(() => ComplaintRepository.detail(complaintId), [complaintId])
   const history = useAsync(() => ComplaintRepository.timeline(complaintId), [complaintId])
   const complaint = detail.data
+
+  const [approvalInfo, setApprovalInfo] = useState(() => complaintApprovalService.isWorkApproved(complaintId, complaint))
+
+  useEffect(() => {
+    if (complaint) {
+      setApprovalInfo(complaintApprovalService.isWorkApproved(complaint.id, complaint))
+    }
+  }, [complaint])
+
+  useEffect(() => {
+    const onApproved = (e) => {
+      if (String(e.detail?.complaintId) === String(complaintId)) {
+        setApprovalInfo({ approved: true, ...e.detail })
+        detail.refetch()
+      }
+    }
+    const onRework = (e) => {
+      if (String(e.detail?.complaintId) === String(complaintId)) {
+        setApprovalInfo({ approved: false })
+        detail.refetch()
+      }
+    }
+    window.addEventListener('ndisp:complaint-approved', onApproved)
+    window.addEventListener('ndisp:complaint-rework-requested', onRework)
+    return () => {
+      window.removeEventListener('ndisp:complaint-approved', onApproved)
+      window.removeEventListener('ndisp:complaint-rework-requested', onRework)
+    }
+  }, [complaintId, detail])
 
   const timeline = useMemo(() => {
     const rows = Array.isArray(history.data) ? history.data : []
@@ -88,16 +118,20 @@ export default function CitizenComplaintDetail({ complaintId, onClose, fullscree
     } catch (error) { setActionError(error) } finally { setSaving(false) }
   }
 
-  const allowFeedback = complaint && canFeedback(complaint.state)
+  const isResolvedState = ['resolved', 'verification_pending', 'citizen_confirmation'].includes(complaint?.state)
+  const isDeptApproved = Boolean(approvalInfo?.approved)
+  // New Flow: Citizen feedback option ONLY opens after department head or officer approves the work!
+  const allowFeedback = complaint && isResolvedState && isDeptApproved
+
   const feedbackSubmitted = feedbackSent || complaint?.rating != null
   const evidence = Array.isArray(complaint?.evidences) ? complaint.evidences : []
-  const showReopenButton = complaint && canReopen(complaint.state)
+  const showReopenButton = complaint && (['closed', 'resolved', 'verification_pending'].includes(complaint.state) && (isDeptApproved || complaint.state === 'closed'))
   const canEscalate = complaint?.slaDueAt && new Date(complaint.slaDueAt) < new Date()
 
   return (
     <div
       id="citizen-complaint-sheet"
-      className={fullscreen ? 'fixed inset-0 z-[180] flex h-dvh flex-col bg-white' : 'card bg-white rounded-2xl overflow-hidden max-h-[88vh] flex flex-col'}
+      className={fullscreen ? 'fixed inset-0 z-[180] flex h-dvh flex-col bg-white' : 'flex flex-col bg-white rounded-2xl overflow-hidden max-h-[85vh]'}
     >
       <header className={clsx('flex shrink-0 justify-between gap-3 bg-ink-950 text-white', fullscreen ? 'px-4 pb-4 pt-[calc(14px+var(--safe-top))]' : 'p-4')}>
         <div className="flex min-w-0 items-center gap-2">
@@ -112,18 +146,22 @@ export default function CitizenComplaintDetail({ complaintId, onClose, fullscree
             </button>
           )}
           <div className="min-w-0">
-            <h2 className="truncate font-semibold">{complaint?.title || 'Complaint details'}</h2>
-            <p className="mt-1 font-mono text-xs text-ink-300">Tracking number: {complaint?.trackingCode || complaint?.id || '—'}</p>
+            <h2 className="truncate font-semibold text-[15px]">{complaint?.title || 'Complaint details'}</h2>
+            <p className="mt-0.5 font-mono text-xs text-ink-300">Tracking number: {complaint?.trackingCode || complaint?.id || '—'}</p>
           </div>
         </div>
         <div className="flex shrink-0 items-start gap-2">
-          {complaint && <Badge tone={complaint.state === 'closed' ? 'positive' : complaint.state === 'rejected' || complaint.state === 'escalated' ? 'negative' : 'info'}>{chatLabel(complaint.state)}</Badge>}
+          {complaint && (
+            <Badge tone={complaint.state === 'closed' ? 'positive' : isResolvedState && !isDeptApproved ? 'warning' : complaint.state === 'rejected' || complaint.state === 'escalated' ? 'negative' : 'info'}>
+              {chatLabel(complaint.state, isDeptApproved)}
+            </Badge>
+          )}
           {onClose && (
             <button
               type="button"
               onClick={onClose}
               aria-label="Close"
-              className={fullscreen ? 'grid h-11 w-11 shrink-0 place-items-center rounded-lg text-ink-300 transition-colors hover:bg-white/10 hover:text-white' : 'text-lg leading-none text-ink-300 hover:text-white'}
+              className={fullscreen ? 'grid h-11 w-11 shrink-0 place-items-center rounded-lg text-ink-300 transition-colors hover:bg-white/10 hover:text-white' : 'text-lg leading-none text-ink-300 hover:text-white p-1'}
             >
               ×
             </button>
@@ -154,12 +192,29 @@ export default function CitizenComplaintDetail({ complaintId, onClose, fullscree
         {/* OVERVIEW */}
         {tab === 'Overview' && (
           <>
+            {isResolvedState && !isDeptApproved && (
+              <div className="p-3.5 rounded-xl border border-amber-200 bg-amber-50/80 flex items-start gap-2.5">
+                <Clock size={16} className="text-amber-600 mt-0.5 shrink-0" />
+                <div className="text-[12.5px] text-amber-900 leading-snug">
+                  <strong>Work Done — Pending Department Approval:</strong> The field team completed the work. The Department Head is reviewing the resolution before citizen sign-off.
+                </div>
+              </div>
+            )}
+            {isResolvedState && isDeptApproved && (
+              <div className="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/80 flex items-start gap-2.5">
+                <CheckCircle2 size={16} className="text-emerald-600 mt-0.5 shrink-0" />
+                <div className="text-[12.5px] text-emerald-900 leading-snug">
+                  <strong>Resolution Approved by Department:</strong> Work has been verified and approved by {approvalInfo?.approvedBy || 'Department Head'}. You can submit your feedback in the Feedback tab.
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-3">
               <div className="p-3 bg-ink-50 rounded-xl flex items-start gap-2">
                 <Clock size={15} className="text-saffron-600 mt-0.5 shrink-0" />
                 <div>
                   <span className="text-xs text-ink-400 block">Current status</span>
-                  <b>{chatLabel(complaint.state)}</b>
+                  <b>{chatLabel(complaint.state, isDeptApproved)}</b>
                 </div>
               </div>
               <div className="p-3 bg-ink-50 rounded-xl flex items-start gap-2">
@@ -295,22 +350,52 @@ export default function CitizenComplaintDetail({ complaintId, onClose, fullscree
         {/* FEEDBACK */}
         {tab === 'Feedback' && (
           <>
-            {!allowFeedback && complaint.state !== 'closed' && complaint.state !== 'reopened' && (
-              <p className="text-ink-500">Feedback will be enabled once the work is resolved on the backend.</p>
+            {!allowFeedback && isResolvedState && !isDeptApproved && (
+              <div className="p-4 rounded-xl bg-amber-50 border border-amber-200/90 space-y-2.5">
+                <div className="flex items-center gap-2 text-amber-950 font-semibold text-[13.5px]">
+                  <Clock size={18} className="text-amber-600 shrink-0" />
+                  <span>Work Completed · Awaiting Department Head Approval</span>
+                </div>
+                <p className="text-[12.5px] text-amber-800 leading-relaxed">
+                  The assigned field inspector has completed the repair work and uploaded on-site verification evidence. The resolution is currently under review by the Department Head / Officer.
+                </p>
+                <div className="p-3 bg-white/80 rounded-lg border border-amber-200/70 text-[12px] text-amber-900 font-medium">
+                  Citizen review and feedback submission will open automatically here once the Department Head approves the resolution.
+                </div>
+              </div>
+            )}
+
+            {!allowFeedback && !isResolvedState && complaint.state !== 'closed' && complaint.state !== 'reopened' && (
+              <p className="text-ink-500">Feedback will be enabled once the repair work is completed and approved by the department.</p>
             )}
 
             {!allowFeedback && complaint.state === 'reopened' && (
               <div className="p-4 rounded-xl bg-saffron-50 border border-saffron-200 space-y-1">
                 <b className="flex gap-2 items-center text-sm text-saffron-800"><RotateCcw size={16} className="shrink-0" /> Your complaint has been reopened.</b>
-                <p className="text-xs text-ink-600">The department is working on it again. Feedback will be enabled once the re-inspection is resolved and forwarded to you.</p>
+                <p className="text-xs text-ink-600">The department is working on it again. Feedback will be enabled once the re-inspection is resolved and approved by the department.</p>
               </div>
             )}
 
             {allowFeedback && (
               <div className="space-y-4">
+                <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl space-y-1">
+                  <div className="flex items-center gap-2 text-[13px] font-semibold text-emerald-950">
+                    <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                    <span>Work Approved by Department {approvalInfo?.approvedBy ? `(${approvalInfo.approvedBy})` : ''}</span>
+                  </div>
+                  <p className="text-[12px] text-emerald-800">
+                    The department head has verified and approved the work. Please confirm if the issue is resolved and rate your experience.
+                  </p>
+                  {approvalInfo?.remarks && (
+                    <p className="text-[11.5px] text-emerald-700 mt-1 bg-white/80 p-2 rounded-lg border border-emerald-200/60 font-mono">
+                      Department Remarks: “{approvalInfo.remarks}”
+                    </p>
+                  )}
+                </div>
+
                 <div>
                   <b>Have you verified that the issue is resolved?</b>
-                  <p className="text-xs text-ink-500 mt-1">Your feedback is sent to the backend workflow.</p>
+                  <p className="text-xs text-ink-500 mt-1">Your feedback is sent directly to the district administration.</p>
                 </div>
 
                 <div>

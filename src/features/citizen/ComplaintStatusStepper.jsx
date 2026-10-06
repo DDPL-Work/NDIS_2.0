@@ -1,7 +1,8 @@
 import clsx from 'clsx'
-import { AlertTriangle, ArrowLeftRight, CheckCircle2, RefreshCw, XCircle } from 'lucide-react'
+import { AlertTriangle, ArrowLeftRight, CheckCircle2, Clock, RefreshCw, XCircle } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import { COMPLAINT_STATE_LABELS } from '../../config/constants'
+import { isWorkApproved } from '../../services/complaintApprovalService'
 
 // Citizen status stepper.  Built ONLY from the real backend complaint workflow
 // states (complaintMapper): the vertical timeline walks the actual mainline
@@ -51,14 +52,22 @@ const COMPACT = [
   { label: 'Closed', hint: 'Confirmed by you' },
 ]
 
-export function complaintStateLabel(state) {
+export function complaintStateLabel(state, complaint = null) {
   if (!state) return 'Submitted'
+  if ((state === 'resolved' || state === 'verification_pending') && complaint) {
+    const approval = isWorkApproved(complaint.id || complaint._id, complaint)
+    if (!approval.approved) {
+      return 'Pending Dept Approval'
+    }
+  }
   return COMPLAINT_STATE_LABELS[state] || SIDE_STATES[state]?.label || String(state).replace(/_/g, ' ')
 }
 
-export default function ComplaintStatusStepper({ state, size = 'full', className = '' }) {
+export default function ComplaintStatusStepper({ state, complaint = null, size = 'full', className = '' }) {
   const side = SIDE_STATES[state]
   const rank = RANK[state] ?? 0
+  const isResolvedOrVerif = state === 'resolved' || state === 'verification_pending'
+  const isPendingApproval = isResolvedOrVerif && complaint ? !isWorkApproved(complaint.id || complaint._id, complaint).approved : false
 
   if (size === 'full') {
     return (
@@ -69,9 +78,21 @@ export default function ComplaintStatusStepper({ state, size = 'full', className
           </li>
         )}
         {MAINLINE.map((entry, index) => {
+          const isResolvedEntry = entry === 'resolved'
           const completed = rank > index
           const current = rank === index
           const upcoming = !completed && !current
+
+          let displayLabel = COMPLAINT_STATE_LABELS[entry] || String(entry).replace(/_/g, ' ')
+          let statusSubtext = current ? 'Current status' : null
+
+          if (isResolvedEntry && isPendingApproval) {
+            displayLabel = 'Pending Dept Approval'
+            if (current) {
+              statusSubtext = 'Awaiting department officer approval before feedback'
+            }
+          }
+
           return (
             <li key={entry} className="relative flex gap-3 pb-5 last:pb-0">
               {index < MAINLINE.length - 1 && (
@@ -92,9 +113,9 @@ export default function ComplaintStatusStepper({ state, size = 'full', className
               </span>
               <span className="min-w-0 pt-0.5">
                 <span className={clsx('block text-[13px] font-semibold leading-snug', current ? 'text-ink-950' : completed ? 'text-ink-800' : 'text-ink-400')}>
-                  {COMPLAINT_STATE_LABELS[entry] || String(entry).replace(/_/g, ' ')}
+                  {displayLabel}
                 </span>
-                {current && <span className="text-[10.5px] font-semibold uppercase tracking-wide text-saffron-700">Current status</span>}
+                {statusSubtext && <span className="text-[10.5px] font-semibold uppercase tracking-wide text-saffron-700">{statusSubtext}</span>}
               </span>
             </li>
           )
@@ -104,8 +125,13 @@ export default function ComplaintStatusStepper({ state, size = 'full', className
   }
 
   // Compact: five citizen-friendly dots over the real workflow.
+  const currentStageIndex = Math.max(0, Math.min(rank, COMPACT.length - 1))
+  const isCompactResolved = currentStageIndex === 3 && isPendingApproval
+  const compactLabel = isCompactResolved ? 'Pending Approval' : COMPACT[currentStageIndex].label
+  const compactHint = isCompactResolved ? 'Awaiting department sign-off' : COMPACT[currentStageIndex].hint
+
   return (
-    <div className={clsx(className)} role="img" aria-label={`Status: ${complaintStateLabel(state)}`}>
+    <div className={clsx(className)} role="img" aria-label={`Status: ${complaintStateLabel(state, complaint)}`}>
       <ol className="flex items-center">
         {COMPACT.map((stage, index) => {
           const completed = rank > index
@@ -129,8 +155,8 @@ export default function ComplaintStatusStepper({ state, size = 'full', className
           )
         })}
       </ol>
-      <p className="mt-1.5 text-[11px] font-semibold text-ink-800">{COMPACT[Math.max(0, Math.min(rank, COMPACT.length - 1))].label}</p>
-      <p className="text-[10.5px] text-ink-500">{COMPACT[Math.max(0, Math.min(rank, COMPACT.length - 1))].hint}</p>
+      <p className="mt-1.5 text-[11px] font-semibold text-ink-800">{compactLabel}</p>
+      <p className="text-[10.5px] text-ink-500">{compactHint}</p>
     </div>
   )
 }

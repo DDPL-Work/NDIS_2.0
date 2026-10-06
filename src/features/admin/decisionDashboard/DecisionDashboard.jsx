@@ -204,9 +204,11 @@ export default function DecisionDashboard() {
       </div>
 
       {/* Complaint detail drill-down */}
-      {complaintToOpen && (
-        <ComplaintDetailHub complaintId={complaintToOpen} onClose={() => setComplaintToOpen(null)} />
-      )}
+      <Modal open={Boolean(complaintToOpen)} onClose={() => setComplaintToOpen(null)} width="max-w-4xl" frameless scrollBody={false}>
+        {complaintToOpen && (
+          <ComplaintDetailHub complaintId={complaintToOpen} onClose={() => setComplaintToOpen(null)} />
+        )}
+      </Modal>
 
       {/* Proposal drill-down */}
       {proposalToOpen && (

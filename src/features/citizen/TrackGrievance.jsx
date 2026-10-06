@@ -132,9 +132,9 @@ export default function TrackGrievance() {
 
           <div className="mt-5 rounded-xl border border-ink-100 p-4">
             <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-400">
-              Status · {complaintStateLabel(result.state)}
+              Status · {complaintStateLabel(result.state, result)}
             </p>
-            <ComplaintStatusStepper state={result.state} size="full" />
+            <ComplaintStatusStepper state={result.state} complaint={result} size="full" />
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2">
@@ -147,7 +147,7 @@ export default function TrackGrievance() {
         isMobile ? (
           <CitizenComplaintDetail fullscreen complaintId={result.id} onClose={() => setDetailOpen(false)} />
         ) : (
-          <Modal open={detailOpen} onClose={() => setDetailOpen(false)} width="max-w-3xl">
+          <Modal open={detailOpen} onClose={() => setDetailOpen(false)} width="max-w-3xl" frameless scrollBody={false}>
             <CitizenComplaintDetail complaintId={result.id} onClose={() => setDetailOpen(false)} />
           </Modal>
         )

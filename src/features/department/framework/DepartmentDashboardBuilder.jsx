@@ -130,7 +130,7 @@ export default function DepartmentDashboardBuilder() {
         }
       </div>
 
-      <Modal open={!!selectedTicketId} onClose={() => setSelectedTicketId(null)} width="max-w-4xl" scrollBody={false}>
+      <Modal open={!!selectedTicketId} onClose={() => setSelectedTicketId(null)} width="max-w-4xl" frameless scrollBody={false}>
         {selectedTicketId && <ComplaintDetailHub complaintId={selectedTicketId} onClose={() => setSelectedTicketId(null)} />}
       </Modal>
     </div>

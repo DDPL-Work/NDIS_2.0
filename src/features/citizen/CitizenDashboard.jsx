@@ -248,14 +248,14 @@ export default function CitizenDashboard() {
                 </p>
               </div>
               <span className="h-fit rounded-full bg-ink-100 px-2.5 py-1 text-[11px] font-semibold text-ink-700">
-                {complaintStateLabel(complaint.state)}
+                {complaintStateLabel(complaint.state, complaint)}
               </span>
             </div>
             {complaint.description && (
               <p className="mt-2 text-[13px] leading-relaxed text-ink-600 line-clamp-2">{complaint.description}</p>
             )}
             <div className="mt-3 grid items-end gap-3 sm:grid-cols-[1fr_auto]">
-              <ComplaintStatusStepper state={complaint.state} size="compact" />
+              <ComplaintStatusStepper state={complaint.state} complaint={complaint} size="compact" />
               <div className="flex items-center gap-2">
                 {complaint.slaDueAt && (
                   <span className="mr-1 hidden text-[11px] text-ink-500 md:inline">Expected update: {new Date(complaint.slaDueAt).toLocaleDateString()}</span>
@@ -269,7 +269,7 @@ export default function CitizenDashboard() {
         {!loading && !error && <Pagination page={page} pageCount={pageCount} pageSize={pageSize} total={total} onChange={setPage} />}
       </section>
 
-      <Modal open={!!selectedId} onClose={() => setSelectedId(null)} width="max-w-3xl">
+      <Modal open={!!selectedId} onClose={() => setSelectedId(null)} width="max-w-3xl" frameless scrollBody={false}>
         {selectedId && <CitizenComplaintDetail complaintId={selectedId} onClose={() => setSelectedId(null)} />}
       </Modal>
     </div>

@@ -331,6 +331,7 @@ export default function CollectorExecutiveDashboard() {
         open={!!selectedComplaintId}
         onClose={() => setSelectedComplaintId(null)}
         width="max-w-4xl"
+        frameless
         scrollBody={false}
       >
         {selectedComplaintId && (
